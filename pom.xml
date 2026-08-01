@@ -61,7 +61,7 @@
 
                 <configuration>
 
-                    <mainClass>${mainClass}</mainClass>
+                    <mainClass>om.university.App</mainClass>
 
                 </configuration>
 
