@@ -1,4 +1,7 @@
 module com.university {
     requires javafx.controls;
-    exports com.university to javafx.graphics;
+    requires javafx.fxml;
+
+    opens com.university to javafx.fxml;
+    exports com.university;
 }

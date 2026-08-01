@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.TestPageController"
+      alignment="CENTER"
+      spacing="16.0"
+      prefWidth="640.0"
+      prefHeight="480.0"
+      styleClass="root-pane"
+      stylesheets="@testpage.css">
+
+    <Label fx:id="titleLabel" text="University System" styleClass="title-label" />
+
+    <Label fx:id="subtitleLabel" text="This is a test page." styleClass="subtitle-label" />
+
+    <Button fx:id="continueButton" text="Continue" styleClass="primary-button"
+            onAction="#handleContinue" />
+
+</VBox>
