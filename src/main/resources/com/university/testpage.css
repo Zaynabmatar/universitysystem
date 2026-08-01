@@ -1,0 +1,38 @@
+/* Test page theme: clean blue and white. */
+
+.root-pane {
+    -fx-background-color: #ffffff;
+    -fx-padding: 40px;
+}
+
+.title-label {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1565c0;
+}
+
+.subtitle-label {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 16px;
+    -fx-text-fill: #5b6b7c;
+}
+
+.primary-button {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+    -fx-background-color: #1976d2;
+    -fx-background-radius: 6px;
+    -fx-padding: 10px 32px;
+    -fx-cursor: hand;
+}
+
+.primary-button:hover {
+    -fx-background-color: #1565c0;
+}
+
+.primary-button:pressed {
+    -fx-background-color: #0d47a1;
+}

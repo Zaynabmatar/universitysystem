@@ -1,0 +1,64 @@
+/* Login page theme: clean blue and white. */
+
+.root-pane {
+    -fx-background-color: #ffffff;
+}
+
+.title-label {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1565c0;
+}
+
+.subtitle-label {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 15px;
+    -fx-text-fill: #5b6b7c;
+}
+
+.field-label {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 14px;
+    -fx-text-fill: #33404d;
+}
+
+.form-grid .text-field,
+.form-grid .password-field {
+    -fx-font-size: 14px;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #bfd4e8;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 10px;
+}
+
+.form-grid .text-field:focused,
+.form-grid .password-field:focused {
+    -fx-border-color: #1976d2;
+}
+
+.primary-button {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+    -fx-background-color: #1976d2;
+    -fx-background-radius: 6px;
+    -fx-padding: 10px 40px;
+    -fx-cursor: hand;
+}
+
+.primary-button:hover {
+    -fx-background-color: #1565c0;
+}
+
+.primary-button:pressed {
+    -fx-background-color: #0d47a1;
+}
+
+.status-label {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 13px;
+    -fx-text-fill: #c62828;
+}
