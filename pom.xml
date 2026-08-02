@@ -36,6 +36,14 @@
             <version>13.4.0.jre11</version>
         </dependency>
 
+        <!-- Password hashing. The users table stores BCrypt hashes, never
+             plain text, so signing in needs this to verify them. -->
+        <dependency>
+            <groupId>org.mindrot</groupId>
+            <artifactId>jbcrypt</artifactId>
+            <version>0.4</version>
+        </dependency>
+
     </dependencies>
 
     <build>
