@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.AdminDashboardController"
+      styleClass="content-page" spacing="10">
+    <Label fx:id="titleLabel" text="Admin Dashboard" styleClass="page-title"/>
+    <Label fx:id="welcomeLabel" styleClass="muted-text"/>
+    <Label text="KPI cards and charts are built in Phase 14." styleClass="muted-text"/>
+</VBox>

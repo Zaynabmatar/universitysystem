@@ -50,8 +50,8 @@ public class AuthService {
             throw new ServiceException(SIGN_IN_FAILED);
         }
         if (!user.isActive()) {
-            throw new ServiceException("This account has been disabled. "
-                    + "Please contact the administration.");
+            throw new ServiceException("This account has been deactivated. "
+                    + "Please contact the registrar.");
         }
 
         Student student = null;
