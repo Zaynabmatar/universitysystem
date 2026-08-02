@@ -76,6 +76,35 @@ public class CoursePrerequisiteDAO extends AbstractDAO implements GenericDAO<Cou
                 CourseDAO::mapRow, courseId);
     }
 
+    /**
+     * The prerequisites of a course the student has not yet satisfied.
+     *
+     * <p>A prerequisite counts as met only when the student passed that
+     * course with at least the grade points the link demands, and the grade
+     * has been published. Doing this in one statement keeps the rule in step
+     * with the data: reading the pieces separately would let a grade change
+     * between the read and the decision.</p>
+     *
+     * @return the courses still outstanding, empty when the student may enrol
+     */
+    public List<Course> findUnmetPrerequisiteCourses(int studentId, int courseId) {
+        return queryList("SELECT c.course_id, c.course_code, c.course_title, c.description, "
+                        + "c.credits, c.dept_id, c.level_year, c.is_active "
+                        + "FROM dbo.course_prerequisites p "
+                        + "INNER JOIN dbo.courses c ON c.course_id = p.prerequisite_course_id "
+                        + "WHERE p.course_id = ? AND NOT EXISTS ("
+                        + "    SELECT 1 FROM dbo.enrollments e "
+                        + "    INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                        + "    INNER JOIN dbo.grades g ON g.enrollment_id = e.enrollment_id "
+                        + "    WHERE e.student_id = ? "
+                        + "      AND s.course_id = p.prerequisite_course_id "
+                        + "      AND g.is_submitted = 1 "
+                        + "      AND g.result_status = 'PASSED' "
+                        + "      AND g.grade_points >= p.min_grade_points) "
+                        + "ORDER BY c.course_code",
+                CourseDAO::mapRow, courseId, studentId);
+    }
+
     /** True when the course has no prerequisites at all. */
     public boolean hasNoPrerequisites(int courseId) {
         return queryInt("SELECT COUNT(*) FROM dbo.course_prerequisites WHERE course_id = ?",

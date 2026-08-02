@@ -3,6 +3,7 @@ module com.university {
     requires javafx.fxml;
     requires java.sql;
     requires com.microsoft.sqlserver.jdbc;
+    requires jbcrypt;
 
     opens com.university to javafx.fxml;
     exports com.university;
