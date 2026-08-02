@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.InstructorDashboardController"
+      styleClass="content-page" spacing="10">
+    <Label fx:id="titleLabel" text="Instructor Dashboard" styleClass="page-title"/>
+    <Label fx:id="welcomeLabel" styleClass="muted-text"/>
+    <Label text="Your sections and grade entry are built in Phase 11." styleClass="muted-text"/>
+</VBox>

@@ -124,6 +124,22 @@ public final class Session {
     }
 
     /**
+     * Defence in depth: a screen calls this in its {@code initialize()} so that
+     * even if a menu item leaks, the data does not.
+     *
+     * @throws SecurityException when the signed-in role is not one of {@code allowed}
+     */
+    public void requireRole(UserRole... allowed) {
+        for (UserRole candidate : allowed) {
+            if (getRole() == candidate) {
+                return;
+            }
+        }
+        throw new SecurityException(
+                "Your role (" + getRole() + ") is not allowed to open this screen.");
+    }
+
+    /**
      * Stops anybody but an administrator going further.
      *
      * @throws ServiceException when the signed-in account is not an administrator
