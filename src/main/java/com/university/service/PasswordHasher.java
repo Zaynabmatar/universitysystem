@@ -9,11 +9,10 @@ import org.mindrot.jbcrypt.BCrypt;
  * exists only inside the sign-in call and is never stored, logged or put in
  * an exception message.</p>
  *
- * <p><strong>The sample data will not sign in.</strong> The hashes shipped in
- * {@code universitymanagmentDB.sql} are placeholders in BCrypt shape that
- * match no password at all, which the file says at line 1017. Run
- * {@link #main} to print real hashes and paste them into the {@code users}
- * table yourself.</p>
+ * <p>The hashes shipped in {@code universitymanagmentDB.sql} are real BCrypt
+ * hashes of each sample user's default password ({@code <user_id>@iuL}), so
+ * the sample data signs in out of the box. {@link #main} remains available
+ * for printing a hash of any other password to paste in by hand.</p>
  */
 public final class PasswordHasher {
 
@@ -42,6 +41,28 @@ public final class PasswordHasher {
                     "Password must be at least " + MINIMUM_LENGTH + " characters.");
         }
         return BCrypt.hashpw(plainPassword, BCrypt.gensalt(COST));
+    }
+
+    /**
+     * The mandatory initial password for a given User ID: {@code <userId>@iuL}.
+     *
+     * <p>Assigned automatically to every account, existing or new, so nobody
+     * ever types a password of their own choosing until they change it.</p>
+     */
+    public static String defaultPasswordFor(int userId) {
+        return userId + "@iuL";
+    }
+
+    /**
+     * Hashes the mandatory initial password for a User ID.
+     *
+     * <p>Bypasses the {@link #MINIMUM_LENGTH} check that {@link #hash} applies
+     * to a person's own choice of password: a small User ID (e.g. {@code 4})
+     * produces a short but fixed, non-negotiable value ({@code 4@iuL}), and
+     * that format is the whole point of this rule.</p>
+     */
+    public static String hashDefaultPassword(int userId) {
+        return BCrypt.hashpw(defaultPasswordFor(userId), BCrypt.gensalt(COST));
     }
 
     /**
