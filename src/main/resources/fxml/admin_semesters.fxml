@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.AdminSemestersController"
+      styleClass="content-page" spacing="12">
+
+    <Label text="Manage Semesters" styleClass="page-title"/>
+    <Label text="A semester is the clock of the system: every rule about WHEN something is allowed reads its dates from here."
+           styleClass="muted-text"/>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label fx:id="currentLabel" styleClass="current-semester-banner"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="countLabel" styleClass="muted-text"/>
+    </HBox>
+
+    <TableView fx:id="semesterTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="colCurrent"     text="Current"             prefWidth="90"/>
+            <TableColumn fx:id="colName"        text="Semester"            prefWidth="120"/>
+            <TableColumn fx:id="colYear"        text="Academic Year"       prefWidth="110"/>
+            <TableColumn fx:id="colTerm"        text="Term"                prefWidth="80"/>
+            <TableColumn fx:id="colTermDates"   text="Term Dates"          prefWidth="210"/>
+            <TableColumn fx:id="colRegWindow"   text="Registration Window" prefWidth="260"/>
+            <TableColumn fx:id="colRegState"    text="Registration"        prefWidth="150"/>
+            <TableColumn fx:id="colDropWindow"  text="Drop / Withdraw"     prefWidth="230"/>
+            <TableColumn fx:id="colGradeWindow" text="Grade Entry"         prefWidth="200"/>
+            <TableColumn fx:id="colSections"    text="Sections"            prefWidth="80"/>
+        </columns>
+    </TableView>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <padding><Insets top="4" right="0" bottom="0" left="0"/></padding>
+        <Button text="Add Semester"          onAction="#handleAdd"/>
+        <Button fx:id="editButton"       text="Edit"                            onAction="#handleEdit"/>
+        <Button fx:id="setCurrentButton" text="Make This The Current Semester"  onAction="#handleSetCurrent"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Refresh" onAction="#handleRefresh"/>
+    </HBox>
+</VBox>

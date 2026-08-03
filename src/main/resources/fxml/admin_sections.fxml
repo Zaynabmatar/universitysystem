@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.AdminSectionsController"
+      styleClass="content-page" spacing="12">
+
+    <Label text="Manage Sections" styleClass="page-title"/>
+    <Label text="A section is ONE offering of ONE course in ONE semester. Students register for sections, never for courses."
+           styleClass="muted-text"/>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <ComboBox fx:id="semesterFilter"   prefWidth="170"/>
+        <ComboBox fx:id="courseFilter"     promptText="All courses"     prefWidth="220"/>
+        <ComboBox fx:id="instructorFilter" promptText="All instructors" prefWidth="190"/>
+        <ComboBox fx:id="statusFilter"     promptText="All statuses"    prefWidth="130"/>
+        <TextField fx:id="searchField"     promptText="Search code, title or room" prefWidth="200"/>
+        <Button text="Clear filters" onAction="#handleClearFilters"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="countLabel" styleClass="muted-text"/>
+    </HBox>
+
+    <TableView fx:id="sectionTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="colCourse"     text="Course"          prefWidth="90"/>
+            <TableColumn fx:id="colTitle"      text="Title"           prefWidth="180"/>
+            <TableColumn fx:id="colSection"    text="Sec."            prefWidth="50"/>
+            <TableColumn fx:id="colSemester"   text="Semester"        prefWidth="100"/>
+            <TableColumn fx:id="colInstructor" text="Instructor"      prefWidth="150"/>
+            <TableColumn fx:id="colRoom"       text="Room"            prefWidth="70"/>
+            <TableColumn fx:id="colSchedule"   text="Weekly Schedule" prefWidth="230"/>
+            <TableColumn fx:id="colSeats"      text="Seats"           prefWidth="75"/>
+            <TableColumn fx:id="colFill"       text="Fill"            prefWidth="100"/>
+            <TableColumn fx:id="colStatus"     text="Status"          prefWidth="90"/>
+        </columns>
+    </TableView>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <padding><Insets top="4" right="0" bottom="0" left="0"/></padding>
+        <Button text="Add Section"       onAction="#handleAdd"/>
+        <Button fx:id="editButton"   text="Edit"           onAction="#handleEdit"/>
+        <Button fx:id="cancelButton" text="Cancel Section" onAction="#handleCancel"/>
+        <Button fx:id="reopenButton" text="Re-open"        onAction="#handleReopen"/>
+        <Button fx:id="deleteButton" text="Delete"         onAction="#handleDelete"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Refresh" onAction="#handleRefresh"/>
+    </HBox>
+</VBox>
