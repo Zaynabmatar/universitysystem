@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.AdminCoursesController"
+      styleClass="content-page" spacing="12">
+
+    <Label text="Manage Courses" styleClass="page-title"/>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <TextField fx:id="searchField" promptText="Search by code or title" prefWidth="260"/>
+        <ComboBox fx:id="departmentFilter" promptText="All departments" prefWidth="200"/>
+        <ComboBox fx:id="yearFilter"       promptText="All years"       prefWidth="130"/>
+        <CheckBox fx:id="activeOnlyCheck" text="Active courses only"/>
+        <Button text="Clear filters" onAction="#handleClearFilters"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="countLabel" styleClass="muted-text"/>
+    </HBox>
+
+    <TableView fx:id="courseTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="colCode"     text="Code"       prefWidth="90"/>
+            <TableColumn fx:id="colTitle"    text="Title"      prefWidth="240"/>
+            <TableColumn fx:id="colCredits"  text="Credits"    prefWidth="70"/>
+            <TableColumn fx:id="colDept"     text="Department" prefWidth="100"/>
+            <TableColumn fx:id="colYear"     text="Year"       prefWidth="60"/>
+            <TableColumn fx:id="colPrereq"   text="Requires"   prefWidth="80"/>
+            <TableColumn fx:id="colUnlocks"  text="Unlocks"    prefWidth="80"/>
+            <TableColumn fx:id="colState"    text="State"      prefWidth="90"/>
+        </columns>
+    </TableView>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Button text="Add Course"        onAction="#handleAdd"/>
+        <Button fx:id="editButton"       text="Edit"        onAction="#handleEdit"/>
+        <Button fx:id="deactivateButton" text="Deactivate"  onAction="#handleDeactivate"/>
+        <Button fx:id="reactivateButton" text="Reactivate"  onAction="#handleReactivate"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Refresh" onAction="#handleRefresh"/>
+    </HBox>
+</VBox>

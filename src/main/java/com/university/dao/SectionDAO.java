@@ -99,6 +99,13 @@ public class SectionDAO extends AbstractDAO implements GenericDAO<Section> {
                 + "ORDER BY course_id, section_number", MAPPER, semesterId);
     }
 
+    /** Open sections a course has in the current semester — used to warn before deactivating it. */
+    public int countOpenInCurrentSemester(int courseId) {
+        return queryInt("SELECT COUNT(*) FROM dbo.sections s "
+                + "INNER JOIN dbo.semesters sem ON sem.semester_id = s.semester_id "
+                + "WHERE s.course_id = ? AND sem.is_current = 1 AND s.status = 'OPEN'", courseId);
+    }
+
     /**
      * Moves the cached seat counter and refuses to take it below zero or
      * above capacity.
