@@ -90,6 +90,11 @@ public class StudentDAO extends AbstractDAO implements GenericDAO<Student> {
         return queryOne(SELECT + " WHERE student_number = ?", MAPPER, studentNumber);
     }
 
+    /** Finds a student by their email address, which is also unique. */
+    public Optional<Student> findByEmail(String email) {
+        return queryOne(SELECT + " WHERE email = ?", MAPPER, email);
+    }
+
     /** Every student enrolled on one degree plan. */
     public List<Student> findByProgram(int programId) {
         return queryList(SELECT + " WHERE program_id = ? ORDER BY student_number", MAPPER, programId);
