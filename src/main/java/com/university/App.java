@@ -40,6 +40,11 @@ public class App extends Application {
         primaryStage.centerOnScreen();
     }
 
+    @Override
+    public void stop() {
+        DBConnection.shutdown();
+    }
+
     public static void main(String[] args) {
         Launcher.main(args);
     }
