@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.AdminInstructorsController"
+      styleClass="content-page" spacing="12">
+
+    <Label text="Manage Instructors" styleClass="page-title"/>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <TextField fx:id="searchField" promptText="Search by employee no., name or email" prefWidth="280"/>
+        <ComboBox fx:id="departmentFilter" promptText="All departments" prefWidth="200"/>
+        <ComboBox fx:id="rankFilter"       promptText="All ranks"       prefWidth="180"/>
+        <Button text="Clear filters" onAction="#handleClearFilters"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="countLabel" styleClass="muted-text"/>
+    </HBox>
+
+    <TableView fx:id="instructorTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="colNumber"     text="Employee No." prefWidth="110"/>
+            <TableColumn fx:id="colName"       text="Name"         prefWidth="180"/>
+            <TableColumn fx:id="colEmail"      text="Email"        prefWidth="210"/>
+            <TableColumn fx:id="colPhone"      text="Phone"        prefWidth="120"/>
+            <TableColumn fx:id="colDepartment" text="Department"   prefWidth="110"/>
+            <TableColumn fx:id="colRank"       text="Rank"         prefWidth="150"/>
+            <TableColumn fx:id="colHireDate"   text="Hire Date"    prefWidth="100"/>
+            <TableColumn fx:id="colActive"     text="Account"      prefWidth="100"/>
+        </columns>
+    </TableView>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Button fx:id="addButton"        text="Add Instructor"  onAction="#handleAdd"/>
+        <Button fx:id="editButton"       text="Edit"            onAction="#handleEdit"/>
+        <Button fx:id="deactivateButton" text="Deactivate"      onAction="#handleDeactivate"/>
+        <Button fx:id="reactivateButton" text="Reactivate"      onAction="#handleReactivate"/>
+        <Button fx:id="resetPwdButton"   text="Reset Password"  onAction="#handleResetPassword"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Refresh" onAction="#handleRefresh"/>
+    </HBox>
+</VBox>

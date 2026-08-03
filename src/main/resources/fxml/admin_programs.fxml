@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.AdminProgramsController"
+      styleClass="content-page" spacing="12">
+
+    <Label text="Departments &amp; Programs" styleClass="page-title"/>
+
+    <TabPane VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
+        <tabs>
+            <Tab text="Departments">
+                <VBox spacing="12" styleClass="content-page">
+                    <TableView fx:id="departmentTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="deptColCode"     text="Code"     prefWidth="90"/>
+                            <TableColumn fx:id="deptColName"     text="Name"     prefWidth="220"/>
+                            <TableColumn fx:id="deptColPrograms" text="Programs" prefWidth="90"/>
+                            <TableColumn fx:id="deptColCourses"  text="Courses"  prefWidth="90"/>
+                            <TableColumn fx:id="deptColActive"   text="Status"   prefWidth="100"/>
+                        </columns>
+                    </TableView>
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="Add Department"       onAction="#handleAddDepartment"/>
+                        <Button fx:id="deptEditButton"       text="Edit"        onAction="#handleEditDepartment"/>
+                        <Button fx:id="deptDeactivateButton" text="Deactivate"  onAction="#handleDeactivateDepartment"/>
+                        <Button fx:id="deptReactivateButton" text="Reactivate"  onAction="#handleReactivateDepartment"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Refresh" onAction="#handleRefresh"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+            <Tab text="Programs">
+                <VBox spacing="12" styleClass="content-page">
+                    <TableView fx:id="programTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="progColCode"       text="Code"       prefWidth="90"/>
+                            <TableColumn fx:id="progColName"       text="Name"       prefWidth="220"/>
+                            <TableColumn fx:id="progColDepartment" text="Department" prefWidth="100"/>
+                            <TableColumn fx:id="progColDegree"     text="Degree"     prefWidth="90"/>
+                            <TableColumn fx:id="progColCredits"    text="Credits"    prefWidth="80"/>
+                            <TableColumn fx:id="progColActive"     text="Status"     prefWidth="100"/>
+                        </columns>
+                    </TableView>
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="Add Program"           onAction="#handleAddProgram"/>
+                        <Button fx:id="progEditButton"       text="Edit"        onAction="#handleEditProgram"/>
+                        <Button fx:id="progDeactivateButton" text="Deactivate"  onAction="#handleDeactivateProgram"/>
+                        <Button fx:id="progReactivateButton" text="Reactivate"  onAction="#handleReactivateProgram"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Refresh" onAction="#handleRefresh"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+        </tabs>
+    </TabPane>
+</VBox>

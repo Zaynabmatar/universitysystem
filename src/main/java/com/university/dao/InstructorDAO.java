@@ -68,6 +68,11 @@ public class InstructorDAO extends AbstractDAO implements GenericDAO<Instructor>
         return queryOne(SELECT + " WHERE employee_number = ?", MAPPER, employeeNumber);
     }
 
+    /** Finds an instructor by their email address, which is also unique. */
+    public Optional<Instructor> findByEmail(String email) {
+        return queryOne(SELECT + " WHERE email = ?", MAPPER, email);
+    }
+
     /** Every instructor in one department. */
     public List<Instructor> findByDepartment(int departmentId) {
         return queryList(SELECT + " WHERE dept_id = ? ORDER BY last_name, first_name",
