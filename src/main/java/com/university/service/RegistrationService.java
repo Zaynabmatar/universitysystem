@@ -4,13 +4,14 @@ import com.university.dao.AbstractDAO;
 import com.university.dao.CourseDAO;
 import com.university.dao.CoursePrerequisiteDAO;
 import com.university.dao.EnrollmentDAO;
+import com.university.dao.GradeDAO;
 import com.university.dao.SectionDAO;
 import com.university.dao.SectionScheduleDAO;
 import com.university.dao.SemesterDAO;
 import com.university.dao.StudentDAO;
 import com.university.dao.WaitlistDAO;
-import com.university.enums.AcademicStanding;
 import com.university.enums.EnrollmentStatus;
+import com.university.enums.LetterGrade;
 import com.university.enums.NotificationType;
 import com.university.enums.SectionStatus;
 import com.university.enums.WaitlistStatus;
@@ -21,43 +22,40 @@ import com.university.model.Semester;
 import com.university.model.Student;
 import com.university.model.Waitlist;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
- * Registering for classes, leaving them, and the queue for a full one.
+ * Registering for classes, dropping them, and the eight rules that guard the door.
  *
- * <p>Every check here has to pass before a seat is taken: the student is
- * active, the window is open, the course is not already on their list, the
- * prerequisites are behind them, nothing clashes on the timetable, the credit
- * load still fits, and a seat is genuinely free.</p>
+ * <p>Everything here comes from project_details.md Section 6.1 (the eight registration rules,
+ * checked in order and stopping at the first failure), Section 6.2 (the GPA-based credit limit)
+ * and Section 6.4 (the drop/withdraw deadlines). The exact wording of every message is copied
+ * from those sections character for character — the professor reads them off the screen.</p>
  *
- * <p>The last of those is settled by the database rather than by reading a
- * count first. {@code SectionDAO.changeEnrolledCount} raises the counter only
- * while it stays within capacity, so two students clicking at the same moment
- * cannot both take the final seat.</p>
+ * <p>Every check reads the data fresh; only the seat itself is claimed atomically, by
+ * {@link SectionDAO#changeEnrolledCount}, which raises {@code enrolled_count} only while it
+ * stays within capacity. That one conditional UPDATE is what stops two students clicking
+ * Register on the last seat at the same moment from both succeeding — the count is never read
+ * and written back as two separate steps.</p>
  */
 public class RegistrationService {
 
-    /** The most credits a student may carry in one semester. */
-    public static final int MAX_CREDITS_PER_SEMESTER = 18;
-
-    /** The fewest credits expected of a full-time student. */
-    public static final int MIN_CREDITS_PER_SEMESTER = 12;
-
-    /** A tighter ceiling while a student is on probation. */
-    public static final int MAX_CREDITS_ON_PROBATION = 12;
+    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
+    private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
 
     private final StudentDAO studentDao = new StudentDAO();
     private final SectionDAO sectionDao = new SectionDAO();
     private final SemesterDAO semesterDao = new SemesterDAO();
     private final CourseDAO courseDao = new CourseDAO();
     private final EnrollmentDAO enrollmentDao = new EnrollmentDAO();
+    private final GradeDAO gradeDao = new GradeDAO();
     private final CoursePrerequisiteDAO prerequisiteDao = new CoursePrerequisiteDAO();
     private final SectionScheduleDAO scheduleDao = new SectionScheduleDAO();
     private final WaitlistDAO waitlistDao = new WaitlistDAO();
@@ -67,14 +65,16 @@ public class RegistrationService {
     private final AbstractDAO transactions = new AbstractDAO() {
     };
 
+    // ============================================================== REGISTER
+
     /**
-     * Registers a student for a section.
+     * Registers a student for a section, enforcing rules R1-R8 in the exact order
+     * project_details.md Section 6.1 lists them. The check stops at the first failure — a
+     * student who breaks two rules at once is told about the earlier one.
      *
-     * @return the new enrolment's key
-     * @throws ServiceException when any rule refuses the request, with a
-     *                          message explaining which one
+     * @throws RegistrationException naming the rule that refused the request
      */
-    public int register(int studentId, int sectionId) {
+    public void registerStudent(int studentId, int sectionId) {
         ValidationException.requireId(studentId, "Student");
         ValidationException.requireId(sectionId, "Section");
 
@@ -83,75 +83,126 @@ public class RegistrationService {
         Semester semester = requireSemester(section.getSemesterId());
         Course course = requireCourse(section.getCourseId());
 
-        if (!student.getStatus().canRegister()) {
-            throw new ServiceException("A student whose status is " + student.getStatus()
-                    + " cannot register for classes.");
-        }
-        if (section.getStatus() != SectionStatus.OPEN) {
-            throw new ServiceException("This section is " + section.getStatus()
-                    + " and is not taking registrations.");
-        }
+        // R1 — the registration window
         if (!semester.isRegistrationOpen(LocalDateTime.now())) {
-            throw new ServiceException("Registration for " + semester.getSemesterName()
-                    + " is not open. It runs from " + semester.getRegistrationStart()
-                    + " to " + semester.getRegistrationEnd() + ".");
-        }
-        if (enrollmentDao.isAlreadyRegisteredForCourse(studentId, course.getCourseId(),
-                semester.getSemesterId())) {
-            throw new ServiceException("You are already registered for "
-                    + course.getCourseCode() + " this semester.");
+            throw new RegistrationException("R1", sectionId,
+                    "Registration is closed. It opens on "
+                            + DATE_TIME.format(semester.getRegistrationStart()) + ".");
         }
 
-        List<Course> unmet =
-                prerequisiteDao.findUnmetPrerequisiteCourses(studentId, course.getCourseId());
+        // R2 — the student must be ACTIVE
+        if (!student.getStatus().canRegister()) {
+            throw new RegistrationException("R2", sectionId,
+                    "Your account is " + student.getStatus() + ". Please contact the registrar.");
+        }
+
+        if (section.getStatus() != SectionStatus.OPEN) {
+            throw new RegistrationException("SECTION_CLOSED", sectionId,
+                    "This section is not open for registration.");
+        }
+
+        // R3 — every prerequisite must be passed
+        List<Course> unmet = prerequisiteDao.findUnmetPrerequisiteCourses(studentId, course.getCourseId());
         if (!unmet.isEmpty()) {
-            throw new ServiceException("You have not yet passed the prerequisites for "
-                    + course.getCourseCode() + ": "
-                    + unmet.stream().map(Course::getCourseCode).collect(Collectors.joining(", "))
-                    + ".");
+            throw new RegistrationException("R3", sectionId,
+                    "You must pass " + unmet.get(0).getCourseCode() + " before taking this course.");
         }
 
-        int clashes = scheduleDao.countClashes(studentId, semester.getSemesterId(), sectionId);
-        if (clashes > 0) {
-            throw new ServiceException("This section overlaps something already on your "
-                    + "timetable. Choose a different section.");
+        // R4 — must not already have passed the course
+        Optional<LetterGrade> passed = gradeDao.findPassedLetterGrade(studentId, course.getCourseId());
+        if (passed.isPresent()) {
+            throw new RegistrationException("R4", sectionId,
+                    "You have already passed this course with grade " + passed.get() + ".");
         }
 
-        int creditCap = creditCapFor(student);
-        int current = enrollmentDao.sumCreditsInSemester(studentId, semester.getSemesterId());
-        if (current + course.getCredits() > creditCap) {
-            throw new ServiceException("This would put you on "
-                    + (current + course.getCredits()) + " credits, above your limit of "
-                    + creditCap + ".");
+        // The student's existing relationship with THIS exact section, if any.
+        Optional<Enrollment> existingSame = enrollmentDao.findByStudentAndSection(studentId, sectionId);
+        boolean reviveDrop = false;
+        if (existingSame.isPresent()) {
+            EnrollmentStatus status = existingSame.get().getStatus();
+            if (status == EnrollmentStatus.ENROLLED) {
+                throw new RegistrationException("R8", sectionId, "You are already registered in this section.");
+            }
+            if (status == EnrollmentStatus.WITHDRAWN) {
+                throw new RegistrationException("R8", sectionId,
+                        "You withdrew from this section. Speak to the registrar if you need to re-join it.");
+            }
+            if (status == EnrollmentStatus.COMPLETED) {
+                throw new RegistrationException("R8", sectionId, "You are already registered in this section.");
+            }
+            // DROPPED — the row is revived below rather than duplicated (UQ_enrollments_student_section).
+            reviveDrop = true;
         }
 
-        boolean repeat = enrollmentDao.hasPassedCourse(studentId, course.getCourseId());
+        // R5 — a free seat (a fresh read; the real guard is the atomic UPDATE at write time)
+        if (section.getEnrolledCount() >= section.getCapacity()) {
+            int position = waitlistDao.countWaiting(sectionId) + 1;
+            throw new RegistrationException("R5", sectionId, position,
+                    "This section is full. Would you like to join the waitlist? (You are #" + position + ")");
+        }
+
+        // R6 — no timetable conflict
+        String conflict = checkTimeConflict(null, studentId, sectionId, semester.getSemesterId());
+        if (conflict != null) {
+            throw new RegistrationException("R6", sectionId, conflict);
+        }
+
+        // R7 — the GPA-based credit limit
+        String overLimit = checkCreditLimit(null, studentId, sectionId, semester.getSemesterId());
+        if (overLimit != null) {
+            throw new RegistrationException("R7", sectionId, overLimit);
+        }
+
+        // R8 — not already registered in another section of the same course
+        if (!reviveDrop) {
+            Optional<String> otherSection =
+                    enrollmentDao.findOtherEnrolledSectionNumber(studentId, course.getCourseId(), sectionId);
+            if (otherSection.isPresent()) {
+                throw new RegistrationException("R8", sectionId,
+                        "You are already registered in section " + otherSection.get() + " of this course.");
+            }
+        }
+
+        // Section 5, repeat policy: any earlier COMPLETED attempt at this course makes the new one
+        // a repeat. R4 has already ruled out a *passed* attempt, so in practice this only fires
+        // for a previous fail — but it is written the same way project_details.md's own query is.
+        boolean repeat = enrollmentDao.hasCompletedCourse(studentId, course.getCourseId());
 
         Connection connection = transactions.beginTransaction();
         try {
-            // Raise the seat count first. It only moves while the section stays
-            // within capacity, so this both books the seat and proves one was free.
+            // The atomic guard: raises enrolled_count only while it stays within capacity. If this
+            // returns false, the seat was taken by someone else between the read above and now.
             if (!sectionDao.changeEnrolledCount(connection, sectionId, 1)) {
-                throw new ServiceException("This section just filled up. "
-                        + "You can join the waiting list instead.");
+                int position = waitlistDao.countWaiting(sectionId) + 1;
+                throw new RegistrationException("R5", sectionId, position,
+                        "This section is full. Would you like to join the waitlist? (You are #" + position + ")");
             }
 
-            Enrollment enrollment = new Enrollment();
-            enrollment.setStudentId(studentId);
-            enrollment.setSectionId(sectionId);
-            enrollment.setStatus(EnrollmentStatus.ENROLLED);
-            enrollment.setRepeat(repeat);
-            enrollment.setCountsInGpa(true);
-            int enrollmentId = enrollmentDao.insert(connection, enrollment);
+            int enrollmentId;
+            if (reviveDrop) {
+                Enrollment existing = existingSame.get();
+                existing.setStatus(EnrollmentStatus.ENROLLED);
+                existing.setRepeat(repeat);
+                existing.setCountsInGpa(true);
+                enrollmentDao.update(connection, existing);
+                enrollmentId = existing.getEnrollmentId();
+            } else {
+                Enrollment enrollment = new Enrollment();
+                enrollment.setStudentId(studentId);
+                enrollment.setSectionId(sectionId);
+                enrollment.setStatus(EnrollmentStatus.ENROLLED);
+                enrollment.setRepeat(repeat);
+                enrollment.setCountsInGpa(true);
+                enrollmentId = enrollmentDao.insert(connection, enrollment);
+            }
 
             notifications.notify(connection, student.getUserId(), NotificationType.REGISTRATION,
-                    "Registered for " + course.getCourseCode(),
-                    "You are registered for " + course.getCourseCode() + " section "
-                            + section.getSectionNumber() + " in " + semester.getSemesterName() + ".",
+                    "Registered successfully",
+                    "You are now registered in " + course.getCourseCode() + "-" + section.getSectionNumber()
+                            + " — " + course.getCourseTitle() + ".",
                     "enrollments", enrollmentId);
 
             connection.commit();
-            return enrollmentId;
         } catch (SQLException e) {
             transactions.rollbackQuietly(connection);
             throw new ServiceException("Registration could not be completed.", e);
@@ -164,7 +215,179 @@ public class RegistrationService {
     }
 
     /**
-     * Joins the queue for a section that is full.
+     * RULE R6, exposed so a future waitlist promotion can re-run the same check inside its own
+     * transaction. {@code conn} is accepted for that reason; a null connection reads normally.
+     *
+     * @return {@code null} when there is no conflict, otherwise the R6 message
+     */
+    public String checkTimeConflict(Connection conn, int studentId, int sectionId, int semesterId) {
+        return scheduleDao.findStudentClash(studentId, semesterId, sectionId)
+                .map(c -> "Time conflict with " + c.getCourseCode() + " on " + c.getDayOfWeek().name()
+                        + " at " + HM.format(c.getNewStartTime()) + ".")
+                .orElse(null);
+    }
+
+    /**
+     * RULE R7, exposed for the same reason as {@link #checkTimeConflict}.
+     *
+     * @return {@code null} when the load still fits, otherwise the R7 message
+     */
+    public String checkCreditLimit(Connection conn, int studentId, int sectionId, int semesterId) {
+        Student student = requireStudent(studentId);
+        Section section = requireSection(sectionId);
+        Course course = requireCourse(section.getCourseId());
+
+        int max = creditCapFor(student);
+        int current = enrollmentDao.sumCreditsInSemester(studentId, semesterId);
+        int wouldBe = current + course.getCredits();
+        if (wouldBe > max) {
+            return "Credit limit exceeded. Your maximum is " + max + " credits ("
+                    + current + " + " + course.getCredits() + ").";
+        }
+        return null;
+    }
+
+    /** Section 6.2 — the maximum credits a student may carry this semester, by cumulative GPA. */
+    public int creditCapFor(Student student) {
+        if (student.getCompletedCredits() <= 0) {
+            return 18; // a brand-new student has no GPA yet
+        }
+        BigDecimal gpa = student.getCumulativeGpa() == null ? BigDecimal.ZERO : student.getCumulativeGpa();
+        if (gpa.compareTo(new BigDecimal("3.00")) >= 0) {
+            return 21;
+        }
+        if (gpa.compareTo(new BigDecimal("2.00")) >= 0) {
+            return 18;
+        }
+        return 12;
+    }
+
+    /** The current semester, or null when none is set — Phase 08's `SemesterService` owns the read. */
+    public Semester getCurrentSemester() {
+        return semesterDao.findCurrent().orElse(null);
+    }
+
+    // ================================================================== DROP
+
+    /** What happened when a registration was dropped or withdrawn. */
+    public static class DropResult {
+        private final boolean withdrawal;
+        private final String resultTitle;
+        private final String resultMessage;
+        private String promotionMessage;
+
+        DropResult(boolean withdrawal, String resultTitle, String resultMessage) {
+            this.withdrawal = withdrawal;
+            this.resultTitle = resultTitle;
+            this.resultMessage = resultMessage;
+        }
+
+        /** True when this was a period-2 withdrawal (records against the record); false = a clean drop. */
+        public boolean isWithdrawal() {
+            return withdrawal;
+        }
+
+        public String getResultTitle() {
+            return resultTitle;
+        }
+
+        public String getResultMessage() {
+            return resultMessage;
+        }
+
+        /** Unused until a waitlist-promotion feature reads it. */
+        public String getPromotionMessage() {
+            return promotionMessage;
+        }
+
+        public void setPromotionMessage(String promotionMessage) {
+            this.promotionMessage = promotionMessage;
+        }
+    }
+
+    /**
+     * Drops or withdraws a student from a section, following the three periods of Section 6.4:
+     * a clean drop on or before the drop deadline, a {@code W} withdrawal up to the withdrawal
+     * deadline, and refusal after that.
+     *
+     * @throws ServiceException when the enrolment does not exist, is not currently ENROLLED, or
+     *                          the withdrawal deadline has passed
+     */
+    public DropResult dropSection(int studentId, int sectionId) {
+        ValidationException.requireId(studentId, "Student");
+        ValidationException.requireId(sectionId, "Section");
+
+        Enrollment enrollment = enrollmentDao.findByStudentAndSection(studentId, sectionId)
+                .orElseThrow(() -> new ServiceException("You are not currently registered in this section."));
+        if (enrollment.getStatus() != EnrollmentStatus.ENROLLED) {
+            throw new ServiceException("You are not currently registered in this section.");
+        }
+
+        Section section = requireSection(sectionId);
+        Semester semester = requireSemester(section.getSemesterId());
+        Course course = requireCourse(section.getCourseId());
+        Student student = requireStudent(studentId);
+        String label = course.getCourseCode() + "-" + section.getSectionNumber();
+
+        LocalDate today = LocalDate.now();
+        boolean withinDropWindow = semester.getDropDeadline() == null || !today.isAfter(semester.getDropDeadline());
+        boolean withinWithdrawWindow =
+                semester.getWithdrawDeadline() == null || !today.isAfter(semester.getWithdrawDeadline());
+
+        if (!withinDropWindow && !withinWithdrawWindow) {
+            throw new ServiceException("The withdrawal deadline has passed.");
+        }
+
+        Connection connection = transactions.beginTransaction();
+        try {
+            DropResult result;
+            if (withinDropWindow) {
+                enrollmentDao.setStatus(connection, enrollment.getEnrollmentId(), EnrollmentStatus.DROPPED);
+                sectionDao.changeEnrolledCount(connection, sectionId, -1);
+
+                String message = "You have dropped " + label + ". It will not appear on your transcript.";
+                notifications.notify(connection, student.getUserId(), NotificationType.REGISTRATION,
+                        "Course dropped", message, "enrollments", enrollment.getEnrollmentId());
+                result = new DropResult(false, "Course dropped", message);
+            } else {
+                enrollmentDao.setStatus(connection, enrollment.getEnrollmentId(), EnrollmentStatus.WITHDRAWN);
+                enrollmentDao.setCountsInGpa(connection, enrollment.getEnrollmentId(), false);
+                sectionDao.changeEnrolledCount(connection, sectionId, -1);
+
+                String message = "You have withdrawn from " + label
+                        + ". A grade of W will appear on your transcript. It does not affect your GPA.";
+                notifications.notify(connection, student.getUserId(), NotificationType.REGISTRATION,
+                        "Course withdrawn", message, "enrollments", enrollment.getEnrollmentId());
+                result = new DropResult(true, "Course withdrawn", message);
+            }
+
+            connection.commit();
+            return result;
+        } catch (SQLException e) {
+            transactions.rollbackQuietly(connection);
+            throw new ServiceException("The change could not be completed.", e);
+        } catch (RuntimeException e) {
+            transactions.rollbackQuietly(connection);
+            throw e;
+        } finally {
+            transactions.closeQuietly(connection);
+        }
+    }
+
+    /**
+     * True when today is still on or before the drop deadline for a section's semester — used by
+     * the screen to choose which confirmation text to show *before* calling {@link #dropSection}.
+     */
+    public boolean isWithinFreeDropWindow(Semester semester) {
+        LocalDate today = LocalDate.now();
+        return semester.getDropDeadline() == null || !today.isAfter(semester.getDropDeadline());
+    }
+
+    // =============================================================== WAITLIST
+
+    /**
+     * Joins the queue for a section that is full. Only reached after the student has been shown
+     * their queue position (rule R5) and agreed to join.
      *
      * @return the new queue entry's key
      */
@@ -177,7 +400,8 @@ public class RegistrationService {
         if (!section.isFull()) {
             throw new ServiceException("This section still has seats. Register for it directly.");
         }
-        if (enrollmentDao.findByStudentAndSection(studentId, sectionId).isPresent()) {
+        if (enrollmentDao.findByStudentAndSection(studentId, sectionId)
+                .map(e -> e.getStatus() == EnrollmentStatus.ENROLLED).orElse(false)) {
             throw new ServiceException("You already hold a place in this section.");
         }
         Optional<Waitlist> existing = waitlistDao.findByStudentAndSection(studentId, sectionId);
@@ -215,184 +439,21 @@ public class RegistrationService {
         }
     }
 
-    /**
-     * Drops a class, which leaves no mark on the record.
-     *
-     * <p>Only until the drop deadline. Afterwards the choice is
-     * {@link #withdraw}.</p>
-     */
-    public void drop(int enrollmentId) {
-        changeRegistration(enrollmentId, EnrollmentStatus.DROPPED);
-    }
-
-    /**
-     * Withdraws from a class after the drop deadline has gone.
-     *
-     * <p>The seat is released either way, so the queue is offered it.</p>
-     */
-    public void withdraw(int enrollmentId) {
-        changeRegistration(enrollmentId, EnrollmentStatus.WITHDRAWN);
-    }
+    // ================================================================== READS
 
     /** The credits a student is carrying this semester. */
     public int currentCreditLoad(int studentId, int semesterId) {
         return enrollmentDao.sumCreditsInSemester(studentId, semesterId);
     }
 
-    /** True when the load has reached the full-time minimum. */
-    public boolean isFullTime(int studentId, int semesterId) {
-        return currentCreditLoad(studentId, semesterId) >= MIN_CREDITS_PER_SEMESTER;
+    /** The sections a student currently holds an ENROLLED seat in, for one semester. */
+    public List<Enrollment> currentRegistrations(int studentId, int semesterId) {
+        return enrollmentDao.findByStudentAndSemester(studentId, semesterId).stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.ENROLLED)
+                .toList();
     }
 
-    /** The ceiling that applies to one student, tightened while on probation. */
-    public int creditCapFor(Student student) {
-        return student.getAcademicStanding() == AcademicStanding.PROBATION
-                ? MAX_CREDITS_ON_PROBATION
-                : MAX_CREDITS_PER_SEMESTER;
-    }
-
-    /**
-     * Tells a student why they cannot take a section, without taking a seat.
-     *
-     * @return the reason, or an empty optional when registration would succeed
-     */
-    public Optional<String> whyCannotRegister(int studentId, int sectionId) {
-        try {
-            Student student = requireStudent(studentId);
-            Section section = requireSection(sectionId);
-            Semester semester = requireSemester(section.getSemesterId());
-            Course course = requireCourse(section.getCourseId());
-
-            if (!student.getStatus().canRegister()) {
-                return Optional.of("Your status is " + student.getStatus() + ".");
-            }
-            if (section.getStatus() != SectionStatus.OPEN) {
-                return Optional.of("The section is " + section.getStatus() + ".");
-            }
-            if (!semester.isRegistrationOpen(LocalDateTime.now())) {
-                return Optional.of("Registration is not open.");
-            }
-            if (enrollmentDao.isAlreadyRegisteredForCourse(studentId, course.getCourseId(),
-                    semester.getSemesterId())) {
-                return Optional.of("You already take this course this semester.");
-            }
-            List<Course> unmet =
-                    prerequisiteDao.findUnmetPrerequisiteCourses(studentId, course.getCourseId());
-            if (!unmet.isEmpty()) {
-                return Optional.of("Prerequisites outstanding: " + unmet.stream()
-                        .map(Course::getCourseCode).collect(Collectors.joining(", ")) + ".");
-            }
-            if (scheduleDao.countClashes(studentId, semester.getSemesterId(), sectionId) > 0) {
-                return Optional.of("It clashes with your timetable.");
-            }
-            int cap = creditCapFor(student);
-            int load = enrollmentDao.sumCreditsInSemester(studentId, semester.getSemesterId());
-            if (load + course.getCredits() > cap) {
-                return Optional.of("It would take you past your " + cap + " credit limit.");
-            }
-            if (section.isFull()) {
-                return Optional.of("The section is full.");
-            }
-            return Optional.empty();
-        } catch (ServiceException e) {
-            return Optional.of(e.getMessage());
-        }
-    }
-
-    /**
-     * Moves a registration to dropped or withdrawn, frees the seat and offers
-     * it to whoever is first in the queue.
-     */
-    private void changeRegistration(int enrollmentId, EnrollmentStatus target) {
-        ValidationException.requireId(enrollmentId, "Enrolment");
-
-        Enrollment enrollment = enrollmentDao.findById(enrollmentId)
-                .orElseThrow(() -> new ServiceException("That registration no longer exists."));
-        if (enrollment.getStatus() != EnrollmentStatus.ENROLLED) {
-            throw new ServiceException("This registration is already " + enrollment.getStatus() + ".");
-        }
-
-        Section section = requireSection(enrollment.getSectionId());
-        Semester semester = requireSemester(section.getSemesterId());
-        Course course = requireCourse(section.getCourseId());
-        Student student = requireStudent(enrollment.getStudentId());
-        LocalDate today = LocalDate.now();
-
-        if (target == EnrollmentStatus.DROPPED) {
-            if (semester.getDropDeadline() != null && today.isAfter(semester.getDropDeadline())) {
-                throw new ServiceException("The deadline to drop passed on "
-                        + semester.getDropDeadline() + ". You may withdraw instead.");
-            }
-        } else if (semester.getWithdrawDeadline() != null
-                && today.isAfter(semester.getWithdrawDeadline())) {
-            throw new ServiceException("The deadline to withdraw passed on "
-                    + semester.getWithdrawDeadline() + ".");
-        }
-
-        Connection connection = transactions.beginTransaction();
-        try {
-            enrollmentDao.setStatus(connection, enrollmentId, target);
-            sectionDao.changeEnrolledCount(connection, section.getSectionId(), -1);
-
-            notifications.notify(connection, student.getUserId(), NotificationType.REGISTRATION,
-                    course.getCourseCode() + " "
-                            + (target == EnrollmentStatus.DROPPED ? "dropped" : "withdrawn"),
-                    "You are no longer registered for " + course.getCourseCode() + " section "
-                            + section.getSectionNumber() + ".",
-                    "enrollments", enrollmentId);
-
-            promoteNextInQueue(connection, section, course, semester);
-
-            connection.commit();
-        } catch (SQLException e) {
-            transactions.rollbackQuietly(connection);
-            throw new ServiceException("The change could not be completed.", e);
-        } catch (RuntimeException e) {
-            transactions.rollbackQuietly(connection);
-            throw e;
-        } finally {
-            transactions.closeQuietly(connection);
-        }
-    }
-
-    /**
-     * Gives the seat just released to whoever is at the front of the queue.
-     *
-     * <p>Runs on the connection of the change that freed the seat, so the
-     * promotion is undone too if that change is rolled back.</p>
-     */
-    private void promoteNextInQueue(Connection connection, Section section, Course course,
-                                    Semester semester) {
-        Optional<Waitlist> next = waitlistDao.findNextInQueue(section.getSectionId());
-        if (next.isEmpty()) {
-            return;
-        }
-        Waitlist entry = next.get();
-
-        // Only proceed if the seat really is available.
-        if (!sectionDao.changeEnrolledCount(connection, section.getSectionId(), 1)) {
-            return;
-        }
-
-        Enrollment promoted = new Enrollment();
-        promoted.setStudentId(entry.getStudentId());
-        promoted.setSectionId(section.getSectionId());
-        promoted.setStatus(EnrollmentStatus.ENROLLED);
-        promoted.setRepeat(enrollmentDao.hasPassedCourse(entry.getStudentId(), course.getCourseId()));
-        promoted.setCountsInGpa(true);
-        int enrollmentId = enrollmentDao.insert(connection, promoted);
-
-        waitlistDao.setStatus(connection, entry.getWaitlistId(), WaitlistStatus.PROMOTED);
-        waitlistDao.closeGap(connection, section.getSectionId(), entry.getPosition());
-
-        studentDao.findById(entry.getStudentId()).ifPresent(waiting ->
-                notifications.notify(connection, waiting.getUserId(), NotificationType.WAITLIST,
-                        "A seat opened in " + course.getCourseCode(),
-                        "You have been moved off the waiting list into "
-                                + course.getCourseCode() + " section " + section.getSectionNumber()
-                                + " for " + semester.getSemesterName() + ".",
-                        "enrollments", enrollmentId));
-    }
+    // ================================================================= HELPERS
 
     private Student requireStudent(int studentId) {
         return studentDao.findById(studentId)

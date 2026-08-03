@@ -115,6 +115,31 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
                 + "AND e.status = 'ENROLLED'", studentId, courseId, semesterId) > 0;
     }
 
+    /**
+     * Section 5, repeat policy — true when the student has any earlier COMPLETED attempt at this
+     * course, pass or fail. Used to flag a new registration's {@code is_repeat}.
+     */
+    public boolean hasCompletedCourse(int studentId, int courseId) {
+        return queryInt("SELECT COUNT(*) FROM dbo.enrollments e "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "WHERE e.student_id = ? AND s.course_id = ? AND e.status = 'COMPLETED'",
+                studentId, courseId) > 0;
+    }
+
+    /**
+     * RULE R8 — another live section of the same course.
+     *
+     * @return the {@code section_number} of the other section, if the student holds one
+     */
+    public java.util.Optional<String> findOtherEnrolledSectionNumber(int studentId, int courseId,
+                                                                      int excludeSectionId) {
+        return queryOne("SELECT TOP 1 s.section_number FROM dbo.enrollments e "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "WHERE e.student_id = ? AND e.status = 'ENROLLED' "
+                + "AND s.course_id = ? AND s.section_id <> ?",
+                rs -> rs.getNString("section_number"), studentId, courseId, excludeSectionId);
+    }
+
     /** The credits a student is carrying this semester, for the load limit. */
     public int sumCreditsInSemester(int studentId, int semesterId) {
         return queryInt("SELECT ISNULL(SUM(c.credits), 0) FROM dbo.enrollments e "

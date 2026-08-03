@@ -37,6 +37,15 @@
             <version>13.4.0.jre11</version>
         </dependency>
 
+        <!-- Connection pooling. Without it, every DAO call opened a brand new
+             physical connection (TCP handshake + TLS + SQL Server login), which
+             is what made the UI stall on ordinary screens. -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>5.1.0</version>
+        </dependency>
+
         <!-- Password hashing. The users table stores BCrypt hashes, never
              plain text, so signing in needs this to verify them. -->
         <dependency>

@@ -111,6 +111,22 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
     }
 
     /**
+     * RULE R4 — the letter grade of a course this student has already passed, if any.
+     *
+     * <p>Picks the best attempt when more than one exists (should not normally happen, since a
+     * passed course blocks further registration, but a defensive {@code ORDER BY} costs nothing).</p>
+     */
+    public Optional<LetterGrade> findPassedLetterGrade(int studentId, int courseId) {
+        return queryOne("SELECT TOP 1 g.letter_grade FROM dbo.grades g "
+                + "INNER JOIN dbo.enrollments e ON e.enrollment_id = g.enrollment_id "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "WHERE e.student_id = ? AND s.course_id = ? AND e.status = 'COMPLETED' "
+                + "AND g.is_submitted = 1 AND g.result_status = 'PASSED' "
+                + "ORDER BY g.grade_points DESC",
+                rs -> LetterGrade.fromDb(rs.getString("letter_grade")), studentId, courseId);
+    }
+
+    /**
      * Recomputes the cumulative grade point average from the submitted grades.
      *
      * <p>Weighted by course credits, and limited to the attempts still marked
