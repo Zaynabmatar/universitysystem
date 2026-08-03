@@ -14,7 +14,7 @@ public class DBConnection {
             "jdbc:sqlserver://localhost\\SQLEXPRESS"
             + ";databaseName=universitymanagementDB"
             + ";user=sa"
-            + ";password=Zaynabmatar567"
+            + ";password=112345a"
             + ";encrypt=true"
             + ";trustServerCertificate=true";
 

@@ -23,16 +23,130 @@
 }
 
 /* ---------- login ---------- */
-.login-root  { -fx-background-color: linear-gradient(to bottom right, #1e3a8a, #2563eb); }
-.login-card {
-    -fx-background-color: white;
-    -fx-background-radius: 12;
-    -fx-padding: 34;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 22, 0.2, 0, 6);
-    -fx-max-width: 430;
+.login-root {
+    -fx-background-color: radial-gradient(center 50% 32%, radius 90%, #0c3690 0%, #082766 55%, #051a4a 100%);
 }
-.login-title    { -fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #1e3a8a; }
-.login-subtitle { -fx-font-size: 12.5px; -fx-text-fill: #6b7280; }
+
+.login-content {
+    -fx-alignment: center;
+}
+
+.logo-badge {
+    -fx-padding: 0 0 6 0;
+}
+
+.logo-circle-outline {
+    -fx-fill: transparent;
+    -fx-stroke: white;
+    -fx-stroke-width: 1.5;
+}
+
+.logo-tree-icon {
+    -fx-fill: white;
+}
+
+.corner-pane {
+    -fx-background-color: transparent;
+}
+
+.wave-glow {
+    -fx-fill: transparent;
+    -fx-stroke: rgba(140, 190, 255, 0.4);
+    -fx-stroke-width: 20;
+    -fx-stroke-line-cap: round;
+    -fx-effect: gaussianblur(22);
+}
+
+.wave-soft {
+    -fx-fill: transparent;
+    -fx-stroke: rgba(255, 255, 255, 0.25);
+    -fx-stroke-width: 2;
+    -fx-stroke-line-cap: round;
+    -fx-effect: dropshadow(gaussian, rgba(120, 170, 255, 0.4), 6, 0.3, 0, 0);
+}
+
+.wave-main {
+    -fx-fill: transparent;
+    -fx-stroke: rgba(255, 255, 255, 0.7);
+    -fx-stroke-width: 2.2;
+    -fx-stroke-line-cap: round;
+    -fx-effect: dropshadow(gaussian, rgba(180, 215, 255, 0.75), 10, 0.5, 0, 0);
+}
+
+.halftone-pane {
+    -fx-background-color: transparent;
+}
+
+.halftone-dot {
+    -fx-fill: rgba(255, 255, 255, 0.4);
+}
+
+
+.input-pill {
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-padding: 11 16 11 16;
+    -fx-pref-width: 340;
+    -fx-max-width: 340;
+}
+
+.input-pill .text-field {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-font-size: 13px;
+    -fx-text-fill: #12294f;
+    -fx-prompt-text-fill: #98a2b8;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.field-icon {
+    -fx-fill: #16308f;
+}
+
+.icon-toggle-btn {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.icon-toggle-btn:hover {
+    -fx-opacity: 0.7;
+}
+
+.login-content .error-text {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 11.5px;
+    -fx-background-color: rgba(255, 255, 255, 0.14);
+    -fx-background-radius: 6;
+    -fx-padding: 6 10 6 10;
+}
+
+.login-button-outline {
+    -fx-background-color: transparent;
+    -fx-border-color: white;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 13 0 13 0;
+    -fx-pref-width: 340;
+    -fx-max-width: 340;
+    -fx-cursor: hand;
+}
+
+.login-button-outline:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.login-button-outline:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.18);
+}
 
 /* ---------- application shell ---------- */
 .top-bar {

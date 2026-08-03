@@ -1,0 +1,119 @@
+.root-pane {
+    -fx-background-color: linear-gradient(135deg, #0d1b3e 0%, #1e4d91 55%, #4f9ee8 100%);
+}
+
+.login-card {
+    -fx-background-color: white;
+    -fx-background-radius: 24;
+    -fx-effect: dropshadow(gaussian, rgba(10, 25, 60, 0.45), 35, 0.12, 0, 12);
+}
+
+.logo-placeholder {
+    -fx-padding: 4 0 0 0;
+}
+
+.logo-circle {
+    -fx-fill: linear-gradient(to bottom right, #1e4d91, #4f9ee8);
+    -fx-stroke: transparent;
+}
+
+.logo-text {
+    -fx-text-fill: white;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-letter-spacing: 1;
+}
+
+.university-name {
+    -fx-font-size: 19px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #12294f;
+    -fx-text-alignment: center;
+}
+
+.university-subtitle {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #4f9ee8;
+}
+
+.welcome-text {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: #8593a8;
+}
+
+.input-field {
+    -fx-background-color: #f2f5fa;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: #e1e7f0;
+    -fx-border-width: 1;
+    -fx-padding: 11 14 11 14;
+    -fx-font-size: 13px;
+    -fx-text-fill: #12294f;
+    -fx-prompt-text-fill: #a3aec2;
+}
+
+.input-field:focused {
+    -fx-border-color: #2e67c1;
+    -fx-background-color: white;
+}
+
+.forgot-link {
+    -fx-text-fill: #2e67c1;
+    -fx-font-size: 11.5px;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-underline: false;
+}
+
+.forgot-link:hover {
+    -fx-text-fill: #12294f;
+    -fx-underline: true;
+}
+
+.login-button {
+    -fx-background-color: linear-gradient(to right, #1e4d91, #4f9ee8);
+    -fx-background-radius: 25;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 12 0 12 0;
+    -fx-cursor: hand;
+}
+
+.login-button:hover {
+    -fx-background-color: linear-gradient(to right, #163b73, #3f8dd6);
+}
+
+.login-button:pressed {
+    -fx-background-color: #12294f;
+}
+
+.follow-us-box {
+    -fx-padding: 6 0 0 0;
+}
+
+.follow-us-label {
+    -fx-font-size: 10.5px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #a3aec2;
+}
+
+.social-icon {
+    -fx-background-color: #eef3fb;
+    -fx-background-radius: 50%;
+    -fx-min-width: 34;
+    -fx-min-height: 34;
+    -fx-max-width: 34;
+    -fx-max-height: 34;
+    -fx-text-fill: #2e67c1;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.social-icon:hover {
+    -fx-background-color: #2e67c1;
+    -fx-text-fill: white;
+}

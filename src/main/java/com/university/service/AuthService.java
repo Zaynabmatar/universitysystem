@@ -13,15 +13,15 @@ import java.util.Optional;
 /**
  * Signing in, signing out and changing a password.
  *
- * <p>A failed sign-in always gives the same message whether the name was
+ * <p>A failed sign-in always gives the same message whether the User ID was
  * unknown or the password was wrong. Saying which one was at fault would tell
- * a stranger that a username exists, which is worth more to them than to
+ * a stranger that a User ID exists, which is worth more to them than to
  * anybody honest.</p>
  */
 public class AuthService {
 
     /** Deliberately vague, for the reason above. */
-    private static final String SIGN_IN_FAILED = "Incorrect username or password.";
+    private static final String SIGN_IN_FAILED = "Incorrect User ID or password.";
 
     private final UserDAO userDao = new UserDAO();
     private final StudentDAO studentDao = new StudentDAO();
@@ -33,14 +33,23 @@ public class AuthService {
      * <p>The student or instructor record behind the account is loaded here,
      * so no screen has to do it later.</p>
      *
+     * @param userIdText the User ID as typed on the sign-in screen; must be
+     *                    the numeric {@code users.user_id}
      * @return the open session, also reachable through {@link Session#current()}
      * @throws ServiceException if the details are wrong or the account is disabled
      */
-    public Session login(String username, String password) {
-        ValidationException.requireText(username, "Username");
+    public Session login(String userIdText, String password) {
+        ValidationException.requireText(userIdText, "User ID");
         ValidationException.requireText(password, "Password");
 
-        Optional<User> found = userDao.findByUsername(username.trim());
+        int userId;
+        try {
+            userId = Integer.parseInt(userIdText.trim());
+        } catch (NumberFormatException e) {
+            throw new ServiceException(SIGN_IN_FAILED);
+        }
+
+        Optional<User> found = userDao.findById(userId);
         if (found.isEmpty()) {
             throw new ServiceException(SIGN_IN_FAILED);
         }

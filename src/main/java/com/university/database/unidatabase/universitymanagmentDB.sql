@@ -1014,9 +1014,15 @@ GO
      Spring 2026 (future)   : exists so registration-window logic has a target.
 
    *** PASSWORD NOTE - READ THIS ***
-   The password_hash values below are PLACEHOLDERS in BCrypt format.
-   They are NOT real hashes of any password and they will NOT verify against
-   anything. Replace them with hashes produced by your own BCrypt code.
+   Login is by User ID (dbo.users.user_id) only - usernames below are for
+   display purposes and can no longer be used to sign in.
+
+   Every account's initial password is fixed to "<user_id>@iuL". The
+   password_hash values below are real BCrypt hashes (cost 12) of that rule
+   for user_id 1-5:
+       1 -> 1@iuL   2 -> 2@iuL   3 -> 3@iuL   4 -> 4@iuL   5 -> 5@iuL
+   The same rule is applied automatically by UserDAO.insert for every future
+   account, so this is also the password to use after signing up any new user.
 ============================================================================ */
 BEGIN TRY
     BEGIN TRANSACTION;
@@ -1040,19 +1046,19 @@ BEGIN TRY
         (2, N'BSIT', N'BSc Information Technology', N'BACHELOR', 126);
 
     /* ---- users -----------------------------------------------------------
-       1 = admin     (ADMIN)
-       2 = a.khoury  (INSTRUCTOR)
-       3 = s.haddad  (INSTRUCTOR)
-       4 = z.matar   (STUDENT)
-       5 = o.saleh   (STUDENT)
-       PLACEHOLDER hashes - see the password note above.
+       1 = admin     (ADMIN)       login User ID 1, password 1@iuL
+       2 = a.khoury  (INSTRUCTOR)  login User ID 2, password 2@iuL
+       3 = s.haddad  (INSTRUCTOR)  login User ID 3, password 3@iuL
+       4 = z.matar   (STUDENT)     login User ID 4, password 4@iuL
+       5 = o.saleh   (STUDENT)     login User ID 5, password 5@iuL
+       Real BCrypt hashes (cost 12) - see the password note above.
     ---------------------------------------------------------------------- */
     INSERT INTO dbo.users (username, password_hash, role) VALUES
-        (N'admin',    N'$2a$10$PLACEHOLDER.REPLACE.WITH.REAL.BCRYPT.HASH.000000000', N'ADMIN'),
-        (N'a.khoury', N'$2a$10$PLACEHOLDER.REPLACE.WITH.REAL.BCRYPT.HASH.000000001', N'INSTRUCTOR'),
-        (N's.haddad', N'$2a$10$PLACEHOLDER.REPLACE.WITH.REAL.BCRYPT.HASH.000000002', N'INSTRUCTOR'),
-        (N'z.matar',  N'$2a$10$PLACEHOLDER.REPLACE.WITH.REAL.BCRYPT.HASH.000000003', N'STUDENT'),
-        (N'o.saleh',  N'$2a$10$PLACEHOLDER.REPLACE.WITH.REAL.BCRYPT.HASH.000000004', N'STUDENT');
+        (N'admin',    N'$2a$12$qzkxkx5uLhTF.WCug9QZbuXOkd7K0RfJt/aOsacfXesZiVQZd1UzO', N'ADMIN'),
+        (N'a.khoury', N'$2a$12$iavXLZMGTQ5HcfJpzdaae.7m60PEq.osd8FM5yJjVq5Lg0ebclosW', N'INSTRUCTOR'),
+        (N's.haddad', N'$2a$12$NUbHWmzUAyeMJDBGTFgueeGfZe199rkns2XEhi.u3qk/XVvvdqk.C', N'INSTRUCTOR'),
+        (N'z.matar',  N'$2a$12$hswCE1bYn2pYxyUA9ordN.2P.AarIv2u0CvTAtpcWJXiMlqK3fe2K', N'STUDENT'),
+        (N'o.saleh',  N'$2a$12$5UhcsfS05DJ8wBHMlrkW3eBrURRU0lH19d5Y58MqMloTB2.2ihqEq', N'STUDENT');
 
     /* ---- instructors (1 -> user 2, 2 -> user 3) -------------------------- */
     INSERT INTO dbo.instructors (user_id, employee_number, first_name, last_name, email, phone, dept_id, academic_rank, hire_date) VALUES

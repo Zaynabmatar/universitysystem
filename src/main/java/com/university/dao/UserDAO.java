@@ -2,6 +2,7 @@ package com.university.dao;
 
 import com.university.enums.UserRole;
 import com.university.model.User;
+import com.university.service.PasswordHasher;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -25,6 +26,13 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
 
     private static final String INSERT =
             "INSERT INTO dbo.users (username, password_hash, role, is_active) VALUES (?, ?, ?, ?)";
+
+    /**
+     * Column-filler only: {@code password_hash} is NOT NULL, but the real
+     * value can't be computed until the IDENTITY column assigns a user_id.
+     * {@link #insert} overwrites this immediately after the row exists.
+     */
+    private static final String PLACEHOLDER_HASH = "PENDING-DEFAULT-PASSWORD";
 
     private static final String UPDATE =
             "UPDATE dbo.users SET username = ?, password_hash = ?, role = ?, is_active = ? "
@@ -56,24 +64,9 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
         return queryList(SELECT + " ORDER BY username", MAPPER);
     }
 
-    /**
-     * Finds the account behind a login name.
-     *
-     * <p>The starting point of signing in: fetch the row, then verify the
-     * hash it carries.</p>
-     */
-    public Optional<User> findByUsername(String username) {
-        return queryOne(SELECT + " WHERE username = ?", MAPPER, username);
-    }
-
     /** Every account holding one role. */
     public List<User> findByRole(UserRole role) {
         return queryList(SELECT + " WHERE role = ? ORDER BY username", MAPPER, role);
-    }
-
-    /** True when the login name is already taken. */
-    public boolean usernameExists(String username) {
-        return queryInt("SELECT COUNT(*) FROM dbo.users WHERE username = ?", username) > 0;
     }
 
     /** Stamps the moment of a successful sign-in. */
@@ -94,14 +87,30 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
                 active, userId) > 0;
     }
 
+    /**
+     * Inserts a new account and assigns its mandatory initial password:
+     * BCrypt of {@code <user_id>@iuL}, where {@code user_id} is the key the
+     * database just generated. Any password hash on {@code entity} is
+     * ignored — this rule is not something a caller can opt out of.
+     */
     @Override
     public int insert(User entity) {
-        return insertAndReturnKey(INSERT, insertParams(entity));
+        try (Connection connection = openConnection()) {
+            return insert(connection, entity);
+        } catch (SQLException e) {
+            throw new DataAccessException("Could not close the connection used by: " + INSERT, e);
+        }
     }
 
     @Override
     public int insert(Connection connection, User entity) {
-        return insertAndReturnKey(connection, INSERT, insertParams(entity));
+        int userId = insertAndReturnKey(connection, INSERT, insertParams(entity));
+        String defaultHash = PasswordHasher.hashDefaultPassword(userId);
+        executeUpdate(connection, "UPDATE dbo.users SET password_hash = ? WHERE user_id = ?",
+                defaultHash, userId);
+        entity.setUserId(userId);
+        entity.setPasswordHash(defaultHash);
+        return userId;
     }
 
     @Override
@@ -127,7 +136,7 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     private Object[] insertParams(User entity) {
         return new Object[]{
                 entity.getUsername(),
-                entity.getPasswordHash(),
+                PLACEHOLDER_HASH,
                 entity.getRole(),
                 entity.isActive()
         };
