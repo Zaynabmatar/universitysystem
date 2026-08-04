@@ -16,6 +16,7 @@ import com.university.service.SemesterService;
 import com.university.service.ServiceException;
 import com.university.service.Session;
 import com.university.util.AlertUtil;
+import com.university.util.SceneManager;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -57,6 +58,7 @@ public class AdminSectionsController {
     @FXML private Button cancelButton;
     @FXML private Button reopenButton;
     @FXML private Button deleteButton;
+    @FXML private Button gradesButton;
 
     private final SectionService sectionService = new SectionService();
     private final SemesterService semesterService = new SemesterService();
@@ -142,6 +144,7 @@ public class AdminSectionsController {
         cancelButton.disableProperty().bind(selected.isNull());
         reopenButton.disableProperty().bind(selected.isNull());
         deleteButton.disableProperty().bind(selected.isNull());
+        gradesButton.disableProperty().bind(selected.isNull());
 
         reload();
     }
@@ -251,6 +254,30 @@ public class AdminSectionsController {
         if (result.isPresent() && result.get()) {
             AlertUtil.success("Saved", "The section's details were updated.");
             reload();
+        }
+    }
+
+    /**
+     * RULE G5 — the registrar's way into a grade sheet. There is deliberately no
+     * {@code admin_grades.fxml}: this opens the instructor's own screen, which detects the ADMIN
+     * role and switches itself into correction mode (submitted rows stay editable, the button
+     * reads "Apply Correction", a reason is required). The role is re-checked in
+     * {@code GradeService.adminOverride}, so opening the screen grants nothing on its own.
+     */
+    @FXML
+    private void handleGrades() {
+        Section selected = sectionTable.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        try {
+            InstructorGradesController controller = SceneManager.getInstance()
+                    .navigateTo("instructor_grades.fxml", "Grades");
+            if (controller != null) {
+                controller.load(selected.getSectionId(), labelOf(selected) + "  "
+                        + courseTitleOf(selected.getCourseId()));
+            }
+        } catch (Exception e) {
+            AlertUtil.error("Grades", "The grade sheet could not be opened.", e);
         }
     }
 

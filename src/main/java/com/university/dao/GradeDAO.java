@@ -1,9 +1,11 @@
 package com.university.dao;
 
+import com.university.enums.EnrollmentStatus;
 import com.university.enums.LetterGrade;
 import com.university.enums.ResultStatus;
 import com.university.model.Grade;
 import com.university.model.GradeSheetRow;
+import com.university.model.StudentGradeRow;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -211,6 +213,61 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
             row.recompute();
             return row;
         }, sectionId);
+    }
+
+    /**
+     * The student's My Grades list: every enrollment they still hold, with the grade attached
+     * ONLY when it has been submitted.
+     *
+     * <p>The mark columns are read through {@code CASE WHEN g.is_submitted = 1} rather than being
+     * filtered out afterwards, so an unpublished draft never leaves the database — Section 6.6:
+     * "a student must never see a draft". Dropped rows are left out; withdrawn ones are kept,
+     * because a W belongs on the record.</p>
+     *
+     * @param semesterId one semester, or null for every semester
+     */
+    public List<StudentGradeRow> findStudentGradeRows(int studentId, Integer semesterId) {
+        String sql = "SELECT e.enrollment_id, e.status, e.counts_in_gpa, "
+                + "sem.semester_id, sem.semester_name, c.course_code, c.course_title, c.credits, "
+                + "ISNULL(g.is_submitted, 0) AS is_submitted, "
+                + "CASE WHEN g.is_submitted = 1 THEN g.coursework_mark END AS coursework_mark, "
+                + "CASE WHEN g.is_submitted = 1 THEN g.midterm_mark    END AS midterm_mark, "
+                + "CASE WHEN g.is_submitted = 1 THEN g.final_mark      END AS final_mark, "
+                + "CASE WHEN g.is_submitted = 1 THEN g.total_mark      END AS total_mark, "
+                + "CASE WHEN g.is_submitted = 1 THEN g.letter_grade    END AS letter_grade, "
+                + "CASE WHEN g.is_submitted = 1 THEN g.grade_points    END AS grade_points "
+                + "FROM dbo.enrollments e "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "INNER JOIN dbo.semesters sem ON sem.semester_id = s.semester_id "
+                + "INNER JOIN dbo.courses c ON c.course_id = s.course_id "
+                + "LEFT JOIN dbo.grades g ON g.enrollment_id = e.enrollment_id "
+                + "WHERE e.student_id = ? AND e.status <> 'DROPPED'"
+                + (semesterId == null ? "" : " AND sem.semester_id = ?")
+                + " ORDER BY sem.start_date DESC, c.course_code";
+
+        RowMapper<StudentGradeRow> mapper = rs -> {
+            StudentGradeRow row = new StudentGradeRow();
+            row.setEnrollmentId(rs.getInt("enrollment_id"));
+            row.setEnrollmentStatus(EnrollmentStatus.fromDb(rs.getString("status")));
+            row.setCountsInGpa(rs.getBoolean("counts_in_gpa"));
+            row.setSemesterId(rs.getInt("semester_id"));
+            row.setSemesterName(rs.getString("semester_name"));
+            row.setCourseCode(rs.getString("course_code"));
+            row.setCourseTitle(rs.getString("course_title"));
+            row.setCredits(rs.getInt("credits"));
+            row.setSubmitted(rs.getBoolean("is_submitted"));
+            row.setCourseworkMark(rs.getBigDecimal("coursework_mark"));
+            row.setMidtermMark(rs.getBigDecimal("midterm_mark"));
+            row.setFinalMark(rs.getBigDecimal("final_mark"));
+            row.setTotalMark(rs.getBigDecimal("total_mark"));
+            row.setLetterGrade(LetterGrade.fromDb(rs.getString("letter_grade")));
+            row.setGradePoints(rs.getBigDecimal("grade_points"));
+            return row;
+        };
+
+        return semesterId == null
+                ? queryList(sql, mapper, studentId)
+                : queryList(sql, mapper, studentId, semesterId);
     }
 
     /** True once at least one grade in the section has been submitted — rule G4's read side. */

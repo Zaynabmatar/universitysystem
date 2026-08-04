@@ -53,6 +53,7 @@
         <Button fx:id="cancelButton" text="Cancel Section" onAction="#handleCancel"/>
         <Button fx:id="reopenButton" text="Re-open"        onAction="#handleReopen"/>
         <Button fx:id="deleteButton" text="Delete"         onAction="#handleDelete"/>
+        <Button fx:id="gradesButton" text="Grades / Correct" onAction="#handleGrades"/>
         <Region HBox.hgrow="ALWAYS"/>
         <Button text="Refresh" onAction="#handleRefresh"/>
     </HBox>

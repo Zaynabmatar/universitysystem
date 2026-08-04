@@ -2,18 +2,14 @@ package com.university.controller;
 
 import com.university.enums.UserRole;
 import com.university.model.Course;
-import com.university.model.Enrollment;
 import com.university.model.Section;
 import com.university.model.SectionSchedule;
 import com.university.model.Semester;
-import com.university.model.Student;
 import com.university.service.CourseService;
 import com.university.service.GradeService;
-import com.university.service.RegistrationService;
 import com.university.service.SectionService;
 import com.university.service.SemesterService;
 import com.university.service.Session;
-import com.university.service.StudentService;
 import com.university.util.AlertUtil;
 import com.university.util.SceneManager;
 import javafx.collections.FXCollections;
@@ -61,8 +57,6 @@ public class InstructorSectionsController {
     private final SemesterService semesterService = new SemesterService();
     private final CourseService courseService = new CourseService();
     private final GradeService gradeService = new GradeService();
-    private final RegistrationService registrationService = new RegistrationService();
-    private final StudentService studentService = new StudentService();
 
     private final ObservableList<Section> rows = FXCollections.observableArrayList();
     private List<Course> courses = List.of();
@@ -168,14 +162,13 @@ public class InstructorSectionsController {
         if (selected == null) {
             return;
         }
+        List<String> names;
         try {
-            List<Enrollment> enrolled = registrationService.currentRegistrations(-1, -1); // unused placeholder
-        } catch (RuntimeException ignored) {
-            // no-op: replaced below by the section-scoped roster read
+            names = rosterNames(selected.getSectionId());
+        } catch (RuntimeException e) {
+            AlertUtil.error("Students", "The student list could not be loaded.", e);
+            return;
         }
-        List<String> names = sectionService.countEnrollments(selected.getSectionId()) == 0
-                ? List.of()
-                : rosterNames(selected.getSectionId());
 
         ListView<String> listView = new ListView<>(FXCollections.observableArrayList(names));
         listView.setPrefSize(320, 300);

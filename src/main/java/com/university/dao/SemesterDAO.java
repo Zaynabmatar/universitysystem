@@ -77,6 +77,22 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
         return queryOne(SELECT + " WHERE is_current = 1", MAPPER);
     }
 
+    /**
+     * Every semester the student actually has enrollments in, newest first — the choices for the
+     * My Grades semester selector. A semester they never studied in is not offered.
+     */
+    public List<Semester> findWithEnrollments(int studentId) {
+        return queryList("SELECT DISTINCT sem.semester_id, sem.semester_name, sem.academic_year, "
+                + "sem.term, sem.start_date, sem.end_date, sem.registration_start, "
+                + "sem.registration_end, sem.drop_deadline, sem.withdraw_deadline, "
+                + "sem.grade_entry_start, sem.grade_entry_end, sem.is_current "
+                + "FROM dbo.semesters sem "
+                + "INNER JOIN dbo.sections s ON s.semester_id = sem.semester_id "
+                + "INNER JOIN dbo.enrollments e ON e.section_id = s.section_id "
+                + "WHERE e.student_id = ? AND e.status <> 'DROPPED' "
+                + "ORDER BY sem.start_date DESC", MAPPER, studentId);
+    }
+
     /** Finds a semester by its unique name, for example Fall 2025. */
     public Optional<Semester> findByName(String semesterName) {
         return queryOne(SELECT + " WHERE semester_name = ?", MAPPER, semesterName);
