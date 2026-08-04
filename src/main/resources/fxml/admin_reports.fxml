@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.BarChart?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.chart.PieChart?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.AdminReportsController"
+      styleClass="content-page" spacing="12">
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <VBox spacing="2">
+            <Label text="Reports &amp; Analytics" styleClass="page-title"/>
+            <Label fx:id="subtitleLabel" styleClass="muted-text"/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="refreshButton" text="Refresh all" onAction="#handleRefresh"/>
+    </HBox>
+
+    <TabPane fx:id="tabs" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+
+        <!-- ============ 1. Enrollment per department (BarChart) ============ -->
+        <Tab text="Enrollment per Department">
+            <BorderPane>
+                <center>
+                    <StackPane fx:id="deptHolder" styleClass="chart-card">
+                        <BarChart fx:id="deptChart" title="Enrollment count per department"
+                                  legendVisible="false" animated="false">
+                            <xAxis><CategoryAxis fx:id="deptX" label="Department"/></xAxis>
+                            <yAxis><NumberAxis fx:id="deptY" label="Students enrolled"/></yAxis>
+                        </BarChart>
+                        <Label fx:id="deptEmpty" styleClass="chart-empty" visible="false" managed="false"
+                               text="No enrollments in the current semester yet."/>
+                    </StackPane>
+                </center>
+                <bottom>
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label fx:id="deptNote" styleClass="muted-text" text=""/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Export CSV" onAction="#handleExportDept"/>
+                    </HBox>
+                </bottom>
+            </BorderPane>
+        </Tab>
+
+        <!-- ============ 2. Grade distribution (PieChart) ============ -->
+        <Tab text="Grade Distribution">
+            <BorderPane>
+                <center>
+                    <StackPane fx:id="gradeHolder" styleClass="chart-card">
+                        <PieChart fx:id="gradeChart" title="Grade distribution (submitted grades)"
+                                  legendSide="RIGHT" animated="false"/>
+                        <Label fx:id="gradeEmpty" styleClass="chart-empty" visible="false" managed="false"
+                               text="No grades have been submitted yet, so there is nothing to chart."/>
+                    </StackPane>
+                </center>
+                <bottom>
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label fx:id="gradeNote" styleClass="muted-text"
+                               text="W (withdrawn) and I (incomplete) are excluded — they are not grades."/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Export CSV" onAction="#handleExportGrades"/>
+                    </HBox>
+                </bottom>
+            </BorderPane>
+        </Tab>
+
+        <!-- ============ 3. Pass rate per course (BarChart) ============ -->
+        <Tab text="Pass Rate per Course">
+            <BorderPane>
+                <center>
+                    <StackPane fx:id="passHolder" styleClass="chart-card">
+                        <BarChart fx:id="passChart" title="Pass rate per course (%)"
+                                  legendVisible="false" animated="false">
+                            <xAxis><CategoryAxis fx:id="passX" label="Course"/></xAxis>
+                            <yAxis>
+                                <NumberAxis fx:id="passY" label="Pass rate (%)"
+                                            autoRanging="false" lowerBound="0" upperBound="100" tickUnit="10"/>
+                            </yAxis>
+                        </BarChart>
+                        <Label fx:id="passEmpty" styleClass="chart-empty" visible="false" managed="false"
+                               text="No course has been completed and graded yet."/>
+                    </StackPane>
+                </center>
+                <bottom>
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label fx:id="passNote" styleClass="muted-text"
+                               text="Chart shows the top 15 courses. The CSV export contains every course."/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Export CSV" onAction="#handleExportPassRate"/>
+                    </HBox>
+                </bottom>
+            </BorderPane>
+        </Tab>
+
+        <!-- ============ 4. Enrollment trend (LineChart) ============ -->
+        <Tab text="Enrollment Trend">
+            <BorderPane>
+                <center>
+                    <StackPane fx:id="trendHolder" styleClass="chart-card">
+                        <LineChart fx:id="trendChart" title="Enrollment trend across semesters"
+                                   legendVisible="false" animated="false" createSymbols="true">
+                            <xAxis><CategoryAxis fx:id="trendX" label="Semester"/></xAxis>
+                            <yAxis><NumberAxis fx:id="trendY" label="Enrollments"/></yAxis>
+                        </LineChart>
+                        <Label fx:id="trendEmpty" styleClass="chart-empty" visible="false" managed="false"
+                               text="No enrollment history yet."/>
+                    </StackPane>
+                </center>
+                <bottom>
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label fx:id="trendNote" styleClass="muted-text"
+                               text="Ordered by semester start date, not by name."/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Export CSV" onAction="#handleExportTrend"/>
+                    </HBox>
+                </bottom>
+            </BorderPane>
+        </Tab>
+
+        <!-- ============ 5. Section fill rate (Table + progress bars) ============ -->
+        <Tab text="Section Fill Rate">
+            <BorderPane>
+                <center>
+                    <TableView fx:id="fillTable">
+                        <columns>
+                            <TableColumn fx:id="fillCourse" text="Course" prefWidth="90"/>
+                            <TableColumn fx:id="fillTitle" text="Title" prefWidth="200"/>
+                            <TableColumn fx:id="fillSection" text="Sec." prefWidth="55"/>
+                            <TableColumn fx:id="fillInstructor" text="Instructor" prefWidth="160"/>
+                            <TableColumn fx:id="fillRoom" text="Room" prefWidth="70"/>
+                            <TableColumn fx:id="fillEnrolled" text="Enrolled" prefWidth="75"/>
+                            <TableColumn fx:id="fillCapacity" text="Capacity" prefWidth="75"/>
+                            <TableColumn fx:id="fillSeats" text="Seats left" prefWidth="85"/>
+                            <TableColumn fx:id="fillPercent" text="Fill rate" prefWidth="170"/>
+                        </columns>
+                    </TableView>
+                </center>
+                <bottom>
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label fx:id="fillNote" styleClass="muted-text" text=""/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Export CSV" onAction="#handleExportFill"/>
+                    </HBox>
+                </bottom>
+            </BorderPane>
+        </Tab>
+
+        <!-- ============ 6. Students on probation (Table) ============ -->
+        <Tab text="Students on Probation">
+            <BorderPane>
+                <center>
+                    <TableView fx:id="probationTable">
+                        <columns>
+                            <TableColumn fx:id="probNumber" text="Student No." prefWidth="105"/>
+                            <TableColumn fx:id="probName" text="Name" prefWidth="170"/>
+                            <TableColumn fx:id="probProgram" text="Program" prefWidth="180"/>
+                            <TableColumn fx:id="probGpa" text="GPA" prefWidth="65"/>
+                            <TableColumn fx:id="probCredits" text="Credits" prefWidth="65"/>
+                            <TableColumn fx:id="probCount" text="Probations" prefWidth="85"/>
+                            <TableColumn fx:id="probStanding" text="Standing" prefWidth="100"/>
+                            <TableColumn fx:id="probEmail" text="Email" prefWidth="180"/>
+                        </columns>
+                    </TableView>
+                </center>
+                <bottom>
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label fx:id="probNote" styleClass="muted-text" text=""/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Export CSV" onAction="#handleExportProbation"/>
+                    </HBox>
+                </bottom>
+            </BorderPane>
+        </Tab>
+
+        <!-- ============ 7. Top 10 students by GPA (Table) ============ -->
+        <Tab text="Top 10 by GPA">
+            <BorderPane>
+                <center>
+                    <TableView fx:id="topTable">
+                        <columns>
+                            <TableColumn fx:id="topRank" text="#" prefWidth="40"/>
+                            <TableColumn fx:id="topNumber" text="Student No." prefWidth="110"/>
+                            <TableColumn fx:id="topName" text="Name" prefWidth="190"/>
+                            <TableColumn fx:id="topProgram" text="Program" prefWidth="200"/>
+                            <TableColumn fx:id="topGpa" text="GPA" prefWidth="70"/>
+                            <TableColumn fx:id="topCredits" text="Credits" prefWidth="70"/>
+                            <TableColumn fx:id="topStanding" text="Standing" prefWidth="110"/>
+                        </columns>
+                    </TableView>
+                </center>
+                <bottom>
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label fx:id="topNote" styleClass="muted-text"
+                               text="Only students with at least one completed course appear."/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Export CSV" onAction="#handleExportTop"/>
+                    </HBox>
+                </bottom>
+            </BorderPane>
+        </Tab>
+    </TabPane>
+</VBox>
