@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.InstructorGradesController"
+      styleClass="content-page" spacing="10">
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label fx:id="titleLabel" text="Enter Grades" styleClass="page-title"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Refresh" onAction="#handleRefresh"/>
+    </HBox>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="Section:"/>
+        <ComboBox fx:id="sectionCombo" prefWidth="360"/>
+        <Label fx:id="sectionLabel" styleClass="muted-text"/>
+    </HBox>
+
+    <HBox spacing="14" alignment="CENTER_LEFT">
+        <Label fx:id="windowLabel" styleClass="muted-label"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="lockBanner" styleClass="lock-banner" wrapText="true"
+               visible="false" managed="false"/>
+    </HBox>
+
+    <Label text="Weighting: coursework 30%  •  midterm 30%  •  final 40%" styleClass="muted-label"/>
+
+    <TableView fx:id="gradeTable" editable="true" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="colStudentNumber" text="Student No."      prefWidth="110" editable="false"/>
+            <TableColumn fx:id="colStudentName"   text="Student"          prefWidth="200" editable="false"/>
+            <TableColumn fx:id="colCoursework"    text="Coursework (30%)" prefWidth="130"/>
+            <TableColumn fx:id="colMidterm"       text="Midterm (30%)"    prefWidth="120"/>
+            <TableColumn fx:id="colFinal"         text="Final (40%)"      prefWidth="110"/>
+            <TableColumn fx:id="colTotal"         text="Total"            prefWidth="80"  editable="false"/>
+            <TableColumn fx:id="colLetter"        text="Letter"           prefWidth="70"  editable="false"/>
+            <TableColumn fx:id="colPoints"        text="Points"           prefWidth="70"  editable="false"/>
+        </columns>
+    </TableView>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <padding><Insets top="4" right="0" bottom="0" left="0"/></padding>
+        <Label fx:id="statsLabel" styleClass="muted-label"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="exportButton"    text="Export CSV"      onAction="#handleExportCsv"/>
+        <Button fx:id="saveDraftButton" text="Save Draft"      onAction="#handleSaveDraft"/>
+        <Button fx:id="submitButton"    text="Submit and Lock" onAction="#handleSubmit"/>
+    </HBox>
+</VBox>

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.StudentGradesController"
+      styleClass="content-page" spacing="12">
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="My Grades" styleClass="page-title"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label text="Semester:"/>
+        <ComboBox fx:id="semesterCombo" prefWidth="200"/>
+        <Button text="Refresh" onAction="#handleRefresh"/>
+    </HBox>
+
+    <HBox spacing="12">
+        <VBox styleClass="kpi-card" spacing="2">
+            <Label fx:id="termGpaLabel" text="0.00" styleClass="kpi-value"/>
+            <Label fx:id="termGpaCaption" text="Term GPA" styleClass="kpi-label"/>
+        </VBox>
+        <VBox styleClass="kpi-card" spacing="2">
+            <Label fx:id="cumulativeGpaLabel" text="0.00" styleClass="kpi-value"/>
+            <Label text="Cumulative GPA" styleClass="kpi-label"/>
+        </VBox>
+        <VBox styleClass="kpi-card" spacing="2">
+            <Label fx:id="standingLabel" text="—" styleClass="kpi-value"/>
+            <Label text="Academic Standing" styleClass="kpi-label"/>
+        </VBox>
+        <VBox styleClass="kpi-card" spacing="2">
+            <Label fx:id="creditsLabel" text="0" styleClass="kpi-value"/>
+            <Label text="Completed Credits" styleClass="kpi-label"/>
+        </VBox>
+    </HBox>
+
+    <Label fx:id="emptyLabel" styleClass="muted-text" wrapText="true" visible="false" managed="false"
+           text="You have no enrollments yet. Register for courses to see your grades here."/>
+
+    <TableView fx:id="gradesTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="colCourseCode"  text="Course"     prefWidth="90"/>
+            <TableColumn fx:id="colCourseTitle" text="Title"      prefWidth="190"/>
+            <TableColumn fx:id="colCredits"     text="Cr."        prefWidth="45"/>
+            <TableColumn fx:id="colCoursework"  text="Coursework" prefWidth="105"/>
+            <TableColumn fx:id="colMidterm"     text="Midterm"    prefWidth="105"/>
+            <TableColumn fx:id="colFinal"       text="Final"      prefWidth="105"/>
+            <TableColumn fx:id="colTotal"       text="Total"      prefWidth="90"/>
+            <TableColumn fx:id="colLetter"      text="Letter"     prefWidth="65"/>
+            <TableColumn fx:id="colPoints"      text="Points"     prefWidth="65"/>
+            <TableColumn fx:id="colStatus"      text="Status"     prefWidth="215"/>
+        </columns>
+    </TableView>
+
+    <Label fx:id="repeatNote" styleClass="muted-label" wrapText="true" visible="false" managed="false"
+           text="Rows marked Repeated are earlier attempts. Only your most recent attempt counts towards your GPA."/>
+</VBox>

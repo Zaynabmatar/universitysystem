@@ -5,13 +5,16 @@ import com.university.dao.EnrollmentDAO;
 import com.university.dao.GradeDAO;
 import com.university.dao.ProgramDAO;
 import com.university.dao.ProgramRequirementDAO;
+import com.university.dao.SemesterDAO;
 import com.university.dao.StudentDAO;
 import com.university.enums.AcademicStanding;
 import com.university.enums.NotificationType;
 import com.university.enums.StudentStatus;
 import com.university.model.Grade;
 import com.university.model.Program;
+import com.university.model.Semester;
 import com.university.model.Student;
+import com.university.model.StudentGradeRow;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -45,6 +48,7 @@ public class AcademicService {
     private final EnrollmentDAO enrollmentDao = new EnrollmentDAO();
     private final ProgramDAO programDao = new ProgramDAO();
     private final ProgramRequirementDAO requirementDao = new ProgramRequirementDAO();
+    private final SemesterDAO semesterDao = new SemesterDAO();
     private final NotificationService notifications = new NotificationService();
 
     /** Gives access to the connection helpers without exposing a whole data access object. */
@@ -167,6 +171,34 @@ public class AcademicService {
     /** The average recomputed from the grades, without touching the cache. */
     public BigDecimal currentGpa(int studentId) {
         return gradeDao.calculateCumulativeGpa(studentId);
+    }
+
+    /**
+     * Section 5.3 — the average for one semester alone, on the same rules as the cumulative one
+     * (submitted grades only, counting attempts only, W and I excluded).
+     */
+    public BigDecimal termGpa(int studentId, int semesterId) {
+        return gradeDao.calculateTermGpa(studentId, semesterId);
+    }
+
+    /**
+     * What the student sees on My Grades: their enrollments with the published grade attached,
+     * and nothing at all attached while a grade is still a draft.
+     *
+     * @param semesterId one semester, or null for the whole record
+     */
+    public List<StudentGradeRow> gradeRows(int studentId, Integer semesterId) {
+        return gradeDao.findStudentGradeRows(studentId, semesterId);
+    }
+
+    /** The semesters the student has actually studied in, newest first. */
+    public List<Semester> semestersStudied(int studentId) {
+        return semesterDao.findWithEnrollments(studentId);
+    }
+
+    /** The student's stored record, for the standing and credit figures shown beside the GPA. */
+    public Student academicRecordOf(int studentId) {
+        return requireStudent(studentId);
     }
 
     /** The credits actually earned. */
