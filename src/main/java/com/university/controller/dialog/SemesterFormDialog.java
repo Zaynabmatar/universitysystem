@@ -24,7 +24,7 @@ import java.util.List;
  * a single row, and is changed only by the "Make This The Current Semester"
  * button on the screen.</p>
  */
-public class SemesterFormDialog extends Dialog<Semester> {
+public final class SemesterFormDialog extends Dialog<Semester> {
 
     private final TextField nameField          = new TextField();
     private final TextField academicYearField  = new TextField();

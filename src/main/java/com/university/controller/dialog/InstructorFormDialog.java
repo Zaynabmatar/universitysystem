@@ -24,7 +24,7 @@ import java.util.List;
  * username from the employee number and assigns the account's mandatory
  * {@code <user_id>@iuL} password once the row exists.</p>
  */
-public class InstructorFormDialog extends Dialog<Instructor> {
+public final class InstructorFormDialog extends Dialog<Instructor> {
 
     private final TextField employeeNumberField      = new TextField();
     private final TextField firstNameField            = new TextField();
