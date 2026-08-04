@@ -19,7 +19,11 @@
             <Label text="University Registration System" styleClass="app-name"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Label fx:id="semesterLabel" text=""/>
-            <Button fx:id="notificationsButton" text="Notifications" onAction="#handleNotifications"/>
+            <StackPane styleClass="bell-stack">
+                <Button fx:id="notificationsButton" text="🔔 Notifications" onAction="#handleNotifications"/>
+                <Label fx:id="unreadBadge" text="0" styleClass="bell-badge"
+                       StackPane.alignment="TOP_RIGHT" managed="false" visible="false"/>
+            </StackPane>
             <Label fx:id="userLabel" text=""/>
             <Button fx:id="logoutButton" text="Log out" onAction="#handleLogout"/>
         </HBox>

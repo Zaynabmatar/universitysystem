@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.NotificationsController"
+      prefWidth="460" prefHeight="520" spacing="0" styleClass="notifications-popup">
+
+    <HBox alignment="CENTER_LEFT" spacing="10" styleClass="popup-header">
+        <padding><Insets top="12" right="14" bottom="12" left="14"/></padding>
+        <Label text="Notifications" styleClass="popup-title"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="unreadLabel" text="0 unread" styleClass="badge-label"/>
+        <Button fx:id="markAllButton" text="Mark all read" onAction="#handleMarkAllRead"/>
+    </HBox>
+
+    <Separator/>
+
+    <ListView fx:id="notificationList" VBox.vgrow="ALWAYS" styleClass="notification-list"/>
+
+    <HBox alignment="CENTER_RIGHT" spacing="10">
+        <padding><Insets top="10" right="14" bottom="12" left="14"/></padding>
+        <Label fx:id="emptyLabel" text="" styleClass="muted-label"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="closeButton" text="Close" onAction="#handleClose"/>
+    </HBox>
+</VBox>

@@ -10,6 +10,7 @@ import com.university.model.Instructor;
 import com.university.model.Section;
 import com.university.model.SectionSchedule;
 import com.university.model.Semester;
+import com.university.model.Waitlist;
 import com.university.service.CourseService;
 import com.university.service.InstructorService;
 import com.university.service.RegistrationException;
@@ -18,6 +19,7 @@ import com.university.service.SectionService;
 import com.university.service.SemesterService;
 import com.university.service.ServiceException;
 import com.university.service.Session;
+import com.university.service.WaitlistService;
 import com.university.util.AlertUtil;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -75,14 +77,22 @@ public class StudentRegistrationController {
     @FXML private TableColumn<Section, String> myColRoom;
     @FXML private Button dropButton;
 
+    @FXML private TableView<Waitlist> waitlistTable;
+    @FXML private TableColumn<Waitlist, String> wlColCourse;
+    @FXML private TableColumn<Waitlist, String> wlColSection;
+    @FXML private TableColumn<Waitlist, Integer> wlColPosition;
+    @FXML private Button leaveWaitlistButton;
+
     private final RegistrationService registrationService = new RegistrationService();
     private final SectionService sectionService = new SectionService();
     private final SemesterService semesterService = new SemesterService();
     private final CourseService courseService = new CourseService();
     private final InstructorService instructorService = new InstructorService();
+    private final WaitlistService waitlistService = new WaitlistService();
 
     private final ObservableList<Section> availableRows = FXCollections.observableArrayList();
     private final ObservableList<Section> myRows = FXCollections.observableArrayList();
+    private final ObservableList<Waitlist> waitlistRows = FXCollections.observableArrayList();
 
     private List<Course> courses = List.of();
     private List<Department> departments = List.of();
@@ -134,10 +144,18 @@ public class StudentRegistrationController {
         myColRoom.setCellValueFactory(c -> new SimpleStringProperty(
                 c.getValue().getRoom() == null ? "—" : c.getValue().getRoom()));
 
+        wlColCourse.setCellValueFactory(c -> new SimpleStringProperty(
+                courseCodeOf(sectionOf(c.getValue()).map(Section::getCourseId).orElse(-1))));
+        wlColSection.setCellValueFactory(c -> new SimpleStringProperty(
+                sectionOf(c.getValue()).map(Section::getSectionNumber).orElse("—")));
+        wlColPosition.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getPosition()));
+
         availableTable.setItems(availableRows);
         availableTable.setPlaceholder(new Label("No sections match your filters."));
         myTable.setItems(myRows);
         myTable.setPlaceholder(new Label("You are not registered in any section this semester."));
+        waitlistTable.setItems(waitlistRows);
+        waitlistTable.setPlaceholder(new Label("You are not on any waiting list."));
 
         departmentFilter.getItems().add(null);
         departmentFilter.getItems().addAll(departments);
@@ -156,6 +174,7 @@ public class StudentRegistrationController {
 
         registerButton.disableProperty().bind(availableTable.getSelectionModel().selectedItemProperty().isNull());
         dropButton.disableProperty().bind(myTable.getSelectionModel().selectedItemProperty().isNull());
+        leaveWaitlistButton.disableProperty().bind(waitlistTable.getSelectionModel().selectedItemProperty().isNull());
 
         updateSemesterBanner();
         reload();
@@ -212,6 +231,14 @@ public class StudentRegistrationController {
         return sectionService.listMeetings(sectionId).stream().anyMatch(m -> m.getDayOfWeek() == day);
     }
 
+    private java.util.Optional<Section> sectionOf(Waitlist waitlist) {
+        try {
+            return java.util.Optional.ofNullable(sectionService.findById(waitlist.getSectionId()));
+        } catch (RuntimeException e) {
+            return java.util.Optional.empty();
+        }
+    }
+
     // ------------------------------------------------------------------ data
 
     private void updateSemesterBanner() {
@@ -227,7 +254,16 @@ public class StudentRegistrationController {
     private void reload() {
         reloadAvailable();
         reloadMine();
+        reloadWaitlist();
         updateCreditsBadge();
+    }
+
+    private void reloadWaitlist() {
+        try {
+            waitlistRows.setAll(waitlistService.getMyWaitlist(studentId));
+        } catch (Exception e) {
+            AlertUtil.error("Could not load your waitlist", "Your waitlist entries could not be loaded.", e);
+        }
     }
 
     private void reloadAvailable() {
@@ -346,6 +382,7 @@ public class StudentRegistrationController {
                     "You are #" + ex.getWaitlistPosition()
                             + " in line. You will be notified if a seat opens.");
             errorLabel.setText("");
+            reload();
         } catch (Exception e) {
             AlertUtil.error("Could not join the waiting list", "The waiting list could not be updated.", e);
         }
@@ -372,16 +409,44 @@ public class StudentRegistrationController {
 
         try {
             RegistrationService.DropResult result = registrationService.dropSection(studentId, selected.getSectionId());
+            String message = result.getResultMessage();
+            if (result.getPromotionMessage() != null) {
+                message += "\n\nThe next student on the waiting list has been enrolled automatically.";
+            }
             if (result.isWithdrawal()) {
-                AlertUtil.warn(result.getResultTitle(), result.getResultMessage());
+                AlertUtil.warn(result.getResultTitle(), message);
             } else {
-                AlertUtil.info(result.getResultTitle(), result.getResultMessage());
+                AlertUtil.info(result.getResultTitle(), message);
             }
             reload();
         } catch (ServiceException se) {
             AlertUtil.warn("Cannot drop this course", se.getMessage());
         } catch (Exception e) {
             AlertUtil.error("Could not drop the course", "The change could not be completed.", e);
+        }
+    }
+
+    @FXML
+    private void handleLeaveWaitlist() {
+        Waitlist selected = waitlistTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            return;
+        }
+        String label = sectionOf(selected)
+                .map(s -> courseCodeOf(s.getCourseId()) + "-" + s.getSectionNumber())
+                .orElse("this section");
+
+        if (!AlertUtil.confirm("Leave the waiting list",
+                "Leave the waiting list for " + label + "?")) {
+            return;
+        }
+        try {
+            waitlistService.leaveWaitlist(studentId, selected.getSectionId());
+            AlertUtil.success("Removed from the waiting list",
+                    "You are no longer on the waitlist for " + label + ".");
+            reload();
+        } catch (Exception e) {
+            AlertUtil.error("Could not leave the waiting list", "The waiting list could not be updated.", e);
         }
     }
 }

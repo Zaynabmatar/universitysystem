@@ -72,4 +72,17 @@
     <HBox spacing="10" alignment="CENTER_LEFT">
         <Button fx:id="dropButton" text="Drop / Withdraw" onAction="#handleDrop"/>
     </HBox>
+
+    <Label text="My waitlist" styleClass="section-title"/>
+    <TableView fx:id="waitlistTable" prefHeight="150">
+        <columns>
+            <TableColumn fx:id="wlColCourse"   text="Course"   prefWidth="90"/>
+            <TableColumn fx:id="wlColSection"  text="Section"  prefWidth="90"/>
+            <TableColumn fx:id="wlColPosition" text="Position" prefWidth="90"/>
+        </columns>
+    </TableView>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Button fx:id="leaveWaitlistButton" text="Leave waitlist" onAction="#handleLeaveWaitlist"/>
+    </HBox>
 </VBox>

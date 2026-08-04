@@ -2,14 +2,24 @@ package com.university.controller;
 
 import com.university.enums.UserRole;
 import com.university.service.AuthService;
+import com.university.service.NotificationService;
 import com.university.service.Session;
 import com.university.util.AlertUtil;
 import com.university.util.SceneManager;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import java.util.List;
 
@@ -28,10 +38,13 @@ public class MainShellController {
     @FXML private Label userLabel;
     @FXML private Label semesterLabel;
     @FXML private Button notificationsButton;
+    @FXML private Label unreadBadge;
     @FXML private Button logoutButton;
 
     private final AuthService authService = new AuthService();
+    private final NotificationService notificationService = new NotificationService();
     private Button activeButton;
+    private Timeline bellRefresh;
 
     /** One sidebar entry: the text the user sees and the FXML it opens. */
     private record MenuEntry(String label, String fxml) { }
@@ -85,6 +98,32 @@ public class MainShellController {
         // Role-based routing: land on the dashboard for this role.
         MenuEntry home = menu.get(0);
         SceneManager.getInstance().navigateTo(home.fxml(), home.label());
+
+        initNotificationBell();
+    }
+
+    /** The bell is visible for all three roles — admins and instructors get notifications too. */
+    private void initNotificationBell() {
+        refreshBell();
+        // Polls so a promotion made in another window (or by another user) shows up without
+        // the student having to navigate away and back.
+        bellRefresh = new Timeline(new KeyFrame(Duration.seconds(30), e -> refreshBell()));
+        bellRefresh.setCycleCount(Animation.INDEFINITE);
+        bellRefresh.play();
+    }
+
+    /** Public so any screen can call it right after an action that creates a notification. */
+    public void refreshBell() {
+        try {
+            int unread = notificationService.unreadCount(Session.current().getUser().getUserId());
+            boolean show = unread > 0;
+            unreadBadge.setText(unread > 99 ? "99+" : String.valueOf(unread));
+            unreadBadge.setVisible(show);
+            unreadBadge.setManaged(show);
+        } catch (RuntimeException e) {
+            unreadBadge.setVisible(false);
+            unreadBadge.setManaged(false);
+        }
     }
 
     private List<MenuEntry> menuFor(UserRole role) {
@@ -129,14 +168,34 @@ public class MainShellController {
 
     @FXML
     private void handleNotifications() {
-        // Phase 10 replaces this with the notifications.fxml popup.
-        AlertUtil.info("Notifications", "Notifications will be available in a later phase.");
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource(SceneManager.FXML_DIR + "notifications.fxml"));
+            Parent root = loader.load();
+            NotificationsController controller = loader.getController();
+            controller.setOnCloseCallback(this::refreshBell);
+
+            Stage popup = new Stage();
+            popup.initOwner(notificationsButton.getScene().getWindow());
+            popup.initModality(Modality.WINDOW_MODAL);
+            popup.setTitle("Notifications");
+            Scene scene = new Scene(root);
+            SceneManager.getInstance().applyStylesheet(scene);
+            popup.setScene(scene);
+            popup.showAndWait();
+
+            refreshBell();
+        } catch (Exception e) {
+            AlertUtil.error("Notifications", "The notifications window could not be opened.", e);
+        }
     }
 
     @FXML
     private void handleLogout() {
         if (!AlertUtil.confirm("Log out", "Are you sure you want to log out?")) {
             return;
+        }
+        if (bellRefresh != null) {
+            bellRefresh.stop();
         }
         authService.logout();
         SceneManager.getInstance().switchRoot("login.fxml", "University Registration System — Login");
