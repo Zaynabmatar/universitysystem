@@ -1,6 +1,8 @@
 package com.university.util;
 
+import javafx.application.Platform;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -69,11 +71,27 @@ public final class AlertUtil {
     /**
      * "Are you sure?" — project_details.md Section 13: every destructive action asks first.
      *
+     * <p>Cancel is the default and focused button, never OK, so a stray Enter key press —
+     * or the professor watching over a shoulder — cannot accidentally trigger the destructive
+     * action (Phase 15 hardening rule H4).</p>
+     *
      * @return true only when the user clicked OK.
      */
     public static boolean confirm(String title, String message) {
         Alert alert = base(Alert.AlertType.CONFIRMATION, title, message);
         alert.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+
+        Button okButton = (Button) alert.getDialogPane().lookupButton(ButtonType.OK);
+        Button cancelButton = (Button) alert.getDialogPane().lookupButton(ButtonType.CANCEL);
+        if (okButton != null) {
+            okButton.setDefaultButton(false);
+        }
+        if (cancelButton != null) {
+            cancelButton.setDefaultButton(true);
+            cancelButton.setCancelButton(true);
+            Platform.runLater(cancelButton::requestFocus);
+        }
+
         Optional<ButtonType> result = alert.showAndWait();
         return result.isPresent() && result.get() == ButtonType.OK;
     }

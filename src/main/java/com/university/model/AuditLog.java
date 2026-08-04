@@ -18,6 +18,7 @@ public class AuditLog {
 
     private int logId;
     private Integer userId;
+    private String username;      // joined from users; "System / SSMS" when userId is null
     private AuditActionType actionType;
     private String tableName;
     private Integer recordId;
@@ -58,6 +59,15 @@ public class AuditLog {
 
     public void setUserId(Integer userId) {
         this.userId = userId;
+    }
+
+    /** Not a column of audit_log — joined in by {@code AuditLogDAO.search}. */
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public AuditActionType getActionType() {
