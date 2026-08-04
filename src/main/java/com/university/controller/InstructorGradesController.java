@@ -403,8 +403,6 @@ public class InstructorGradesController {
 
     /**
      * Section 2.2 — "Export their own section's grade sheet to CSV".
-     *
-     * <p>TODO Phase 14: move this to {@code CsvExporter}.</p>
      */
     @FXML
     private void handleExportCsv() {
