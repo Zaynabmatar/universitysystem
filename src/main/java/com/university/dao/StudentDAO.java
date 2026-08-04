@@ -145,6 +145,22 @@ public class StudentDAO extends AbstractDAO implements GenericDAO<Student> {
                 cumulativeGpa, completedCredits, standing, studentId) > 0;
     }
 
+    /**
+     * Writes the cached academic figures together with {@code probation_count} and
+     * {@code status} — Section 5.4: a second term on probation also suspends the account.
+     * Pass the student's unchanged status when this refresh is not the one causing a
+     * suspension, so an already-GRADUATED or WITHDRAWN student is never overwritten back to
+     * something else.
+     */
+    public boolean updateAcademicCache(Connection connection, int studentId, BigDecimal cumulativeGpa,
+                                       int completedCredits, AcademicStanding standing,
+                                       int probationCount, StudentStatus status) {
+        return executeUpdate(connection, "UPDATE dbo.students SET cumulative_gpa = ?, "
+                        + "completed_credits = ?, academic_standing = ?, probation_count = ?, "
+                        + "status = ? WHERE student_id = ?",
+                cumulativeGpa, completedCredits, standing, probationCount, status, studentId) > 0;
+    }
+
     @Override
     public int insert(Student entity) {
         return insertAndReturnKey(INSERT, insertParams(entity));

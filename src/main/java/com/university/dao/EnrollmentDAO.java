@@ -169,6 +169,25 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
                 countsInGpa, enrollmentId) > 0;
     }
 
+    /**
+     * Section 5.5 repeat policy, step 2 — every OLDER COMPLETED attempt at the same course loses
+     * {@code counts_in_gpa}, so only the newest attempt affects the average. Both attempts stay
+     * on the transcript; nothing is deleted. Keyed on {@code course_id}, not {@code section_id}:
+     * a repeat is a second attempt at the same course, in any section, in any semester.
+     *
+     * @return how many older attempts were retired
+     */
+    public int retireOlderCompletedAttempts(Connection connection, int studentId, int courseId,
+                                            int newEnrollmentId) {
+        return executeUpdate(connection,
+                "UPDATE e SET e.counts_in_gpa = 0 "
+                + "FROM dbo.enrollments e "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "WHERE e.student_id = ? AND s.course_id = ? AND e.enrollment_id <> ? "
+                + "AND e.status = 'COMPLETED'",
+                studentId, courseId, newEnrollmentId);
+    }
+
     @Override
     public int insert(Enrollment entity) {
         return insertAndReturnKey(INSERT, insertParams(entity));

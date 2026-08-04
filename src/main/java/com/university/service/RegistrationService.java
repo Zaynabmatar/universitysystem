@@ -197,6 +197,12 @@ public class RegistrationService {
                 enrollmentId = enrollmentDao.insert(connection, enrollment);
             }
 
+            // Section 5.5 repeat policy, step 2 — the new attempt has just been created above;
+            // every older COMPLETED attempt at this course now stops counting in the GPA.
+            if (repeat) {
+                enrollmentDao.retireOlderCompletedAttempts(connection, studentId, course.getCourseId(), enrollmentId);
+            }
+
             notifications.notify(connection, student.getUserId(), NotificationType.REGISTRATION,
                     "Registered successfully",
                     "You are now registered in " + course.getCourseCode() + "-" + section.getSectionNumber()

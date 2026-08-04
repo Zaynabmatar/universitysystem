@@ -453,18 +453,20 @@ BEGIN TRY
     );
 
     /* ---- E2. grades : 1-to-1 with enrollments -----------------------------
-       Components: partial_mark, lab_mark (NULL when the course has no lab),
-       final_mark. total_mark is written explicitly by the application.
-       result_status is what the student sees next to the numeric total.
-       grade_points is KEPT - GPA, prerequisites and reports all depend on it.
+       Components: coursework_mark (30%), midterm_mark (30%), final_mark (40%) -
+       project_details.md Section 5.1. total_mark is written explicitly by the
+       application. result_status is what the student sees next to the numeric
+       total. grade_points is KEPT - GPA, prerequisites and reports all depend
+       on it. letter_grade also allows W (withdrawn) and I (incomplete), Section
+       5.2 - neither counts in the GPA.
     ------------------------------------------------------------------------ */
     CREATE TABLE dbo.grades
     (
         grade_id         INT          IDENTITY(1,1) NOT NULL,
         enrollment_id    INT          NOT NULL,
-        partial_mark     DECIMAL(5,2) NULL,
-        lab_mark         DECIMAL(5,2) NULL,   -- NULL = this course has no lab
-        final_mark       DECIMAL(5,2) NULL,
+        coursework_mark  DECIMAL(5,2) NULL,   -- weight 30%
+        midterm_mark     DECIMAL(5,2) NULL,   -- weight 30%
+        final_mark       DECIMAL(5,2) NULL,   -- weight 40%
         total_mark       DECIMAL(5,2) NULL,
         letter_grade     NVARCHAR(2)  NULL,
         grade_points     DECIMAL(3,2) NULL,
@@ -486,13 +488,14 @@ BEGIN TRY
         CONSTRAINT FK_grades_modified_by  FOREIGN KEY (last_modified_by)
             REFERENCES dbo.users (user_id)             ON DELETE NO ACTION,
 
-        CONSTRAINT CK_grades_partial CHECK (partial_mark  BETWEEN 0 AND 100),
-        CONSTRAINT CK_grades_lab     CHECK (lab_mark      BETWEEN 0 AND 100),
-        CONSTRAINT CK_grades_final   CHECK (final_mark    BETWEEN 0 AND 100),
-        CONSTRAINT CK_grades_total   CHECK (total_mark    BETWEEN 0 AND 100),
-        CONSTRAINT CK_grades_points  CHECK (grade_points  BETWEEN 0.00 AND 4.00),
-        CONSTRAINT CK_grades_letter  CHECK (letter_grade  IN (N'A', N'B', N'C', N'D', N'F')),
-        CONSTRAINT CK_grades_result  CHECK (result_status IN (N'PASSED', N'FAILED'))
+        CONSTRAINT CK_grades_coursework CHECK (coursework_mark BETWEEN 0 AND 100),
+        CONSTRAINT CK_grades_midterm    CHECK (midterm_mark    BETWEEN 0 AND 100),
+        CONSTRAINT CK_grades_final      CHECK (final_mark      BETWEEN 0 AND 100),
+        CONSTRAINT CK_grades_total      CHECK (total_mark      BETWEEN 0 AND 100),
+        CONSTRAINT CK_grades_points     CHECK (grade_points    BETWEEN 0.00 AND 4.00),
+        CONSTRAINT CK_grades_letter     CHECK (letter_grade IN
+            (N'A', N'A-', N'B+', N'B', N'B-', N'C+', N'C', N'C-', N'D+', N'D', N'F', N'W', N'I')),
+        CONSTRAINT CK_grades_result     CHECK (result_status IN (N'PASSED', N'FAILED'))
     );
 
     /* ---- E3. waitlist : the queue for a FULL section ---------------------- */
@@ -1155,16 +1158,16 @@ BEGIN TRY
         (1, 4, N'ENROLLED',  '2025-09-16T10:05:00');
 
     /* ---- grades ----------------------------------------------------------
-       CS101 has a lab, so lab_mark is filled. A course without a lab would
-       leave lab_mark NULL - which is why the column is nullable.
-       Letter -> points: A=4.00  B=3.00  C=2.00  D=1.00  F=0.00
+       total_mark = 0.30*coursework + 0.30*midterm + 0.40*final (Section 5.1).
+       Row 1: 0.30*85 + 0.30*90 + 0.40*88 = 87.70 -> B+ (3.30, Section 5.2).
+       Row 2: 0.30*40 + 0.30*45 + 0.40*30 = 37.50 -> F  (0.00).
        submitted_at falls inside the Spring 2025 grade-entry window
        (2025-05-25 .. 2025-06-20), so rule G2 is satisfied.
     ---------------------------------------------------------------------- */
     INSERT INTO dbo.grades
-        (enrollment_id, partial_mark, lab_mark, final_mark, total_mark,
+        (enrollment_id, coursework_mark, midterm_mark, final_mark, total_mark,
          letter_grade, grade_points, result_status, is_submitted, submitted_by, submitted_at) VALUES
-        (1, 85.00, 90.00, 88.00, 87.50, N'A', 4.00, N'PASSED', 1, 2, '2025-06-05T14:00:00'),
+        (1, 85.00, 90.00, 88.00, 87.70, N'B+', 3.30, N'PASSED', 1, 2, '2025-06-05T14:00:00'),
         (2, 40.00, 45.00, 30.00, 37.50, N'F', 0.00, N'FAILED', 1, 2, '2025-06-05T14:05:00');
 
     /* ---- waitlist ---------------------------------------------------------
@@ -1282,7 +1285,7 @@ BEGIN TRY
        during the demo.
     ---------------------------------------------------------------------- */
     INSERT INTO dbo.audit_log (user_id, action_type, table_name, record_id, new_value, description) VALUES
-        (2, N'INSERT', N'grades', 1, N'total_mark=87.50; letter=A; result=PASSED', N'Initial grade entry for CS101.');
+        (2, N'INSERT', N'grades', 1, N'total_mark=87.70; letter=B+; result=PASSED', N'Initial grade entry for CS101.');
 
     COMMIT TRANSACTION;
     PRINT N'>>> SAMPLE DATA INSERTED SUCCESSFULLY.';
@@ -1292,6 +1295,68 @@ BEGIN CATCH
     PRINT N'!!! SAMPLE DATA FAILED - all inserts were rolled back.';
     THROW;
 END CATCH
+GO
+
+
+/* ============================================================================
+   PART 4B - PROGRAMMABILITY
+   project_details.md Section 4.16: audit_log is filled automatically by
+   database triggers, never by Java. trg_Grade_Audit is the one trigger this
+   project ships with (Phase 11, rule G5 - the registrar's correction of a
+   submitted grade must be auditable even though Java never inserts into
+   audit_log itself).
+============================================================================ */
+IF OBJECT_ID('dbo.trg_Grade_Audit', 'TR') IS NOT NULL
+    DROP TRIGGER dbo.trg_Grade_Audit;
+GO
+
+CREATE TRIGGER dbo.trg_Grade_Audit
+ON dbo.grades
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM inserted) AND NOT EXISTS (SELECT 1 FROM deleted)
+        RETURN;
+
+    -- UPDATE: a row exists in both inserted and deleted.
+    INSERT INTO dbo.audit_log (user_id, action_type, table_name, record_id, old_value, new_value, description)
+    SELECT
+        COALESCE(i.last_modified_by, i.submitted_by),
+        N'UPDATE', N'grades', i.grade_id,
+        CONCAT(N'total=', CONVERT(NVARCHAR(20), d.total_mark), N'; letter=', d.letter_grade,
+               N'; points=', CONVERT(NVARCHAR(20), d.grade_points), N'; submitted=', CONVERT(NVARCHAR(2), d.is_submitted)),
+        CONCAT(N'total=', CONVERT(NVARCHAR(20), i.total_mark), N'; letter=', i.letter_grade,
+               N'; points=', CONVERT(NVARCHAR(20), i.grade_points), N'; submitted=', CONVERT(NVARCHAR(2), i.is_submitted)),
+        CONCAT(N'Grade changed for enrollment ', i.enrollment_id)
+    FROM inserted AS i
+        INNER JOIN deleted AS d ON d.grade_id = i.grade_id;
+
+    -- INSERT: the row is in inserted but not in deleted.
+    INSERT INTO dbo.audit_log (user_id, action_type, table_name, record_id, old_value, new_value, description)
+    SELECT
+        COALESCE(i.last_modified_by, i.submitted_by),
+        N'INSERT', N'grades', i.grade_id,
+        NULL,
+        CONCAT(N'total=', CONVERT(NVARCHAR(20), i.total_mark), N'; letter=', i.letter_grade,
+               N'; points=', CONVERT(NVARCHAR(20), i.grade_points), N'; submitted=', CONVERT(NVARCHAR(2), i.is_submitted)),
+        CONCAT(N'Grade created for enrollment ', i.enrollment_id)
+    FROM inserted AS i
+    WHERE NOT EXISTS (SELECT 1 FROM deleted AS d WHERE d.grade_id = i.grade_id);
+
+    -- DELETE: the row is in deleted but not in inserted.
+    INSERT INTO dbo.audit_log (user_id, action_type, table_name, record_id, old_value, new_value, description)
+    SELECT
+        COALESCE(d.last_modified_by, d.submitted_by),
+        N'DELETE', N'grades', d.grade_id,
+        CONCAT(N'total=', CONVERT(NVARCHAR(20), d.total_mark), N'; letter=', d.letter_grade,
+               N'; points=', CONVERT(NVARCHAR(20), d.grade_points), N'; submitted=', CONVERT(NVARCHAR(2), d.is_submitted)),
+        NULL,
+        CONCAT(N'Grade deleted for enrollment ', d.enrollment_id)
+    FROM deleted AS d
+    WHERE NOT EXISTS (SELECT 1 FROM inserted AS i WHERE i.grade_id = d.grade_id);
+END;
 GO
 
 
