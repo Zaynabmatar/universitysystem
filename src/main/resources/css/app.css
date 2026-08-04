@@ -162,6 +162,12 @@
     -fx-min-width: 240;
     -fx-pref-width: 240;
 }
+/* main_shell.fxml wraps the sidebar in a ScrollPane; without this it falls back to the
+   default white viewport background instead of blending with the dark sidebar. */
+.sidebar-scroll,
+.sidebar-scroll > .viewport {
+    -fx-background-color: #111827;
+}
 .sidebar-header {
     -fx-text-fill: #9ca3af;
     -fx-font-size: 11px;

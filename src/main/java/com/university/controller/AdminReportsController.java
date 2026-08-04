@@ -15,7 +15,6 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.scene.Node;
 import javafx.scene.chart.BarChart;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.PieChart;
@@ -118,10 +117,10 @@ public class AdminReportsController {
             passData = reportService.passRatePerCourse(15);
             trendData = reportService.enrollmentTrend();
 
-            fillBar(deptChart, deptEmpty, deptData, "Enrollments");
-            fillPie(gradeChart, gradeEmpty, gradeData);
+            ChartUtil.fillBar(deptChart, deptEmpty, deptData, "Enrollments");
+            ChartUtil.fillPie(gradeChart, gradeEmpty, gradeData);
             fillPassRate();
-            fillLine(trendChart, trendEmpty, trendData, "Enrollments");
+            ChartUtil.fillLine(trendChart, trendEmpty, trendData, "Enrollments");
 
             fillRows.setAll(reportService.sectionFillRates());
             probRows.setAll(reportService.studentsOnProbation());
@@ -242,45 +241,6 @@ public class AdminReportsController {
     // (context/CHART_RULES.md)
     // =====================================================================
 
-    private void fillBar(BarChart<String, Number> chart, Label empty, List<Slice> data, String seriesName) {
-        chart.getData().clear();
-        boolean hasData = data.stream().anyMatch(s -> s.value > 0);
-        if (hasData) {
-            XYChart.Series<String, Number> series = new XYChart.Series<>();
-            series.setName(seriesName);
-            for (Slice s : data) {
-                series.getData().add(new XYChart.Data<>(s.label, s.value));
-            }
-            chart.getData().add(series);
-        }
-        showOrExplain(chart, empty, hasData);
-    }
-
-    private void fillPie(PieChart chart, Label empty, List<Slice> data) {
-        chart.getData().clear();
-        boolean hasData = !data.isEmpty();
-        if (hasData) {
-            for (Slice s : data) {
-                chart.getData().add(new PieChart.Data(s.label + " (" + (int) s.value + ")", s.value));
-            }
-        }
-        showOrExplain(chart, empty, hasData);
-    }
-
-    private void fillLine(LineChart<String, Number> chart, Label empty, List<Slice> data, String seriesName) {
-        chart.getData().clear();
-        boolean hasData = !data.isEmpty();
-        if (hasData) {
-            XYChart.Series<String, Number> series = new XYChart.Series<>();
-            series.setName(seriesName);
-            for (Slice s : data) {
-                series.getData().add(new XYChart.Data<>(s.label, s.value));
-            }
-            chart.getData().add(series);
-        }
-        showOrExplain(chart, empty, hasData);
-    }
-
     private void fillPassRate() {
         passChart.getData().clear();
         boolean hasData = !passData.isEmpty();
@@ -293,14 +253,7 @@ public class AdminReportsController {
             }
             passChart.getData().add(series);
         }
-        showOrExplain(passChart, passEmpty, hasData);
-    }
-
-    private void showOrExplain(Node chart, Label emptyLabel, boolean hasData) {
-        chart.setVisible(hasData);
-        chart.setManaged(hasData);
-        emptyLabel.setVisible(!hasData);
-        emptyLabel.setManaged(!hasData);
+        ChartUtil.showOrExplain(passChart, passEmpty, hasData);
     }
 
     // =====================================================================
