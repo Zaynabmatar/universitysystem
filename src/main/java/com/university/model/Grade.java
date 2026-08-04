@@ -9,16 +9,17 @@ import java.time.LocalDateTime;
 /**
  * One row of {@code dbo.grades}, paired one to one with an enrolment.
  *
- * <p>Every mark is nullable because an instructor fills them in gradually.
- * {@code labMark} stays null for a course that has no lab. {@code totalMark}
- * is written explicitly by the application, not computed by the database.</p>
+ * <p>Every mark is nullable because an instructor fills them in gradually — a
+ * missing mark means "not marked yet", not "scored nothing" (project_details.md
+ * Section 5.1). {@code totalMark} is written explicitly by the application,
+ * not computed by the database.</p>
  */
 public class Grade {
 
     private int gradeId;
     private int enrollmentId;
-    private BigDecimal partialMark;
-    private BigDecimal labMark;
+    private BigDecimal courseworkMark;
+    private BigDecimal midtermMark;
     private BigDecimal finalMark;
     private BigDecimal totalMark;
     private LetterGrade letterGrade;
@@ -33,15 +34,15 @@ public class Grade {
     public Grade() {
     }
 
-    public Grade(int gradeId, int enrollmentId, BigDecimal partialMark, BigDecimal labMark,
+    public Grade(int gradeId, int enrollmentId, BigDecimal courseworkMark, BigDecimal midtermMark,
                  BigDecimal finalMark, BigDecimal totalMark, LetterGrade letterGrade,
                  BigDecimal gradePoints, ResultStatus resultStatus, boolean submitted,
                  Integer submittedBy, LocalDateTime submittedAt,
                  Integer lastModifiedBy, LocalDateTime lastModifiedAt) {
         this.gradeId = gradeId;
         this.enrollmentId = enrollmentId;
-        this.partialMark = partialMark;
-        this.labMark = labMark;
+        this.courseworkMark = courseworkMark;
+        this.midtermMark = midtermMark;
         this.finalMark = finalMark;
         this.totalMark = totalMark;
         this.letterGrade = letterGrade;
@@ -70,23 +71,25 @@ public class Grade {
         this.enrollmentId = enrollmentId;
     }
 
-    public BigDecimal getPartialMark() {
-        return partialMark;
+    /** Weight 30% (Section 5.1). */
+    public BigDecimal getCourseworkMark() {
+        return courseworkMark;
     }
 
-    public void setPartialMark(BigDecimal partialMark) {
-        this.partialMark = partialMark;
+    public void setCourseworkMark(BigDecimal courseworkMark) {
+        this.courseworkMark = courseworkMark;
     }
 
-    /** Null when the course has no lab component. */
-    public BigDecimal getLabMark() {
-        return labMark;
+    /** Weight 30% (Section 5.1). */
+    public BigDecimal getMidtermMark() {
+        return midtermMark;
     }
 
-    public void setLabMark(BigDecimal labMark) {
-        this.labMark = labMark;
+    public void setMidtermMark(BigDecimal midtermMark) {
+        this.midtermMark = midtermMark;
     }
 
+    /** Weight 40% (Section 5.1). */
     public BigDecimal getFinalMark() {
         return finalMark;
     }
