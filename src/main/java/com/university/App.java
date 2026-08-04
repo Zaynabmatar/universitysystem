@@ -4,6 +4,7 @@ import com.university.database.DBConnection;
 import com.university.util.AlertUtil;
 import com.university.util.SceneManager;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.stage.Stage;
 
 import java.sql.Connection;
@@ -23,7 +24,14 @@ public class App extends Application {
         //    phase-05/context/preflight.md §4. css/app.css carries the styling.
         setUserAgentStylesheet(STYLESHEET_MODENA);
 
-        // 2. Fail fast, and fail politely, if SQL Server is not reachable.
+        // 2. Section 13: even an unexpected bug shows a popup instead of the app vanishing.
+        Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
+            error.printStackTrace();
+            Platform.runLater(() -> AlertUtil.error("Unexpected problem",
+                    "Something went wrong, but the application is still running. Please try that again."));
+        });
+
+        // 3. Fail fast, and fail politely, if SQL Server is not reachable.
         //    Throwable, not Exception: DBConnection builds its pool in a static
         //    initialiser, so the first touch of the class throws
         //    ExceptionInInitializerError — an Error, which catch (Exception)
@@ -32,14 +40,15 @@ public class App extends Application {
         try (Connection ignored = DBConnection.getConnection()) {
             // connection OK
         } catch (Throwable e) {
-            AlertUtil.error("Database connection failed",
-                    "Cannot connect to SQL Server. Check that the service is running, and that the "
-                    + "login details in DBConnection are correct — see DATABASE_SETUP.md",
-                    e);
-            return;   // do not open a broken application
+            e.printStackTrace();
+            // project_details.md Section 13 — the exact wording, character for character.
+            AlertUtil.error("University Registration System",
+                    "Cannot connect to SQL Server. Check that the service is running — see DATABASE_SETUP.md");
+            Platform.exit();
+            return;   // never fall through into a half-built login screen
         }
 
-        // 3. Open the login screen.
+        // 4. Open the login screen.
         SceneManager.getInstance().init(primaryStage);
         SceneManager.getInstance().switchRoot("login.fxml", "University Registration System — Login");
         primaryStage.show();

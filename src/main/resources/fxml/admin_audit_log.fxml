@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.AdminAuditLogController"
+      styleClass="content-page" spacing="12">
+
+    <Label text="Audit Log" styleClass="page-title"/>
+    <Label text="Every row below was written automatically by a database trigger. The application never writes here."
+           styleClass="muted-text"/>
+
+    <FlowPane hgap="10" vgap="8">
+        <VBox spacing="2">
+            <Label text="Table" styleClass="muted-text"/>
+            <ComboBox fx:id="tableFilter" prefWidth="130"/>
+        </VBox>
+        <VBox spacing="2">
+            <Label text="Action" styleClass="muted-text"/>
+            <ComboBox fx:id="actionFilter" prefWidth="110"/>
+        </VBox>
+        <VBox spacing="2">
+            <Label text="User" styleClass="muted-text"/>
+            <ComboBox fx:id="userFilter" prefWidth="170"/>
+        </VBox>
+        <VBox spacing="2">
+            <Label text="From" styleClass="muted-text"/>
+            <DatePicker fx:id="fromDate" prefWidth="140"/>
+        </VBox>
+        <VBox spacing="2">
+            <Label text="To" styleClass="muted-text"/>
+            <DatePicker fx:id="toDate" prefWidth="140"/>
+        </VBox>
+        <VBox spacing="2">
+            <Label text="Search text" styleClass="muted-text"/>
+            <TextField fx:id="searchField" promptText="e.g. total, letter, points" prefWidth="200"/>
+        </VBox>
+        <VBox spacing="2" alignment="BOTTOM_LEFT">
+            <HBox spacing="8">
+                <Button fx:id="searchButton" text="Search" onAction="#handleSearch" defaultButton="true"/>
+                <Button text="Clear filters" onAction="#handleClear"/>
+                <Button text="Export CSV" onAction="#handleExport"/>
+            </HBox>
+        </VBox>
+    </FlowPane>
+
+    <SplitPane fx:id="split" orientation="VERTICAL" dividerPositions="0.65" VBox.vgrow="ALWAYS">
+
+        <TableView fx:id="logTable">
+            <columns>
+                <TableColumn fx:id="colId" text="#" prefWidth="60"/>
+                <TableColumn fx:id="colWhen" text="When" prefWidth="150"/>
+                <TableColumn fx:id="colUser" text="User" prefWidth="120"/>
+                <TableColumn fx:id="colAction" text="Action" prefWidth="80"/>
+                <TableColumn fx:id="colTable" text="Table" prefWidth="90"/>
+                <TableColumn fx:id="colRecord" text="Record ID" prefWidth="80"/>
+                <TableColumn fx:id="colDesc" text="What changed" prefWidth="420"/>
+            </columns>
+        </TableView>
+
+        <VBox spacing="6">
+            <padding><Insets top="8" right="4" bottom="4" left="4"/></padding>
+            <Label text="Details of the selected entry" styleClass="section-title"/>
+            <HBox spacing="14" VBox.vgrow="ALWAYS">
+                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                    <Label text="Before" styleClass="muted-text"/>
+                    <TextArea fx:id="oldValueArea" editable="false" wrapText="true" prefRowCount="5"/>
+                </VBox>
+                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                    <Label text="After" styleClass="muted-text"/>
+                    <TextArea fx:id="newValueArea" editable="false" wrapText="true" prefRowCount="5"/>
+                </VBox>
+            </HBox>
+        </VBox>
+    </SplitPane>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label fx:id="countLabel" styleClass="muted-text" text=""/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label text="Read-only. Rows are written by trg_Grade_Audit." styleClass="muted-text"/>
+    </HBox>
+</VBox>

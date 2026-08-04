@@ -1,6 +1,8 @@
 package com.university.service;
 
+import com.university.dao.AuditLogDAO;
 import com.university.dao.ReportDAO;
+import com.university.model.AuditLog;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,6 +24,7 @@ import java.util.List;
 public class ReportService {
 
     private final ReportDAO reportDao = new ReportDAO();
+    private final AuditLogDAO auditLogDao = new AuditLogDAO();
 
     // =====================================================================
     // Small carrier types. One per report. Public fields on purpose: these are
@@ -193,5 +196,25 @@ public class ReportService {
 
     public List<TopGpaRow> topStudentsByGpa(int howMany) {
         return reportDao.topStudentsByGpa(howMany);
+    }
+
+    // =====================================================================
+    // Phase 15 — the audit log viewer.
+    //
+    // project_details.md Section 8 lists no AuditService, so this read-only query lives here,
+    // on the service that already owns "read-only things an administrator looks at". The audit
+    // log is written exclusively by database triggers; nothing on this path ever writes.
+    // =====================================================================
+
+    public List<AuditLog> searchAuditLog(AuditLogDAO.Filter filter) {
+        return auditLogDao.search(filter);
+    }
+
+    public List<String> auditTableNames() {
+        return auditLogDao.distinctTableNames();
+    }
+
+    public List<String> auditActionTypes() {
+        return auditLogDao.distinctActionTypes();
     }
 }

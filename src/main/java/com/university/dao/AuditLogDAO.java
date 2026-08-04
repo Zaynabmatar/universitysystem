@@ -5,7 +5,9 @@ import com.university.model.AuditLog;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -85,5 +87,107 @@ public class AuditLogDAO extends AbstractDAO {
     /** How many entries a table has collected. */
     public int countByTable(String tableName) {
         return queryInt("SELECT COUNT(*) FROM dbo.audit_log WHERE table_name = ?", tableName);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    //  Phase 15 — the audit log viewer. Everything below this line is new.
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    /** The screen's four filters plus a free-text search. Any field left null means "all". */
+    public static final class Filter {
+        public String tableName;     // null for all
+        public AuditActionType actionType;   // null for all
+        public Integer userId;       // null for all users
+        public LocalDate dateFrom;   // inclusive, null for no lower bound
+        public LocalDate dateTo;     // inclusive, null for no upper bound
+        public String searchText;    // matches the description/old/new value, null for no filter
+        public int maxRows = 500;
+    }
+
+    /**
+     * The filtered, searchable view of the log, newest first, with the acting user's name
+     * joined in. Every filter value is a bound parameter — this is exactly the screen where
+     * getting SQL injection wrong would be unforgivable, since every value comes from what an
+     * administrator typed or picked.
+     */
+    public List<AuditLog> search(Filter filter) {
+        StringBuilder sql = new StringBuilder(
+                "SELECT TOP (" + clamp(filter.maxRows) + ") "
+                + "a.log_id, a.user_id, u.username, a.action_type, a.table_name, a.record_id, "
+                + "a.old_value, a.new_value, a.description, a.created_at "
+                + "FROM dbo.audit_log a "
+                + "LEFT JOIN dbo.users u ON u.user_id = a.user_id "
+                + "WHERE 1 = 1 ");
+        List<Object> params = new ArrayList<>();
+
+        if (filter.tableName != null && !filter.tableName.isBlank()) {
+            sql.append("AND a.table_name = ? ");
+            params.add(filter.tableName);
+        }
+        if (filter.actionType != null) {
+            sql.append("AND a.action_type = ? ");
+            params.add(filter.actionType.toDb());
+        }
+        if (filter.userId != null) {
+            sql.append("AND a.user_id = ? ");
+            params.add(filter.userId);
+        }
+        if (filter.dateFrom != null) {
+            sql.append("AND a.created_at >= ? ");
+            params.add(Timestamp.valueOf(filter.dateFrom.atStartOfDay()));
+        }
+        if (filter.dateTo != null) {
+            // "to" is INCLUSIVE: everything before midnight at the start of the NEXT day.
+            // "<= dateTo" would silently drop every entry made later on that last day.
+            sql.append("AND a.created_at < ? ");
+            params.add(Timestamp.valueOf(filter.dateTo.plusDays(1).atStartOfDay()));
+        }
+        if (filter.searchText != null && !filter.searchText.isBlank()) {
+            sql.append("AND (a.description LIKE ? OR a.old_value LIKE ? OR a.new_value LIKE ?) ");
+            String like = "%" + filter.searchText.trim() + "%";
+            params.add(like);
+            params.add(like);
+            params.add(like);
+        }
+        sql.append("ORDER BY a.log_id DESC");
+
+        return queryList(sql.toString(), AuditLogDAO::mapSearchRow, params.toArray());
+    }
+
+    /** The distinct table names actually present in the log, for the filter drop-down. */
+    public List<String> distinctTableNames() {
+        return distinctColumn("SELECT DISTINCT table_name FROM dbo.audit_log ORDER BY table_name",
+                "table_name");
+    }
+
+    /** The distinct action types actually present in the log, for the filter drop-down. */
+    public List<String> distinctActionTypes() {
+        return distinctColumn("SELECT DISTINCT action_type FROM dbo.audit_log ORDER BY action_type",
+                "action_type");
+    }
+
+    private List<String> distinctColumn(String sql, String column) {
+        return queryList(sql, resultSet -> resultSet.getNString(column));
+    }
+
+    private static AuditLog mapSearchRow(ResultSet rs) throws SQLException {
+        AuditLog log = mapRow(rs);
+        String username = rs.getNString("username");
+        // A null user means the change was made outside the application — directly in SSMS.
+        // That is not a bug; it is the strongest evidence that a TRIGGER wrote this row.
+        log.setUsername(username == null ? "System / SSMS" : username);
+        return log;
+    }
+
+    /** {@code TOP (?)} is not accepted in every context, so the count is clamped and inlined. */
+    private String clamp(int n) {
+        int bounded = n;
+        if (bounded < 1) {
+            bounded = 1;
+        }
+        if (bounded > 5000) {
+            bounded = 5000;
+        }
+        return Integer.toString(bounded);
     }
 }
