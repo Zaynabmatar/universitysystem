@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressIndicator?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.StudentRecommendationController"
+      styleClass="content-page" spacing="12">
+
+    <!-- ===== header ===== -->
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <VBox spacing="2">
+            <Label text="Recommended Courses" styleClass="page-title"/>
+            <Label fx:id="subtitleLabel" styleClass="muted-text" wrapText="true"
+                   text="Three layers: eligibility rules, degree fit out of 100, and students like you up to +15."/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <ProgressIndicator fx:id="busyIndicator" managed="false" visible="false"
+                           prefWidth="24" prefHeight="24"/>
+        <Button fx:id="explainButton" text="Why this order?" onAction="#handleExplain"/>
+        <Button fx:id="runButton" text="Recommend courses for me" onAction="#handleRun"
+                defaultButton="true"/>
+    </HBox>
+
+    <!-- ===== the model strip: proof that the numbers are real ===== -->
+    <HBox fx:id="statsStrip" spacing="12">
+        <VBox styleClass="kpi-card" spacing="2">
+            <Label fx:id="consideredLabel" text="—" styleClass="kpi-value"/>
+            <Label text="Sections Considered" styleClass="kpi-label"/>
+        </VBox>
+        <VBox styleClass="kpi-card" spacing="2">
+            <Label fx:id="survivingLabel" text="—" styleClass="kpi-value"/>
+            <Label text="Passed All Eligibility Rules" styleClass="kpi-label"/>
+        </VBox>
+        <VBox styleClass="kpi-card" spacing="2">
+            <Label fx:id="neighbourLabel" text="—" styleClass="kpi-value"/>
+            <Label text="Similar Students (k)" styleClass="kpi-label"/>
+        </VBox>
+        <VBox styleClass="kpi-card" spacing="2">
+            <Label fx:id="scaleLabel" text="115" styleClass="kpi-value"/>
+            <Label text="Maximum Possible Score" styleClass="kpi-label"/>
+        </VBox>
+    </HBox>
+
+    <Label fx:id="bannerLabel" managed="false" visible="false" styleClass="banner-warn"
+           wrapText="true"/>
+
+    <ScrollPane fx:id="scrollPane" fitToWidth="true" VBox.vgrow="ALWAYS" styleClass="reco-scroll">
+        <content>
+            <VBox fx:id="cardsBox" spacing="14">
+                <padding><Insets top="4" right="6" bottom="10" left="4"/></padding>
+            </VBox>
+        </content>
+    </ScrollPane>
+
+    <Label styleClass="muted-label" wrapText="true"
+           text="Scores are out of 115: up to 100 for how well a course fits your degree plan, plus up to 15 from students with a similar academic history. Everything is computed offline from your own database — no external service is called and no random numbers are used."/>
+</VBox>
