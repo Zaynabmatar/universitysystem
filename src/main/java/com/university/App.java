@@ -18,6 +18,7 @@ import java.sql.Connection;
 public class App extends Application {
 
     @Override
+    @SuppressWarnings("try")   // the connection is opened only to prove it can be; see the try body
     public void start(Stage primaryStage) {
         // 1. Theme. The spec asks for AtlantaFX; that artefact could not be
         //    downloaded here, so this is the documented fallback from

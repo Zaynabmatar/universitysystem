@@ -15,7 +15,7 @@ import java.util.List;
  * project_details.md Section 7 lists the complete set of FXML files and no
  * dialog appears in it.
  */
-public class DepartmentFormDialog extends Dialog<Department> {
+public final class DepartmentFormDialog extends Dialog<Department> {
 
     private final TextField departmentCodeField = new TextField();
     private final TextField departmentNameField = new TextField();

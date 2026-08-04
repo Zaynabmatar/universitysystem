@@ -29,7 +29,7 @@ import java.util.List;
  * consumed until every field is valid, and a message appears under the form
  * (project_details.md Section 13).</p>
  */
-public class StudentFormDialog extends Dialog<Student> {
+public final class StudentFormDialog extends Dialog<Student> {
 
     private final TextField studentNumberField     = new TextField();
     private final TextField firstNameField         = new TextField();

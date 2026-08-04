@@ -37,7 +37,7 @@ import java.util.List;
  * saved" — the OK-button filter reports rules S1, S2 and S3 by keeping the
  * dialog open and showing the service's message.</p>
  */
-public class SectionFormDialog extends Dialog<Boolean> {
+public final class SectionFormDialog extends Dialog<Boolean> {
 
     private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
 

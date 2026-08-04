@@ -22,7 +22,7 @@ import java.util.List;
  * are shown read-only, because changing them would really be a different
  * link (and the service has no "move" operation, only add/remove).</p>
  */
-public class PrerequisiteFormDialog extends Dialog<CoursePrerequisite> {
+public final class PrerequisiteFormDialog extends Dialog<CoursePrerequisite> {
 
     private final ComboBox<Course> courseBox = new ComboBox<>();
     private final ComboBox<Course> prereqBox = new ComboBox<>();

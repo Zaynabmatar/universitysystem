@@ -22,7 +22,7 @@ import java.util.List;
  * one program at a time, and moving an entry to a different course would
  * really be a different plan row.</p>
  */
-public class RequirementFormDialog extends Dialog<ProgramRequirement> {
+public final class RequirementFormDialog extends Dialog<ProgramRequirement> {
 
     private static final String MANDATORY = "Mandatory";
     private static final String ELECTIVE = "Elective";

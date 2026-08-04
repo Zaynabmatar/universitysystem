@@ -105,6 +105,7 @@ public class DBConnection {
     /**
      * Opens a connection and reports the result on the console.
      */
+    @SuppressWarnings("try")   // the connection is opened only to prove it can be
     public static void testConnection() {
         try (Connection connection = getConnection()) {
             System.out.println("Database connected successfully");
