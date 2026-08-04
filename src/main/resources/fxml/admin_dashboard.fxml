@@ -1,13 +1,89 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.BarChart?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.chart.PieChart?>
+<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
       fx:controller="com.university.controller.AdminDashboardController"
-      styleClass="content-page" spacing="10">
-    <Label fx:id="titleLabel" text="Admin Dashboard" styleClass="page-title"/>
-    <Label fx:id="welcomeLabel" styleClass="muted-text"/>
-    <Label text="KPI cards and charts are built in Phase 14." styleClass="muted-text"/>
+      styleClass="content-page" spacing="12">
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <VBox spacing="2">
+            <Label text="Dashboard" styleClass="page-title"/>
+            <Label fx:id="semesterLabel" styleClass="muted-text"/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="reportsButton" text="Full Reports" onAction="#handleOpenReports"/>
+        <Button fx:id="refreshButton" text="Refresh" onAction="#handleRefresh"/>
+    </HBox>
+
+    <ScrollPane fx:id="scrollPane" fitToWidth="true" VBox.vgrow="ALWAYS" styleClass="dashboard-scroll">
+        <VBox spacing="16">
+            <padding><Insets top="4" right="2" bottom="12" left="2"/></padding>
+
+            <!-- Section 10, row 1 — the four KPI cards -->
+            <FlowPane fx:id="kpiRow" hgap="14" vgap="14">
+                <VBox styleClass="kpi-card" spacing="4">
+                    <Label fx:id="kpiStudents" text="—" styleClass="kpi-value"/>
+                    <Label text="Active students" styleClass="kpi-label"/>
+                </VBox>
+                <VBox styleClass="kpi-card" spacing="4">
+                    <Label fx:id="kpiInstructors" text="—" styleClass="kpi-value"/>
+                    <Label text="Instructors" styleClass="kpi-label"/>
+                </VBox>
+                <VBox styleClass="kpi-card" spacing="4">
+                    <Label fx:id="kpiCourses" text="—" styleClass="kpi-value"/>
+                    <Label text="Courses in the catalogue" styleClass="kpi-label"/>
+                </VBox>
+                <VBox styleClass="kpi-card" spacing="4">
+                    <Label fx:id="kpiSections" text="—" styleClass="kpi-value"/>
+                    <Label text="Active sections this semester" styleClass="kpi-label"/>
+                </VBox>
+            </FlowPane>
+
+            <Label fx:id="secondaryLabel" text="" styleClass="muted-text"/>
+
+            <!-- charts -->
+            <HBox spacing="16">
+                <StackPane fx:id="deptHolder" HBox.hgrow="ALWAYS" minHeight="300" styleClass="chart-card">
+                    <BarChart fx:id="deptChart" title="Enrollment per department"
+                              legendVisible="false" animated="false">
+                        <xAxis><CategoryAxis fx:id="deptX" label="Department"/></xAxis>
+                        <yAxis><NumberAxis fx:id="deptY" label="Students enrolled"/></yAxis>
+                    </BarChart>
+                    <Label fx:id="deptEmpty" styleClass="chart-empty" visible="false" managed="false"
+                           text="No enrollments in the current semester yet."/>
+                </StackPane>
+
+                <StackPane fx:id="gradeHolder" HBox.hgrow="ALWAYS" minHeight="300" styleClass="chart-card">
+                    <PieChart fx:id="gradeChart" title="Grade distribution" legendSide="RIGHT" animated="false"/>
+                    <Label fx:id="gradeEmpty" styleClass="chart-empty" visible="false" managed="false"
+                           text="No grades have been submitted yet, so there is nothing to chart."/>
+                </StackPane>
+            </HBox>
+
+            <StackPane fx:id="trendHolder" minHeight="300" styleClass="chart-card">
+                <LineChart fx:id="trendChart" title="Enrollment trend across semesters"
+                           legendVisible="false" animated="false">
+                    <xAxis><CategoryAxis fx:id="trendX" label="Semester"/></xAxis>
+                    <yAxis><NumberAxis fx:id="trendY" label="Enrollments"/></yAxis>
+                </LineChart>
+                <Label fx:id="trendEmpty" styleClass="chart-empty" visible="false" managed="false"
+                       text="No enrollment history yet."/>
+            </StackPane>
+        </VBox>
+    </ScrollPane>
 </VBox>

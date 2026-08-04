@@ -13,6 +13,7 @@ import com.university.service.ServiceException;
 import com.university.service.Session;
 import com.university.service.ValidationException;
 import com.university.util.AlertUtil;
+import com.university.util.CsvExporter;
 import com.university.util.GradeCalculator;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -27,13 +28,10 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.cell.TextFieldTableCell;
-import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
 
 import java.io.File;
-import java.io.PrintWriter;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
@@ -410,30 +408,10 @@ public class InstructorGradesController {
             AlertUtil.warn("Nothing to export", "There are no students on this grade sheet.");
             return;
         }
-        FileChooser chooser = new FileChooser();
-        chooser.setInitialFileName("grades_" + sectionTitle.replaceAll("[^A-Za-z0-9_-]", "_") + ".csv");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV file", "*.csv"));
-        File file = chooser.showSaveDialog(gradeTable.getScene().getWindow());
-        if (file == null) {
-            return;
-        }
-        try (PrintWriter out = new PrintWriter(file, StandardCharsets.UTF_8)) {
-            out.write('﻿'); // BOM, so Excel opens Arabic names correctly
-            out.println("Student Number,Student Name,Coursework,Midterm,Final,Total,Letter,Points");
-            for (GradeSheetRow row : rows) {
-                out.println(String.join(",",
-                        quote(row.getStudentNumber()),
-                        quote(row.getStudentName()),
-                        plain(row.getCourseworkMark()),
-                        plain(row.getMidtermMark()),
-                        plain(row.getFinalMark()),
-                        plain(row.getTotalMark()),
-                        quote(row.getLetterGrade() == null ? null : row.getLetterGrade().getLabel()),
-                        plain(row.getGradePoints())));
-            }
+        File file = CsvExporter.exportTable(gradeTable, gradeTable.getScene().getWindow(),
+                "grades_" + sectionTitle.replaceAll("[^A-Za-z0-9_-]", "_"));
+        if (file != null) {
             AlertUtil.success("Exported", "The grade sheet was saved to:\n" + file.getAbsolutePath());
-        } catch (Exception e) {
-            AlertUtil.error("Export failed", "The file could not be written. Choose a different folder.", e);
         }
     }
 
@@ -488,11 +466,4 @@ public class InstructorGradesController {
         };
     }
 
-    private String quote(String value) {
-        return value == null ? "" : "\"" + value.replace("\"", "\"\"") + "\"";
-    }
-
-    private String plain(BigDecimal value) {
-        return value == null ? "" : value.toPlainString();
-    }
 }

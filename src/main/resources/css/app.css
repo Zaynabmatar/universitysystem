@@ -345,3 +345,12 @@
     -fx-background-radius: 6; -fx-border-radius: 6;
     -fx-padding: 12; -fx-text-fill: #7a5714; -fx-font-size: 13px;
 }
+
+/* ---------- Phase 14: dashboard, charts and reports ---------- */
+.dashboard-scroll { -fx-background-color: transparent; }
+.chart-card  { -fx-background-color: white; -fx-background-radius: 8; -fx-padding: 10;
+               -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 6, 0, 0, 2); }
+.chart-empty { -fx-text-fill: #7a8391; -fx-font-size: 13px; -fx-wrap-text: true;
+               -fx-alignment: center; -fx-padding: 20; }
+.bar-full .bar { -fx-accent: #c62828; }   /* a full section is a problem, not a success */
+.bar-low  .bar { -fx-accent: #f9a825; }   /* an almost-empty section may be cancelled */
