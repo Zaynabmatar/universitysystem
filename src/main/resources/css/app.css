@@ -229,3 +229,23 @@
 .tt-color-4 { -fx-background-color: #fee2e2; -fx-border-color: #fca5a5; }
 .tt-color-5 { -fx-background-color: #ede9fe; -fx-border-color: #c4b5fd; }
 .tt-color-6 { -fx-background-color: #ffe4e6; -fx-border-color: #fda4af; }
+
+/* ---------- Phase 10: waitlist & notifications ---------- */
+.bell-stack  { -fx-padding: 0 2 0 2; }
+.bell-badge  { -fx-background-color: #d32f2f; -fx-text-fill: white; -fx-font-size: 10px;
+               -fx-font-weight: bold; -fx-background-radius: 9; -fx-padding: 1 5 1 5;
+               -fx-translate-x: 4; -fx-translate-y: -6; }
+
+.notifications-popup { -fx-background-color: white; }
+.popup-header       { -fx-background-color: #f5f6f8; }
+.popup-title        { -fx-font-size: 15px; -fx-font-weight: bold; }
+.notification-list  { -fx-background-color: white; }
+.notif-title-unread { -fx-font-weight: bold;   -fx-font-size: 13px; }
+.notif-title-read   { -fx-font-weight: normal; -fx-font-size: 13px; -fx-text-fill: #666666; }
+.notif-body         { -fx-font-size: 12px; -fx-text-fill: #333333; }
+.notif-meta         { -fx-font-size: 10px; -fx-text-fill: #999999; }
+.notif-cell-unread  { -fx-padding: 6 4 6 8; -fx-border-color: transparent transparent transparent #1976d2;
+                      -fx-border-width: 0 0 0 3; }
+.notif-cell-read    { -fx-padding: 6 4 6 8; }
+.muted-label        { -fx-text-fill: #888888; -fx-font-size: 12px; }
+.badge-label         { -fx-text-fill: #1976d2; -fx-font-size: 12px; -fx-font-weight: bold; }

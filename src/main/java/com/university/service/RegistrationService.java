@@ -60,6 +60,7 @@ public class RegistrationService {
     private final SectionScheduleDAO scheduleDao = new SectionScheduleDAO();
     private final WaitlistDAO waitlistDao = new WaitlistDAO();
     private final NotificationService notifications = new NotificationService();
+    private final WaitlistService waitlistService = new WaitlistService();
 
     /** Gives access to the connection helpers without exposing a whole data access object. */
     private final AbstractDAO transactions = new AbstractDAO() {
@@ -339,8 +340,8 @@ public class RegistrationService {
         }
 
         Connection connection = transactions.beginTransaction();
+        DropResult result;
         try {
-            DropResult result;
             if (withinDropWindow) {
                 enrollmentDao.setStatus(connection, enrollment.getEnrollmentId(), EnrollmentStatus.DROPPED);
                 sectionDao.changeEnrolledCount(connection, sectionId, -1);
@@ -362,7 +363,6 @@ public class RegistrationService {
             }
 
             connection.commit();
-            return result;
         } catch (SQLException e) {
             transactions.rollbackQuietly(connection);
             throw new ServiceException("The change could not be completed.", e);
@@ -372,6 +372,16 @@ public class RegistrationService {
         } finally {
             transactions.closeQuietly(connection);
         }
+
+        // project_details.md Section 6.4 — both a DROPPED and a WITHDRAWN seat trigger waitlist
+        // auto-promotion (Section 6.5). This runs only after the drop's own transaction has
+        // committed; run any earlier and the seat does not look free yet.
+        WaitlistService.PromotionResult promotion = waitlistService.promoteNext(sectionId);
+        if (promotion.isPromoted()) {
+            result.setPromotionMessage(promotion.getPromotedStudentName()
+                    + " was promoted from the waitlist for " + promotion.getSectionLabel() + ".");
+        }
+        return result;
     }
 
     /**
@@ -394,7 +404,7 @@ public class RegistrationService {
     public int joinWaitlist(int studentId, int sectionId) {
         Student student = requireStudent(studentId);
         Section section = requireSection(sectionId);
-        Semester semester = requireSemester(section.getSemesterId());
+        requireSemester(section.getSemesterId());
         Course course = requireCourse(section.getCourseId());
 
         if (!section.isFull()) {
@@ -419,11 +429,11 @@ public class RegistrationService {
             entry.setStatus(WaitlistStatus.WAITING);
             int waitlistId = waitlistDao.insert(connection, entry);
 
+            String label = course.getCourseCode() + "-" + section.getSectionNumber();
             notifications.notify(connection, student.getUserId(), NotificationType.WAITLIST,
-                    "Waiting list for " + course.getCourseCode(),
-                    "You are number " + entry.getPosition() + " in the queue for "
-                            + course.getCourseCode() + " section " + section.getSectionNumber()
-                            + " in " + semester.getSemesterName() + ".",
+                    "Added to the waitlist",
+                    "You have joined the waitlist for " + label + ". You are #" + entry.getPosition()
+                            + " in line.",
                     "waitlist", waitlistId);
 
             connection.commit();
