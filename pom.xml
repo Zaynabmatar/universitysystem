@@ -54,6 +54,16 @@
             <version>0.4</version>
         </dependency>
 
+        <!-- The official PDF transcript (Phase 12). OpenPDF is the LGPL/MPL fork
+             of iText 2.1.7, so every class lives under com.lowagie.text. iText 5
+             and 7 are deliberately NOT used: iText 7 is AGPL and its API is
+             entirely different. See phase-12/context/PDF_LAYOUT.md Section 1. -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>1.3.30</version>
+        </dependency>
+
         <!-- Proves the Section 5 arithmetic, above all the worked example that must
              produce exactly 3.24. GradeCalculator is pure — no database, no JavaFX —
              which is precisely what makes it testable. -->

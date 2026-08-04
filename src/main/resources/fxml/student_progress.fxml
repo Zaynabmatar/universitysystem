@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.StudentProgressController"
+      styleClass="content-page" spacing="12">
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <VBox spacing="2">
+            <Label text="Degree Progress" styleClass="page-title"/>
+            <Label fx:id="programLabel" styleClass="muted-text"/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Refresh" onAction="#handleRefresh"/>
+    </HBox>
+
+    <!-- ===== the progress bar ===== -->
+    <VBox spacing="6" styleClass="panel">
+        <padding><Insets top="14" right="16" bottom="14" left="16"/></padding>
+        <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label fx:id="percentLabel" text="—" styleClass="progress-percent"/>
+            <Label fx:id="creditsSummaryLabel" text="—" styleClass="muted-text"/>
+        </HBox>
+        <ProgressBar fx:id="progressBar" progress="0.0" prefHeight="22"
+                     maxWidth="Infinity" styleClass="degree-progress"/>
+        <HBox spacing="24">
+            <Label fx:id="completedLabel" text="—"/>
+            <Label fx:id="remainingLabel" text="—"/>
+            <Label fx:id="mandatoryLabel" text="—"/>
+        </HBox>
+    </VBox>
+
+    <!-- ===== graduation eligibility, Section 6.9 ===== -->
+    <VBox spacing="8" styleClass="panel">
+        <padding><Insets top="14" right="16" bottom="14" left="16"/></padding>
+        <Label text="Graduation eligibility" styleClass="section-title"/>
+        <Label fx:id="condition1Label" text="—" styleClass="condition-line"/>
+        <Label fx:id="condition2Label" text="—" styleClass="condition-line"/>
+        <Label fx:id="condition3Label" text="—" styleClass="condition-line"/>
+        <Separator/>
+        <Label fx:id="verdictLabel" text="—" styleClass="verdict"/>
+    </VBox>
+
+    <!-- ===== the degree plan ===== -->
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="Show:"/>
+        <ComboBox fx:id="filterCombo" prefWidth="200"/>
+        <Label fx:id="planCountLabel" styleClass="muted-text"/>
+    </HBox>
+
+    <TableView fx:id="requirementsTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="colCode"     text="Code"    prefWidth="100"/>
+            <TableColumn fx:id="colTitle"    text="Course"  prefWidth="320"/>
+            <TableColumn fx:id="colCredits"  text="Credits" prefWidth="75"/>
+            <TableColumn fx:id="colType"     text="Type"    prefWidth="100"/>
+            <TableColumn fx:id="colSemester" text="Plan"    prefWidth="85"/>
+            <TableColumn fx:id="colStatus"   text="Status"  prefWidth="130"/>
+        </columns>
+    </TableView>
+</VBox>

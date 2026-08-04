@@ -264,3 +264,84 @@
 .standing-bad    { -fx-text-fill: #c62828; -fx-font-weight: bold; }
 .legend-chip     { -fx-padding: 3 10 3 10; -fx-font-size: 11.5px; }
 .table-view .table-row-cell:selected { -fx-background-color: #cfe3ff; }
+
+/* ---------- Phase 12: transcript, degree progress, student dashboard ---------- */
+.panel {
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-border-color: #dfe5ec;
+    -fx-border-radius: 8;
+}
+.transcript-scroll { -fx-background-color: transparent; }
+
+.term-card {
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-border-color: #dfe5ec;
+    -fx-border-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 6, 0, 0, 2);
+}
+.term-heading          { -fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #1f395c; }
+.term-total            { -fx-font-size: 12px; -fx-text-fill: #44506a; }
+.term-total-cumulative { -fx-font-weight: bold; -fx-text-fill: #1f395c; }
+
+/* Section 5.5 — the superseded attempt is greyed so the eye skips it. */
+.table-row-cell.row-repeated .text   { -fx-fill: #8a8a8a; }
+.table-row-cell.row-repeated         { -fx-opacity: 0.75; }
+.table-row-cell.row-inprogress .text { -fx-fill: #8a6d1f; }
+
+.degree-progress          { -fx-accent: #2f7d4f; }
+.degree-progress > .bar   { -fx-background-insets: 0; -fx-background-radius: 6; }
+.degree-progress > .track { -fx-background-color: #e6ebf1; -fx-background-radius: 6; }
+.progress-percent         { -fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: #1f395c; }
+
+.condition-line { -fx-font-size: 13px; }
+.condition-ok   { -fx-text-fill: #2f7d4f; }
+.condition-fail { -fx-text-fill: #b3402f; }
+.verdict        { -fx-font-size: 15px; -fx-font-weight: bold; }
+.verdict-ok     { -fx-text-fill: #2f7d4f; }
+.verdict-warn   { -fx-text-fill: #a86a12; }
+
+.status-passed     { -fx-text-fill: #2f7d4f; -fx-font-weight: bold; }
+.status-inprogress { -fx-text-fill: #a86a12; }
+.status-nottaken   { -fx-text-fill: #7a8391; }
+
+.empty-state { -fx-text-fill: #7a8391; -fx-font-size: 14px; -fx-padding: 24; }
+
+/* ---------- Phase 13: AI recommendation cards ---------- */
+.reco-scroll { -fx-background-color: transparent; }
+
+.reco-card {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-border-color: #dfe5ec;
+    -fx-border-radius: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.07), 8, 0, 0, 2);
+}
+.reco-rank {
+    -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: white;
+    -fx-background-color: #1f395c; -fx-background-radius: 12;
+    -fx-padding: 2 9 2 9;
+}
+.reco-title { -fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #17202e; }
+.reco-sub   { -fx-font-size: 12px; -fx-text-fill: #6d7684; }
+.reco-score { -fx-font-size: 17px; -fx-font-weight: bold; -fx-text-fill: #2f7d4f; }
+
+.reco-block       { -fx-padding: 4 0 4 0; }
+.reco-block-title { -fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #44506a;
+                    -fx-padding: 6 0 2 0; }
+
+.reason-text   { -fx-font-size: 13px; -fx-text-fill: #2b3444; }
+.reason-yes    { -fx-text-fill: #2f7d4f; -fx-font-weight: bold; }
+.reason-zero   { -fx-text-fill: #9aa3b0; -fx-font-weight: bold; }
+/* Monospace and right-aligned so the four degree-fit numbers line up and the addition is obvious. */
+.reason-points { -fx-font-family: "Consolas", "Courier New", monospace;
+                 -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #1f395c;
+                 -fx-min-width: 44; -fx-alignment: CENTER_RIGHT; }
+.reason-note   { -fx-font-size: 12px; -fx-text-fill: #6d7684; -fx-min-width: 78; }
+
+.banner-warn {
+    -fx-background-color: #fdf3e2; -fx-border-color: #e8c98a;
+    -fx-background-radius: 6; -fx-border-radius: 6;
+    -fx-padding: 12; -fx-text-fill: #7a5714; -fx-font-size: 13px;
+}

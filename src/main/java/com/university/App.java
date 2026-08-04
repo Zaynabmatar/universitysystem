@@ -24,11 +24,17 @@ public class App extends Application {
         setUserAgentStylesheet(STYLESHEET_MODENA);
 
         // 2. Fail fast, and fail politely, if SQL Server is not reachable.
+        //    Throwable, not Exception: DBConnection builds its pool in a static
+        //    initialiser, so the first touch of the class throws
+        //    ExceptionInInitializerError — an Error, which catch (Exception)
+        //    misses. That is what turned a wrong password into a stack trace on
+        //    the console instead of the popup Section 13 asks for.
         try (Connection ignored = DBConnection.getConnection()) {
             // connection OK
-        } catch (Exception e) {
+        } catch (Throwable e) {
             AlertUtil.error("Database connection failed",
-                    "Cannot connect to SQL Server. Check that the service is running — see DATABASE_SETUP.md",
+                    "Cannot connect to SQL Server. Check that the service is running, and that the "
+                    + "login details in DBConnection are correct — see DATABASE_SETUP.md",
                     e);
             return;   // do not open a broken application
         }
@@ -42,7 +48,14 @@ public class App extends Application {
 
     @Override
     public void stop() {
-        DBConnection.shutdown();
+        // If the pool never initialised, touching the class again throws
+        // NoClassDefFoundError. Shutting down is best effort: a failure here must
+        // not turn a clean exit into a second stack trace.
+        try {
+            DBConnection.shutdown();
+        } catch (Throwable ignored) {
+            // nothing to release
+        }
     }
 
     public static void main(String[] args) {
