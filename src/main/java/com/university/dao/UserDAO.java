@@ -26,15 +26,8 @@ import java.util.Optional;
  */
 public class UserDAO extends AbstractDAO implements GenericDAO<User> {
 
-    /**
-     * Every column {@code dbo.users} actually has, and no more.
-     *
-     * <p>There is deliberately no {@code email} here. The university address
-     * lives on {@code dbo.students.email} and {@code dbo.instructors.email} —
-     * that is the schema this application ships with, and each of those two
-     * columns carries its own UNIQUE index, so nothing is lost by not
-     * duplicating the value onto the account row.</p>
-     */
+    // dbo.users has no email column — email lives on dbo.students / dbo.instructors
+    // only, one per role. Nothing below may select, insert or update users.email.
     private static final String SELECT =
             "SELECT user_id, username, password_hash, role, is_active, last_login, created_at "
             + "FROM dbo.users";
@@ -95,9 +88,9 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     /**
      * Is this address already spoken for?
      *
-     * <p>The one place the question is asked, for both roles at once — which is
-     * why it lives on the account data access object even though the column
-     * itself does not live on {@code dbo.users}.</p>
+     * <p>The one place the question is asked, for both roles at once — that is
+     * the whole reason the column lives on {@code users} rather than on
+     * {@code students} and {@code instructors} separately.</p>
      *
      * @param excludeUserId the account being edited, so it never collides with
      *                      the address it already holds; null when creating
@@ -109,11 +102,11 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     /**
      * {@link #emailExists(String, Integer)} inside a transaction already running.
      *
-     * <p>{@code students.email} and {@code instructors.email} are the only two
-     * places an address is kept — {@code dbo.users} has no email column — and
-     * each of them carries its own UNIQUE index. Both are checked here so that
-     * a clash is reported as a sentence the administrator can act on rather
-     * than as a raw constraint violation.</p>
+     * <p>{@code dbo.users} has no {@code email} column of its own — the address
+     * lives on {@code students.email} and {@code instructors.email} only, so
+     * those are the two tables checked. Each carries its own UNIQUE index, and
+     * finding the clash here turns a raw constraint violation into a sentence
+     * the administrator can act on.</p>
      */
     public boolean emailExists(Connection connection, String email, Integer excludeUserId) {
         if (email == null || email.isBlank()) {
@@ -134,6 +127,16 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     /** Is this login name already taken? Used only to keep the legacy username column unique. */
     public boolean usernameExists(Connection connection, String username) {
         return queryInt(connection, "SELECT COUNT(*) FROM dbo.users WHERE username = ?", username) > 0;
+    }
+
+    /**
+     * No-op: {@code dbo.users} has no {@code email} column to change. The
+     * address lives on {@code students.email} / {@code instructors.email}, and
+     * {@code StudentDAO.update} / {@code InstructorDAO.update} already write it
+     * there — this method has nothing left to do.
+     */
+    public boolean updateEmail(Connection connection, int userId, String email) {
+        return false;
     }
 
     /** Stamps the moment of a successful sign-in. */

@@ -28,7 +28,7 @@ public class DBConnection {
 
     /** The one and only place the connection string is defined. */
     private static final String CONNECTION_URL =
-            "jdbc:sqlserver://localhost\\SQL2025"
+            "jdbc:sqlserver://localhost\\SQLEXPRESS"
             + ";databaseName=universitymanagementDB"
             + ";encrypt=true"
             + ";trustServerCertificate=true"
@@ -202,7 +202,7 @@ public class DBConnection {
 
     /** The server and database this build talks to, for error messages. */
     public static String describeTarget() {
-        return "localhost\\SQL2025 / universitymanagementDB (login '" + DB_USER + "')";
+        return "localhost\\SQLEXPRESS / universitymanagementDB (login '" + DB_USER + "')";
     }
 
     /**
