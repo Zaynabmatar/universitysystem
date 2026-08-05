@@ -70,7 +70,7 @@ public final class RequirementFormDialog extends Dialog<ProgramRequirement> {
         g.setPadding(new Insets(14));
         int r = 0;
 
-        if (editMode) {
+        if (existing != null) {
             Course course = courses.stream()
                     .filter(c -> c.getCourseId() == existing.getCourseId())
                     .findFirst().orElse(null);

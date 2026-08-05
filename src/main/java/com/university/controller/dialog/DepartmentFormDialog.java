@@ -30,7 +30,7 @@ public final class DepartmentFormDialog extends Dialog<Department> {
         this.model = editMode ? existing : new Department();
 
         setTitle(editMode ? "Edit Department" : "Add Department");
-        setHeaderText(editMode ? "Editing " + existing.getDepartmentName() : "Create a new department.");
+        setHeaderText(existing != null ? "Editing " + existing.getDepartmentName() : "Create a new department.");
         getDialogPane().setMinWidth(420);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         var css = getClass().getResource("/css/app.css");

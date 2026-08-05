@@ -10,7 +10,6 @@ import com.university.dao.SectionDAO;
 import com.university.dao.SectionScheduleDAO;
 import com.university.enums.SectionStatus;
 import com.university.model.Campus;
-import com.university.model.Course;
 import com.university.model.Section;
 import com.university.model.SectionSchedule;
 import com.university.util.ValidationUtil;
@@ -81,7 +80,7 @@ public class SectionService {
     public List<SectionSchedule> listMeetings(int sectionId) {
         List<SectionSchedule> meetings = new ArrayList<>(scheduleDao.findBySection(sectionId));
         meetings.sort(Comparator.<SectionSchedule>comparingInt(m -> m.getDayOfWeek().ordinal())
-                .thenComparing(SectionSchedule::getStartTime));
+                .thenComparing((SectionSchedule m) -> m.getStartTime()));
         return meetings;
     }
 
@@ -230,7 +229,7 @@ public class SectionService {
 
     private String sectionLabelOf(int sectionId) {
         return sectionDao.findById(sectionId)
-                .map(s -> courseDao.findById(s.getCourseId()).map(Course::getCourseCode).orElse("?")
+                .map(s -> courseDao.findById(s.getCourseId()).map(c -> c.getCourseCode()).orElse("?")
                         + "-" + s.getSectionNumber())
                 .orElse("#" + sectionId);
     }

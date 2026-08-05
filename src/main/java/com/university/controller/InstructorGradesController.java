@@ -55,7 +55,7 @@ public class InstructorGradesController {
     @FXML private Label statsLabel;
     @FXML private ComboBox<SectionChoice> sectionCombo;
     @FXML private TableView<GradeSheetRow> gradeTable;
-    @FXML private TableColumn<GradeSheetRow, String> colStudentNumber;
+    @FXML private TableColumn<GradeSheetRow, String> colStudentId;
     @FXML private TableColumn<GradeSheetRow, String> colStudentName;
     @FXML private TableColumn<GradeSheetRow, BigDecimal> colCoursework;
     @FXML private TableColumn<GradeSheetRow, BigDecimal> colMidterm;
@@ -92,7 +92,7 @@ public class InstructorGradesController {
     private void initialize() {
         adminMode = Session.current().isAdmin();
 
-        colStudentNumber.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getStudentNumber()));
+        colStudentId.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getStudentUserId())));
         colStudentName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getStudentName()));
         colCoursework.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCourseworkMark()));
         colMidterm.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getMidtermMark()));

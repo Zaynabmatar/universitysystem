@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 
@@ -22,9 +23,12 @@ import java.util.Properties;
  */
 public class DBConnection {
 
+    /** Seconds the driver may spend on a single login attempt before giving up. */
+    public static final int LOGIN_TIMEOUT_SECONDS = 5;
+
     /** The one and only place the connection string is defined. */
     private static final String CONNECTION_URL =
-            "jdbc:sqlserver://localhost\\SQLEXPRESS"
+            "jdbc:sqlserver://localhost\\SQL2025"
             + ";databaseName=universitymanagementDB"
             + ";encrypt=true"
             + ";trustServerCertificate=true"
@@ -33,7 +37,11 @@ public class DBConnection {
             // Server reject a bare "? < time_column" comparison with "The data types
             // datetime and time are incompatible in the less than operator" — this is
             // what broke the section instructor/room clash checks on Add/Edit Section.
-            + ";sendTimeAsDatetime=false";
+            + ";sendTimeAsDatetime=false"
+            // Bound every login attempt. The driver's default is 30 seconds per try,
+            // which is what let a misconfigured server turn startup into a long,
+            // silent stall instead of a prompt error message.
+            + ";loginTimeout=" + LOGIN_TIMEOUT_SECONDS;
 
     private static final String DB_USER = "sa";
 
@@ -46,9 +54,23 @@ public class DBConnection {
 
     private static final String PASSWORD_KEY = "db.password";
 
-    private static final HikariDataSource DATA_SOURCE = buildDataSource();
+    /**
+     * Built on first use rather than in a static initialiser. If the pool
+     * cannot be constructed (for example the credentials file is missing), a
+     * static initialiser would throw {@code ExceptionInInitializerError} and
+     * every later touch of this class would then fail with a bare
+     * {@code NoClassDefFoundError} that says nothing about the real problem.
+     */
+    private static HikariDataSource dataSource;
 
     private DBConnection() {
+    }
+
+    private static synchronized HikariDataSource dataSource() {
+        if (dataSource == null) {
+            dataSource = buildDataSource();
+        }
+        return dataSource;
     }
 
     /**
@@ -114,7 +136,68 @@ public class DBConnection {
      * @throws SQLException if no connection can be obtained
      */
     public static Connection getConnection() throws SQLException {
-        return DATA_SOURCE.getConnection();
+        return dataSource().getConnection();
+    }
+
+    /**
+     * Opens one un-pooled connection purely to find out whether the database is
+     * reachable, and closes it again.
+     *
+     * <p>Deliberately bypasses the pool. {@link #getConnection()} goes through
+     * HikariCP, which keeps retrying internally for the whole
+     * {@code connectionTimeout} window before it reports anything — so a server
+     * that is simply not listening still costs ten seconds per call and the
+     * caller never sees the driver's actual complaint. Going straight to the
+     * driver here fails in well under a second and hands back the real cause,
+     * which is what makes a clear startup error possible.</p>
+     *
+     * @throws SQLException if the database cannot be reached or the login fails
+     */
+    public static void verifyConnectivity() throws SQLException {
+        DriverManager.setLoginTimeout(LOGIN_TIMEOUT_SECONDS);
+        try (Connection connection =
+                     DriverManager.getConnection(CONNECTION_URL, DB_USER, readPassword())) {
+            // Reaching here is the whole result: the server answered and accepted the login.
+            // TEMPORARY DEBUG — remove with the block in AuthService.login.
+            System.out.println("[DB] " + describeConnected(connection));
+        }
+    }
+
+    /**
+     * Asks the server which database this connection is actually in, rather
+     * than repeating what the connection string asked for.
+     *
+     * <p>The two can differ — a restored copy under another name, a default
+     * database on the login — and when they do, every "the data is not there"
+     * symptom follows from it. This reports the answer the server gives.</p>
+     */
+    public static String describeConnected(Connection connection) throws SQLException {
+        try (var statement = connection.createStatement();
+             java.sql.ResultSet rs = statement.executeQuery(
+                     "SELECT DB_NAME(), @@SERVERNAME, SUSER_SNAME(), "
+                     + "(SELECT COUNT(*) FROM dbo.users)")) {
+            if (!rs.next()) {
+                return "connected, but the server returned no identifying row";
+            }
+            return "database=" + rs.getString(1)
+                    + "  server=" + rs.getString(2)
+                    + "  login=" + rs.getString(3)
+                    + "  dbo.users rows=" + rs.getInt(4);
+        }
+    }
+
+    /** {@link #describeConnected(Connection)} on a pooled connection. */
+    public static String describeConnected() {
+        try (Connection connection = getConnection()) {
+            return describeConnected(connection);
+        } catch (SQLException e) {
+            return "could not be determined: " + e.getMessage();
+        }
+    }
+
+    /** The server and database this build talks to, for error messages. */
+    public static String describeTarget() {
+        return "localhost\\SQL2025 / universitymanagementDB (login '" + DB_USER + "')";
     }
 
     /**
@@ -130,9 +213,11 @@ public class DBConnection {
     }
 
     /** Releases the pool's connections. Call once, when the application is shutting down. */
-    public static void shutdown() {
-        if (!DATA_SOURCE.isClosed()) {
-            DATA_SOURCE.close();
+    public static synchronized void shutdown() {
+        // Never build the pool just to close it: if startup failed before the
+        // pool was ever needed, there is nothing to release.
+        if (dataSource != null && !dataSource.isClosed()) {
+            dataSource.close();
         }
     }
 

@@ -172,7 +172,7 @@
                 <center>
                     <TableView fx:id="probationTable">
                         <columns>
-                            <TableColumn fx:id="probNumber" text="Student No." prefWidth="105"/>
+                            <TableColumn fx:id="probNumber" text="Student ID" prefWidth="105"/>
                             <TableColumn fx:id="probName" text="Name" prefWidth="170"/>
                             <TableColumn fx:id="probProgram" text="Program" prefWidth="180"/>
                             <TableColumn fx:id="probGpa" text="GPA" prefWidth="65"/>
@@ -201,7 +201,7 @@
                     <TableView fx:id="topTable">
                         <columns>
                             <TableColumn fx:id="topRank" text="#" prefWidth="40"/>
-                            <TableColumn fx:id="topNumber" text="Student No." prefWidth="110"/>
+                            <TableColumn fx:id="topNumber" text="Student ID" prefWidth="110"/>
                             <TableColumn fx:id="topName" text="Name" prefWidth="190"/>
                             <TableColumn fx:id="topProgram" text="Program" prefWidth="200"/>
                             <TableColumn fx:id="topGpa" text="GPA" prefWidth="70"/>

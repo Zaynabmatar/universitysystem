@@ -74,7 +74,7 @@ public class StudentTranscriptController {
     }
 
     private void render() {
-        subtitleLabel.setText(transcript.fullName() + "  •  " + transcript.studentNumber
+        subtitleLabel.setText(transcript.fullName() + "  •  " + transcript.studentUserId
                             + "  •  " + transcript.programName);
         cumulativeGpaLabel.setText(transcript.cumulativeGpaText());
         creditsLabel.setText(transcript.creditsEarned + " / " + transcript.creditsRequired);
@@ -144,11 +144,11 @@ public class StudentTranscriptController {
 
         table.getColumns().add(column("Code",   110, r -> r.courseCode));
         table.getColumns().add(column("Course", 300, r -> r.courseTitle));
-        table.getColumns().add(column("Cr",      50, TranscriptRow::creditsText));
-        table.getColumns().add(column("Mark",    90, TranscriptRow::markText));
-        table.getColumns().add(column("Grade",   80, TranscriptRow::letterText));
-        table.getColumns().add(column("Points",  80, TranscriptRow::pointsText));
-        table.getColumns().add(column("Note",   160, TranscriptRow::displayNote));
+        table.getColumns().add(column("Cr",      50, r -> r.creditsText()));
+        table.getColumns().add(column("Mark",    90, r -> r.markText()));
+        table.getColumns().add(column("Grade",   80, r -> r.letterText()));
+        table.getColumns().add(column("Points",  80, r -> r.pointsText()));
+        table.getColumns().add(column("Note",   160, r -> r.displayNote()));
 
         // Grey out the superseded attempt so the eye skips it (Section 5.5).
         table.setRowFactory(view -> new TableRow<>() {
@@ -188,7 +188,7 @@ public class StudentTranscriptController {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Save transcript as PDF");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF file", "*.pdf"));
-        chooser.setInitialFileName("transcript_" + transcript.studentNumber + ".pdf");
+        chooser.setInitialFileName("transcript_" + transcript.studentUserId + ".pdf");
 
         File target = chooser.showSaveDialog(exportPdfButton.getScene().getWindow());
         if (target == null) {

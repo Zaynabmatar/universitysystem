@@ -18,7 +18,7 @@
     <Label text="Manage Students" styleClass="page-title"/>
 
     <HBox spacing="10" alignment="CENTER_LEFT">
-        <TextField fx:id="searchField" promptText="Search by number, name or email" prefWidth="280"/>
+        <TextField fx:id="searchField" promptText="Search by Student ID, name or email" prefWidth="280"/>
         <ComboBox fx:id="programFilter" promptText="All programs" prefWidth="220"/>
         <ComboBox fx:id="statusFilter"  promptText="All statuses" prefWidth="150"/>
         <Button text="Clear filters" onAction="#handleClearFilters"/>
@@ -28,7 +28,7 @@
 
     <TableView fx:id="studentTable" VBox.vgrow="ALWAYS">
         <columns>
-            <TableColumn fx:id="colNumber"    text="Student No."  prefWidth="110"/>
+            <TableColumn fx:id="colStudentId" text="Student ID"   prefWidth="110"/>
             <TableColumn fx:id="colName"      text="Name"         prefWidth="180"/>
             <TableColumn fx:id="colEmail"     text="Email"        prefWidth="210"/>
             <TableColumn fx:id="colPhone"     text="Phone"        prefWidth="120"/>

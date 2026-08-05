@@ -157,7 +157,8 @@ public class TranscriptService {
        ================================================================ */
     public static class Transcript {
         public int       studentId;
-        public String    studentNumber    = "";
+        /** users.user_id — the Student ID printed on the transcript. */
+        public int       studentUserId;
         public String    firstName        = "";
         public String    lastName         = "";
         public String    programName      = "";
@@ -186,7 +187,8 @@ public class TranscriptService {
        ================================================================ */
     public static class DegreeProgress {
         public int        studentId;
-        public String     studentNumber = "";
+        /** users.user_id — the Student ID. */
+        public int        studentUserId;
         public String     fullName      = "";
         public String     programName   = "";
         public int        creditsRequired;

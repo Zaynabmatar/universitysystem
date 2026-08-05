@@ -184,7 +184,7 @@ public class AdminReportsController {
     }
 
     private void wireProbationTable() {
-        probNumber.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().studentNumber));
+        probNumber.setCellValueFactory(cd -> new SimpleStringProperty(String.valueOf(cd.getValue().studentUserId)));
         probName.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().studentName));
         probProgram.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().programName));
         probGpa.setCellValueFactory(cd -> new SimpleObjectProperty<>(cd.getValue().gpa));
@@ -213,7 +213,7 @@ public class AdminReportsController {
 
     private void wireTopTable() {
         topRank.setCellValueFactory(cd -> new SimpleObjectProperty<>(cd.getValue().rank));
-        topNumber.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().studentNumber));
+        topNumber.setCellValueFactory(cd -> new SimpleStringProperty(String.valueOf(cd.getValue().studentUserId)));
         topName.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().studentName));
         topProgram.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().programName));
         topGpa.setCellValueFactory(cd -> new SimpleObjectProperty<>(cd.getValue().gpa));

@@ -194,7 +194,7 @@ public class GradeService {
                 continue;
             }
             if (row.getCourseworkMark() == null || row.getMidtermMark() == null || row.getFinalMark() == null) {
-                missing.add(row.getStudentNumber() + " " + row.getStudentName());
+                missing.add(row.getStudentUserId() + " " + row.getStudentName());
             }
         }
         if (!missing.isEmpty()) {

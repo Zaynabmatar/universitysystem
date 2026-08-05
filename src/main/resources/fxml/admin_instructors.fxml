@@ -18,7 +18,7 @@
     <Label text="Manage Instructors" styleClass="page-title"/>
 
     <HBox spacing="10" alignment="CENTER_LEFT">
-        <TextField fx:id="searchField" promptText="Search by employee no., name or email" prefWidth="280"/>
+        <TextField fx:id="searchField" promptText="Search by Instructor ID, name or email" prefWidth="280"/>
         <ComboBox fx:id="departmentFilter" promptText="All departments" prefWidth="200"/>
         <ComboBox fx:id="rankFilter"       promptText="All ranks"       prefWidth="180"/>
         <Button text="Clear filters" onAction="#handleClearFilters"/>
@@ -28,7 +28,7 @@
 
     <TableView fx:id="instructorTable" VBox.vgrow="ALWAYS">
         <columns>
-            <TableColumn fx:id="colNumber"     text="Employee No." prefWidth="110"/>
+            <TableColumn fx:id="colInstructorId" text="Instructor ID" prefWidth="110"/>
             <TableColumn fx:id="colName"       text="Name"         prefWidth="180"/>
             <TableColumn fx:id="colEmail"      text="Email"        prefWidth="210"/>
             <TableColumn fx:id="colPhone"      text="Phone"        prefWidth="120"/>

@@ -24,20 +24,86 @@
             prefWidth="1200" prefHeight="780"
             styleClass="content-shell">
 
-    <top>
+    <!-- Sidebar is the outer BorderPane's <left>, so it runs the full window height,
+         top edge to bottom edge. The top bar is NOT the outer <top> — it lives in the
+         inner BorderPane below, so it starts exactly where the sidebar ends and covers
+         only the content column. -->
+    <left>
+        <!-- The shell is what shrinks to 0; the panel inside keeps a fixed 260 width and
+             slides out under the shell's clip, so the logo and menu never reflow into a
+             narrow layout or spill over the content mid-animation. -->
+        <StackPane fx:id="sidebarShell" styleClass="sidebar-shell"
+                   prefWidth="260" minWidth="260" maxWidth="260"
+                   alignment="TOP_LEFT">
+            <VBox fx:id="sidebarPanel" styleClass="sidebar-panel"
+                  prefWidth="260" minWidth="260" maxWidth="260" maxHeight="Infinity">
+
+                <VBox styleClass="sidebar-logo-block" spacing="4" alignment="CENTER">
+                    <ImageView fitWidth="56.0" preserveRatio="true" smooth="true">
+                        <image>
+                            <Image url="@/images/iul-logo.png"/>
+                        </image>
+                    </ImageView>
+                    <ImageView fitWidth="190.0" preserveRatio="true" smooth="true" styleClass="sidebar-name-ar">
+                        <image>
+                            <Image url="@/images/university-name-ar.png"/>
+                        </image>
+                    </ImageView>
+                    <ImageView fitWidth="190.0" preserveRatio="true" smooth="true" styleClass="sidebar-name-en">
+                        <image>
+                            <Image url="@/images/university-name-en.png"/>
+                        </image>
+                    </ImageView>
+                </VBox>
+
+                <VBox fx:id="sidebar" styleClass="sidebar" spacing="2" VBox.vgrow="ALWAYS"/>
+
+                <Pane styleClass="sidebar-wave-pane" prefHeight="64" maxHeight="64" mouseTransparent="true">
+                    <Path styleClass="wave-glow">
+                        <elements>
+                            <MoveTo x="249" y="4"/>
+                            <CubicCurveTo controlX1="163" controlY1="17" controlX2="76" controlY2="38" x="-22" y="64"/>
+                        </elements>
+                    </Path>
+                    <Path styleClass="wave-soft">
+                        <elements>
+                            <MoveTo x="260" y="13"/>
+                            <CubicCurveTo controlX1="173" controlY1="28" controlX2="65" controlY2="49" x="-22" y="64"/>
+                        </elements>
+                    </Path>
+                    <Path styleClass="wave-main">
+                        <elements>
+                            <MoveTo x="249" y="4"/>
+                            <CubicCurveTo controlX1="163" controlY1="17" controlX2="76" controlY2="38" x="-22" y="64"/>
+                        </elements>
+                    </Path>
+                </Pane>
+            </VBox>
+        </StackPane>
+    </left>
+
+    <center>
+      <BorderPane>
+        <top>
         <StackPane styleClass="top-bar">
             <HBox spacing="10" alignment="CENTER_LEFT" styleClass="top-bar-row">
-                <Button fx:id="hamburgerButton" styleClass="icon-btn" onAction="#handleToggleSidebar">
-                    <graphic>
-                        <SVGPath styleClass="ikon"
-                                 content="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/>
-                    </graphic>
-                </Button>
+                <!-- Hamburger and welcome text are grouped in their own HBox so the gap
+                     between them (2 + the icon button's own 8px right padding = 10px) is
+                     set independently of the outer row's 10px spacing, which still governs
+                     the bell and avatar on the right. -->
+                <HBox spacing="2" alignment="CENTER_LEFT">
+                    <Button fx:id="hamburgerButton" styleClass="icon-btn" onAction="#handleToggleSidebar">
+                        <graphic>
+                            <SVGPath styleClass="ikon"
+                                     content="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/>
+                        </graphic>
+                    </Button>
 
-                <HBox spacing="6" alignment="CENTER_LEFT">
-                    <Label text="Welcome" styleClass="welcome-label"/>
-                    <Label fx:id="welcomeNameLabel" text="" styleClass="welcome-label"/>
-                    <Label fx:id="semesterLabel" text="" styleClass="welcome-label"/>
+                    <HBox spacing="6" alignment="CENTER_LEFT">
+                        <Label text="Welcome" styleClass="welcome-label"/>
+                        <Label fx:id="welcomeNameLabel" text="" styleClass="welcome-label"/>
+                        <Label fx:id="semesterLabel" text="" styleClass="welcome-label"/>
+                    </HBox>
                 </HBox>
 
                 <Region HBox.hgrow="ALWAYS"/>
@@ -69,55 +135,11 @@
                 </MenuButton>
             </HBox>
         </StackPane>
-    </top>
+        </top>
 
-    <left>
-        <VBox fx:id="sidebarShell" styleClass="sidebar-shell" prefWidth="260" minWidth="260" maxWidth="260">
-
-            <VBox styleClass="sidebar-logo-block" spacing="4" alignment="CENTER">
-                <ImageView fitWidth="56.0" preserveRatio="true" smooth="true">
-                    <image>
-                        <Image url="@/images/iul-logo.png"/>
-                    </image>
-                </ImageView>
-                <ImageView fitWidth="190.0" preserveRatio="true" smooth="true" styleClass="sidebar-name-ar">
-                    <image>
-                        <Image url="@/images/university-name-ar.png"/>
-                    </image>
-                </ImageView>
-                <ImageView fitWidth="190.0" preserveRatio="true" smooth="true" styleClass="sidebar-name-en">
-                    <image>
-                        <Image url="@/images/university-name-en.png"/>
-                    </image>
-                </ImageView>
-            </VBox>
-
-            <VBox fx:id="sidebar" styleClass="sidebar" spacing="2" VBox.vgrow="ALWAYS"/>
-
-            <Pane styleClass="sidebar-wave-pane" prefHeight="64" maxHeight="64" mouseTransparent="true">
-                <Path styleClass="wave-glow">
-                    <elements>
-                        <MoveTo x="249" y="4"/>
-                        <CubicCurveTo controlX1="163" controlY1="17" controlX2="76" controlY2="38" x="-22" y="64"/>
-                    </elements>
-                </Path>
-                <Path styleClass="wave-soft">
-                    <elements>
-                        <MoveTo x="260" y="13"/>
-                        <CubicCurveTo controlX1="173" controlY1="28" controlX2="65" controlY2="49" x="-22" y="64"/>
-                    </elements>
-                </Path>
-                <Path styleClass="wave-main">
-                    <elements>
-                        <MoveTo x="249" y="4"/>
-                        <CubicCurveTo controlX1="163" controlY1="17" controlX2="76" controlY2="38" x="-22" y="64"/>
-                    </elements>
-                </Path>
-            </Pane>
-        </VBox>
-    </left>
-
-    <center>
-        <StackPane fx:id="contentArea"/>
+        <center>
+            <StackPane fx:id="contentArea"/>
+        </center>
+      </BorderPane>
     </center>
 </BorderPane>

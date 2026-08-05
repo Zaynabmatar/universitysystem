@@ -13,7 +13,6 @@ public final class ValidationUtil {
     private static final Pattern USERNAME = Pattern.compile("^[A-Za-z0-9._]{3,50}$");
     private static final Pattern COURSE   = Pattern.compile("^[A-Z]{2,4}[0-9]{3}$");   // CS201, MATH201
     private static final Pattern CODE     = Pattern.compile("^[A-Z0-9]{2,10}$");       // CS, BSCS
-    private static final Pattern NUMERIC  = Pattern.compile("^[0-9]{4,20}$");          // 2021001234
 
     private ValidationUtil() { }
 
@@ -32,7 +31,6 @@ public final class ValidationUtil {
     public static boolean isUsername(String s)      { return notBlank(s) && USERNAME.matcher(s.trim()).matches(); }
     public static boolean isCourseCode(String s)    { return notBlank(s) && COURSE.matcher(s.trim().toUpperCase()).matches(); }
     public static boolean isShortCode(String s)     { return notBlank(s) && CODE.matcher(s.trim().toUpperCase()).matches(); }
-    public static boolean isStudentNumber(String s) { return notBlank(s) && NUMERIC.matcher(s.trim()).matches(); }
 
     public static boolean maxLength(String s, int max) { return s == null || s.trim().length() <= max; }
 

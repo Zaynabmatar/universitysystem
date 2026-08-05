@@ -54,7 +54,7 @@ public final class SemesterFormDialog extends Dialog<Semester> {
         this.model = editMode ? existing : new Semester();
 
         setTitle(editMode ? "Edit Semester" : "Add Semester");
-        setHeaderText(editMode ? "Editing " + existing.getSemesterName() : "Create a new semester.");
+        setHeaderText(existing != null ? "Editing " + existing.getSemesterName() : "Create a new semester.");
         getDialogPane().setMinWidth(620);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         var css = getClass().getResource("/css/app.css");

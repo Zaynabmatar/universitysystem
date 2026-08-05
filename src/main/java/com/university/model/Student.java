@@ -202,8 +202,10 @@ public class Student {
         this.probationCount = probationCount;
     }
 
+    /** How a student reads in a picker: "1042 - Zaynab Matar" — the Student ID
+     *  is {@code users.user_id}, the same number shown everywhere else. */
     @Override
     public String toString() {
-        return studentNumber + " - " + getFullName();
+        return userId + " - " + getFullName();
     }
 }

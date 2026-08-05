@@ -145,9 +145,9 @@ public class StudentRegistrationController {
                 c.getValue().getRoom() == null ? "—" : c.getValue().getRoom()));
 
         wlColCourse.setCellValueFactory(c -> new SimpleStringProperty(
-                courseCodeOf(sectionOf(c.getValue()).map(Section::getCourseId).orElse(-1))));
+                courseCodeOf(sectionOf(c.getValue()).map(s -> s.getCourseId()).orElse(-1))));
         wlColSection.setCellValueFactory(c -> new SimpleStringProperty(
-                sectionOf(c.getValue()).map(Section::getSectionNumber).orElse("—")));
+                sectionOf(c.getValue()).map(s -> s.getSectionNumber()).orElse("—")));
         wlColPosition.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getPosition()));
 
         availableTable.setItems(availableRows);
@@ -159,12 +159,12 @@ public class StudentRegistrationController {
 
         departmentFilter.getItems().add(null);
         departmentFilter.getItems().addAll(departments);
-        departmentFilter.setConverter(nullableConverter(Department::getDepartmentName, "All departments"));
+        departmentFilter.setConverter(nullableConverter(d -> d.getDepartmentName(), "All departments"));
         departmentFilter.getSelectionModel().selectFirst();
 
         dayFilter.getItems().add(null);
         dayFilter.getItems().addAll(DayOfWeekCode.values());
-        dayFilter.setConverter(nullableConverter(DayOfWeekCode::toString, "All days"));
+        dayFilter.setConverter(nullableConverter(d -> d.toString(), "All days"));
         dayFilter.getSelectionModel().selectFirst();
 
         searchField.textProperty().addListener((o, a, b) -> reloadAvailable());
@@ -191,22 +191,22 @@ public class StudentRegistrationController {
 
     private String courseCodeOf(int courseId) {
         return courses.stream().filter(c -> c.getCourseId() == courseId).findFirst()
-                .map(Course::getCourseCode).orElse("—");
+                .map(c -> c.getCourseCode()).orElse("—");
     }
 
     private String courseTitleOf(int courseId) {
         return courses.stream().filter(c -> c.getCourseId() == courseId).findFirst()
-                .map(Course::getCourseTitle).orElse("—");
+                .map(c -> c.getCourseTitle()).orElse("—");
     }
 
     private int courseCreditsOf(int courseId) {
         return courses.stream().filter(c -> c.getCourseId() == courseId).findFirst()
-                .map(Course::getCredits).orElse(0);
+                .map(c -> c.getCredits()).orElse(0);
     }
 
     private Integer courseDepartmentOf(int courseId) {
         return courses.stream().filter(c -> c.getCourseId() == courseId).findFirst()
-                .map(Course::getDepartmentId).orElse(null);
+                .map(c -> c.getDepartmentId()).orElse(null);
     }
 
     private String instructorNameOf(Integer instructorId) {
@@ -214,7 +214,7 @@ public class StudentRegistrationController {
             return "TBA";
         }
         return instructors.stream().filter(i -> i.getInstructorId() == instructorId).findFirst()
-                .map(Instructor::getFullName).orElse("TBA");
+                .map(i -> i.getFullName()).orElse("TBA");
     }
 
     private String scheduleTextOf(int sectionId) {

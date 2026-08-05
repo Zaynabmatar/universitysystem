@@ -7,7 +7,7 @@ import com.university.model.Department;
 import com.university.model.Instructor;
 import com.university.service.CourseService;
 import com.university.service.InstructorService;
-import com.university.service.PasswordHasher;
+import com.university.service.AccountService;
 import com.university.service.ServiceException;
 import com.university.service.Session;
 import com.university.util.AlertUtil;
@@ -21,7 +21,6 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.util.StringConverter;
 
 import java.util.List;
-import java.util.Optional;
 
 /** The admin's "Manage Instructors" screen: search/filter table plus add, edit, deactivate and reset-password actions. */
 public class AdminInstructorsController {
@@ -31,7 +30,7 @@ public class AdminInstructorsController {
     @FXML private ComboBox<AcademicRank> rankFilter;
     @FXML private Label countLabel;
     @FXML private TableView<Instructor> instructorTable;
-    @FXML private TableColumn<Instructor, String> colNumber;
+    @FXML private TableColumn<Instructor, String> colInstructorId;
     @FXML private TableColumn<Instructor, String> colName;
     @FXML private TableColumn<Instructor, String> colEmail;
     @FXML private TableColumn<Instructor, String> colPhone;
@@ -54,7 +53,8 @@ public class AdminInstructorsController {
     private void initialize() {
         Session.current().requireRole(UserRole.ADMIN);
 
-        colNumber    .setCellValueFactory(new PropertyValueFactory<>("employeeNumber"));
+        // The Instructor ID is users.user_id — the account's own id.
+        colInstructorId.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getUserId())));
         colName      .setCellValueFactory(new PropertyValueFactory<>("fullName"));
         colEmail     .setCellValueFactory(new PropertyValueFactory<>("email"));
         colPhone     .setCellValueFactory(new PropertyValueFactory<>("phone"));
@@ -145,15 +145,20 @@ public class AdminInstructorsController {
     @FXML
     private void handleAdd() {
         InstructorFormDialog dialog = new InstructorFormDialog(null, departments);
-        Optional<Instructor> result = dialog.showAndWait();
-        if (result.isEmpty()) return;
+        // orElse(null) plus an explicit check rather than isEmpty()/get(): the
+        // null analysis cannot see that the get() is guarded, so it treats the
+        // unwrapped value as possibly null. A plain local carries that proof.
+        Instructor entered = dialog.showAndWait().orElse(null);
+        if (entered == null) return;
 
         try {
-            Instructor created = instructorService.create(result.get());
+            // Shown only after the transaction has committed.
+            AccountService.NewAccount account = instructorService.create(entered);
             AlertUtil.success("Instructor added",
-                    "The instructor was created.\n\n"
-                    + "User ID: " + created.getUserId() + "\n"
-                    + "Temporary password: " + PasswordHasher.defaultPasswordFor(created.getUserId()));
+                    "Instructor created successfully.\n\n"
+                    + "Instructor ID: " + account.userId() + "\n"
+                    + "University Email: " + account.email() + "\n"
+                    + "Temporary Password: " + account.temporaryPassword());
             reload();
 
         } catch (ServiceException se) {
@@ -168,11 +173,11 @@ public class AdminInstructorsController {
         Instructor selected = instructorTable.getSelectionModel().getSelectedItem();
         if (selected == null) return;
 
-        Optional<Instructor> result = new InstructorFormDialog(selected, departments).showAndWait();
-        if (result.isEmpty()) return;
+        Instructor edited = new InstructorFormDialog(selected, departments).showAndWait().orElse(null);
+        if (edited == null) return;
 
         try {
-            instructorService.update(result.get());
+            instructorService.update(edited);
             AlertUtil.success("Saved", "The instructor's details were updated.");
             reload();
         } catch (ServiceException se) {
@@ -188,7 +193,7 @@ public class AdminInstructorsController {
         if (selected == null) return;
 
         boolean ok = AlertUtil.confirm("Deactivate instructor",
-                "Deactivate " + selected.getFullName() + " (" + selected.getEmployeeNumber() + ")?\n\n"
+                "Deactivate " + selected.getFullName() + " (Instructor ID " + selected.getUserId() + ")?\n\n"
                 + "Nothing is deleted. Their login is disabled and they can no longer be assigned new "
                 + "sections, but every section and grade they are already on is kept.");
         if (!ok) return;
@@ -226,13 +231,14 @@ public class AdminInstructorsController {
         if (selected == null) return;
 
         if (!AlertUtil.confirm("Reset password",
-                "Reset the password for " + selected.getFullName() + " (User ID " + selected.getUserId() + ")?")) {
+                "Reset the password for " + selected.getFullName()
+                + " (Instructor ID " + selected.getUserId() + ")?")) {
             return;
         }
         try {
             String newPassword = instructorService.resetPasswordToDefault(selected.getInstructorId());
             AlertUtil.success("Password reset",
-                    "User ID: " + selected.getUserId() + "\nNew password: " + newPassword
+                    "Instructor ID: " + selected.getUserId() + "\nNew password: " + newPassword
                     + "\n\nTell the instructor to change it after signing in.");
         } catch (Exception e) {
             AlertUtil.error("Could not reset password", "The password could not be reset.", e);

@@ -192,18 +192,18 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      * with every mark blank — that is what the LEFT JOIN is for.
      */
     public List<GradeSheetRow> findSectionRoster(int sectionId) {
-        String sql = "SELECT e.enrollment_id, e.student_id, st.student_number, st.first_name, st.last_name, "
+        String sql = "SELECT e.enrollment_id, e.student_id, st.user_id, st.first_name, st.last_name, "
                 + "g.grade_id, g.coursework_mark, g.midterm_mark, g.final_mark, g.is_submitted "
                 + "FROM dbo.enrollments e "
                 + "INNER JOIN dbo.students st ON st.student_id = e.student_id "
                 + "LEFT JOIN dbo.grades g ON g.enrollment_id = e.enrollment_id "
                 + "WHERE e.section_id = ? AND e.status IN ('ENROLLED', 'COMPLETED') "
-                + "ORDER BY st.student_number";
+                + "ORDER BY st.user_id";
         return queryList(sql, rs -> {
             GradeSheetRow row = new GradeSheetRow();
             row.setEnrollmentId(rs.getInt("enrollment_id"));
             row.setStudentId(rs.getInt("student_id"));
-            row.setStudentNumber(rs.getString("student_number"));
+            row.setStudentUserId(rs.getInt("user_id"));
             row.setStudentName(rs.getString("first_name") + " " + rs.getString("last_name"));
             row.setGradeId(DaoUtils.getInteger(rs, "grade_id"));
             row.setCourseworkMark(rs.getBigDecimal("coursework_mark"));

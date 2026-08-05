@@ -5,8 +5,8 @@ import com.university.enums.StudentStatus;
 import com.university.enums.UserRole;
 import com.university.model.Program;
 import com.university.model.Student;
+import com.university.service.AccountService;
 import com.university.service.CourseService;
-import com.university.service.PasswordHasher;
 import com.university.service.ServiceException;
 import com.university.service.Session;
 import com.university.service.StudentService;
@@ -20,7 +20,6 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.util.StringConverter;
 
 import java.util.List;
-import java.util.Optional;
 
 /** The admin's "Manage Students" screen: search/filter table plus add, edit, deactivate and reset-password actions. */
 public class AdminStudentsController {
@@ -30,7 +29,7 @@ public class AdminStudentsController {
     @FXML private ComboBox<StudentStatus> statusFilter;
     @FXML private Label countLabel;
     @FXML private TableView<Student> studentTable;
-    @FXML private TableColumn<Student, String> colNumber;
+    @FXML private TableColumn<Student, String> colStudentId;
     @FXML private TableColumn<Student, String> colName;
     @FXML private TableColumn<Student, String> colEmail;
     @FXML private TableColumn<Student, String> colPhone;
@@ -54,7 +53,9 @@ public class AdminStudentsController {
     private void initialize() {
         Session.current().requireRole(UserRole.ADMIN);
 
-        colNumber  .setCellValueFactory(new PropertyValueFactory<>("studentNumber"));
+        // The Student ID is users.user_id — the account's own id, not a second
+        // number kept alongside it.
+        colStudentId.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getUserId())));
         colName    .setCellValueFactory(new PropertyValueFactory<>("fullName"));
         colEmail   .setCellValueFactory(new PropertyValueFactory<>("email"));
         colPhone   .setCellValueFactory(new PropertyValueFactory<>("phone"));
@@ -144,15 +145,21 @@ public class AdminStudentsController {
     @FXML
     private void handleAdd() {
         StudentFormDialog dialog = new StudentFormDialog(null, programs);
-        Optional<Student> result = dialog.showAndWait();
-        if (result.isEmpty()) return;
+        // orElse(null) plus an explicit check rather than isEmpty()/get(): the
+        // null analysis cannot see that the get() is guarded, so it treats the
+        // unwrapped value as possibly null. A plain local carries that proof.
+        Student entered = dialog.showAndWait().orElse(null);
+        if (entered == null) return;
 
         try {
-            Student created = studentService.create(result.get());
+            // Shown only after the transaction has committed: everything below
+            // is a fact about a row that now exists.
+            AccountService.NewAccount account = studentService.create(entered);
             AlertUtil.success("Student added",
-                    "The student was created.\n\n"
-                    + "User ID: " + created.getUserId() + "\n"
-                    + "Temporary password: " + PasswordHasher.defaultPasswordFor(created.getUserId()));
+                    "Student created successfully.\n\n"
+                    + "Student ID: " + account.userId() + "\n"
+                    + "University Email: " + account.email() + "\n"
+                    + "Temporary Password: " + account.temporaryPassword());
             reload();
 
         } catch (ServiceException se) {
@@ -167,11 +174,11 @@ public class AdminStudentsController {
         Student selected = studentTable.getSelectionModel().getSelectedItem();
         if (selected == null) return;
 
-        Optional<Student> result = new StudentFormDialog(selected, programs).showAndWait();
-        if (result.isEmpty()) return;
+        Student edited = new StudentFormDialog(selected, programs).showAndWait().orElse(null);
+        if (edited == null) return;
 
         try {
-            studentService.update(result.get());
+            studentService.update(edited);
             AlertUtil.success("Saved", "The student's details were updated.");
             reload();
         } catch (ServiceException se) {
@@ -187,7 +194,7 @@ public class AdminStudentsController {
         if (selected == null) return;
 
         boolean ok = AlertUtil.confirm("Deactivate student",
-                "Deactivate " + selected.getFullName() + " (" + selected.getStudentNumber() + ")?\n\n"
+                "Deactivate " + selected.getFullName() + " (Student ID " + selected.getUserId() + ")?\n\n"
                 + "Nothing is deleted. The student's status becomes WITHDRAWN, their login is disabled, "
                 + "and all their history and grades are kept.");
         if (!ok) return;
@@ -225,13 +232,14 @@ public class AdminStudentsController {
         if (selected == null) return;
 
         if (!AlertUtil.confirm("Reset password",
-                "Reset the password for " + selected.getFullName() + " (User ID " + selected.getUserId() + ")?")) {
+                "Reset the password for " + selected.getFullName()
+                + " (Student ID " + selected.getUserId() + ")?")) {
             return;
         }
         try {
             String newPassword = studentService.resetPasswordToDefault(selected.getStudentId());
             AlertUtil.success("Password reset",
-                    "User ID: " + selected.getUserId() + "\nNew password: " + newPassword
+                    "Student ID: " + selected.getUserId() + "\nNew password: " + newPassword
                     + "\n\nTell the student to change it after signing in.");
         } catch (Exception e) {
             AlertUtil.error("Could not reset password", "The password could not be reset.", e);

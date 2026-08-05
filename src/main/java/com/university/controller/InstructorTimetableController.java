@@ -94,9 +94,9 @@ public class InstructorTimetableController {
             }
 
             Map<Integer, Course> coursesById = courseService.listCourses(false).stream()
-                    .collect(Collectors.toMap(Course::getCourseId, c -> c, (a, b) -> a));
+                    .collect(Collectors.toMap(c -> c.getCourseId(), c -> c, (a, b) -> a));
             Map<Integer, Section> sectionsById = mine.stream()
-                    .collect(Collectors.toMap(Section::getSectionId, s -> s, (a, b) -> a));
+                    .collect(Collectors.toMap(s -> s.getSectionId(), s -> s, (a, b) -> a));
 
             List<SectionSchedule> meetings = new ArrayList<>();
             int totalStudents = 0;

@@ -40,7 +40,7 @@ public final class ProgramFormDialog extends Dialog<Program> {
         this.model = editMode ? existing : new Program();
 
         setTitle(editMode ? "Edit Program" : "Add Program");
-        setHeaderText(editMode ? "Editing " + existing.getProgramName() : "Create a new program.");
+        setHeaderText(existing != null ? "Editing " + existing.getProgramName() : "Create a new program.");
         getDialogPane().setMinWidth(480);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         var css = getClass().getResource("/css/app.css");

@@ -42,7 +42,7 @@ public final class GradeScale {
         return STEPS.stream()
                 .filter(s -> format(s).equals(label))
                 .findFirst()
-                .map(Step::points)
+                .map(step -> step.points())
                 .orElseGet(() -> STEPS.get(0).points());
     }
 

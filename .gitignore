@@ -4,3 +4,8 @@ target/
 .project
 .settings/
 *.class
+
+# Generated run logs. Anchored to the project root so that tracked logs
+# under scratch/ and .github/ keep behaving as they always have.
+/*.log
+logs/

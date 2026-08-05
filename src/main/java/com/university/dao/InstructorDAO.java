@@ -58,14 +58,9 @@ public class InstructorDAO extends AbstractDAO implements GenericDAO<Instructor>
         return queryList(SELECT + " ORDER BY last_name, first_name", MAPPER);
     }
 
-    /** Finds the instructor record attached to a login account. */
+    /** Finds the instructor record behind an Instructor ID ({@code users.user_id}). */
     public Optional<Instructor> findByUserId(int userId) {
         return queryOne(SELECT + " WHERE user_id = ?", MAPPER, userId);
-    }
-
-    /** Finds an instructor by employee number. */
-    public Optional<Instructor> findByEmployeeNumber(String employeeNumber) {
-        return queryOne(SELECT + " WHERE employee_number = ?", MAPPER, employeeNumber);
     }
 
     /** Finds an instructor by their email address, which is also unique. */

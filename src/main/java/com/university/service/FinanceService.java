@@ -77,7 +77,7 @@ public class FinanceService {
         Semester semester = requireSemester(semesterId);
 
         if (invoiceDao.findByStudentAndSemester(studentId, semesterId).isPresent()) {
-            throw new ServiceException(student.getStudentNumber()
+            throw new ServiceException("Student ID " + student.getUserId()
                     + " already has an invoice for " + semester.getSemesterName() + ".");
         }
 
@@ -104,7 +104,7 @@ public class FinanceService {
         StudentInvoice invoice = new StudentInvoice();
         invoice.setStudentId(studentId);
         invoice.setSemesterId(semesterId);
-        invoice.setInvoiceNumber("INV-" + semesterId + "-" + student.getStudentNumber());
+        invoice.setInvoiceNumber("INV-" + semesterId + "-" + student.getUserId());
         invoice.setIssueDate(issueDate);
         invoice.setDueDate(dueDate);
         invoice.setOriginalAmount(original);
