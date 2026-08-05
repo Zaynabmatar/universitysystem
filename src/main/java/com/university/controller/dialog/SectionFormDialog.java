@@ -82,7 +82,7 @@ public final class SectionFormDialog extends Dialog<Boolean> {
         this.model = editMode ? existing : new Section();
 
         setTitle(editMode ? "Edit Section" : "Add Section");
-        setHeaderText(editMode ? "Editing " + existing.getSectionNumber() : "A section is one offering of one course in one semester.");
+        setHeaderText(existing != null ? "Editing " + existing.getSectionNumber() : "A section is one offering of one course in one semester.");
         getDialogPane().setMinWidth(700);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         var css = getClass().getResource("/css/app.css");

@@ -96,7 +96,7 @@ public class StudentDashboardController {
             DegreeProgress progress = transcriptService.getDegreeProgress(studentId);
             Student student = academicService.academicRecordOf(studentId);
 
-            contextLabel.setText(student.getStudentNumber() + "  •  " + progress.programName);
+            contextLabel.setText(student.getUserId() + "  •  " + progress.programName);
             gpaLabel.setText(GradeCalculator.formatGpa(progress.cumulativeGpa));
             creditsLabel.setText(progress.creditsCompleted + " / " + progress.creditsRequired);
 
@@ -145,7 +145,7 @@ public class StudentDashboardController {
             }
 
             Map<Integer, Course> coursesById = courseService.listCourses(false).stream()
-                    .collect(Collectors.toMap(Course::getCourseId, course -> course, (a, b) -> a));
+                    .collect(Collectors.toMap(course -> course.getCourseId(), course -> course, (a, b) -> a));
 
             List<Meeting> meetings = new ArrayList<>();
             for (Section section : sections) {
@@ -165,7 +165,7 @@ public class StudentDashboardController {
 
             meetings.stream()
                     .limit(MAX_NEXT_CLASSES)
-                    .map(Meeting::describe)
+                    .map(m -> m.describe())
                     .forEach(nextClassesList.getItems()::add);
 
         } catch (RuntimeException e) {

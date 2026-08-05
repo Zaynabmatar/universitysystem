@@ -128,7 +128,7 @@ public class StudentProgressController {
     }
 
     private void renderSummary() {
-        programLabel.setText(progress.fullName + "  •  " + progress.studentNumber
+        programLabel.setText(progress.fullName + "  •  " + progress.studentUserId
                            + "  •  " + progress.programName);
         percentLabel.setText(progress.percentText());
         progressBar.setProgress(progress.progressFraction());
@@ -199,9 +199,9 @@ public class StudentProgressController {
         }
         return switch (filter) {
             case MANDATORY   -> row -> row.isMandatory;
-            case NOT_TAKEN   -> RequirementRow::isNotTaken;
-            case IN_PROGRESS -> RequirementRow::isInProgress;
-            case PASSED      -> RequirementRow::isPassed;
+            case NOT_TAKEN   -> row -> row.isNotTaken();
+            case IN_PROGRESS -> row -> row.isInProgress();
+            case PASSED      -> row -> row.isPassed();
             default          -> row -> true;
         };
     }

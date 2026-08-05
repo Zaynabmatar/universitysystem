@@ -230,17 +230,17 @@ public class ReportDAO extends AbstractDAO {
      */
     public List<ProbationRow> studentsOnProbation() {
         String sql =
-                "SELECT st.student_number, st.first_name, st.last_name, st.email, st.phone, "
+                "SELECT st.user_id, st.first_name, st.last_name, st.email, st.phone, "
               + "       p.program_name, st.cumulative_gpa, st.completed_credits, "
               + "       st.probation_count, st.academic_standing, st.status "
               + "FROM dbo.students st "
               + "JOIN dbo.programs p ON p.program_id = st.program_id "
               + "WHERE st.academic_standing IN (N'PROBATION', N'SUSPENDED') "
-              + "ORDER BY st.cumulative_gpa ASC, st.student_number";
+              + "ORDER BY st.cumulative_gpa ASC, st.user_id";
 
         return queryList(sql, resultSet -> {
             ProbationRow r = new ProbationRow();
-            r.studentNumber = resultSet.getNString("student_number");
+            r.studentUserId = resultSet.getInt("user_id");
             r.studentName = resultSet.getNString("first_name") + " " + resultSet.getNString("last_name");
             r.email = resultSet.getNString("email");
             r.phone = resultSet.getNString("phone");
@@ -264,19 +264,19 @@ public class ReportDAO extends AbstractDAO {
      */
     public List<TopGpaRow> topStudentsByGpa(int howMany) {
         String sql =
-                "SELECT TOP (" + safeTop(howMany) + ") st.student_number, st.first_name, st.last_name, "
+                "SELECT TOP (" + safeTop(howMany) + ") st.user_id, st.first_name, st.last_name, "
               + "       p.program_name, st.cumulative_gpa, st.completed_credits, st.academic_standing "
               + "FROM dbo.students st "
               + "JOIN dbo.programs p ON p.program_id = st.program_id "
               + "WHERE st.completed_credits > 0 AND st.status = N'ACTIVE' "
-              + "ORDER BY st.cumulative_gpa DESC, st.completed_credits DESC, st.student_number";
+              + "ORDER BY st.cumulative_gpa DESC, st.completed_credits DESC, st.user_id";
 
         List<TopGpaRow> out = new ArrayList<>();
         int[] rank = {0};
         out.addAll(queryList(sql, resultSet -> {
             TopGpaRow r = new TopGpaRow();
             r.rank = ++rank[0];
-            r.studentNumber = resultSet.getNString("student_number");
+            r.studentUserId = resultSet.getInt("user_id");
             r.studentName = resultSet.getNString("first_name") + " " + resultSet.getNString("last_name");
             r.programName = resultSet.getNString("program_name");
             r.gpa = resultSet.getBigDecimal("cumulative_gpa");

@@ -38,7 +38,7 @@
 
     <TableView fx:id="gradeTable" editable="true" VBox.vgrow="ALWAYS">
         <columns>
-            <TableColumn fx:id="colStudentNumber" text="Student No."      prefWidth="110" editable="false"/>
+            <TableColumn fx:id="colStudentId"     text="Student ID"       prefWidth="110" editable="false"/>
             <TableColumn fx:id="colStudentName"   text="Student"          prefWidth="200" editable="false"/>
             <TableColumn fx:id="colCoursework"    text="Coursework (30%)" prefWidth="130"/>
             <TableColumn fx:id="colMidterm"       text="Midterm (30%)"    prefWidth="120"/>

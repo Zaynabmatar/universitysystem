@@ -90,7 +90,8 @@ public class ReportService {
 
     /** One row of the "students on probation" report. */
     public static final class ProbationRow {
-        public String studentNumber;
+        /** users.user_id — the Student ID. */
+        public int studentUserId;
         public String studentName;
         public String email;
         public String phone;
@@ -105,7 +106,8 @@ public class ReportService {
     /** One row of the "top 10 students by GPA" report. */
     public static final class TopGpaRow {
         public int rank;   // filled in by the DAO, 1..10
-        public String studentNumber;
+        /** users.user_id — the Student ID. */
+        public int studentUserId;
         public String studentName;
         public String programName;
         public BigDecimal gpa;

@@ -188,18 +188,18 @@ public class InstructorSectionsController {
 
     private List<String> rosterNames(int sectionId) {
         return gradeService.getGradeSheet(sectionId).stream()
-                .map(row -> row.getStudentNumber() + " — " + row.getStudentName())
+                .map(row -> row.getStudentUserId() + " — " + row.getStudentName())
                 .collect(Collectors.toList());
     }
 
     private String courseCodeOf(int courseId) {
         return courses.stream().filter(c -> c.getCourseId() == courseId).findFirst()
-                .map(Course::getCourseCode).orElse("—");
+                .map(c -> c.getCourseCode()).orElse("—");
     }
 
     private String courseTitleOf(int courseId) {
         return courses.stream().filter(c -> c.getCourseId() == courseId).findFirst()
-                .map(Course::getCourseTitle).orElse("—");
+                .map(c -> c.getCourseTitle()).orElse("—");
     }
 
     private String scheduleTextOf(int sectionId) {

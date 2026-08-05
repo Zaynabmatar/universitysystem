@@ -11,6 +11,7 @@
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.Circle?>
 <?import javafx.scene.shape.Path?>
 <?import javafx.scene.shape.MoveTo?>
 <?import javafx.scene.shape.CubicCurveTo?>
@@ -74,10 +75,22 @@
           maxWidth="-Infinity" maxHeight="-Infinity"
           StackPane.alignment="BOTTOM_LEFT" mouseTransparent="true"/>
 
-    <Button fx:id="backButton" text="&#8249; Back" styleClass="back-button"
+    <!-- Back to role selection. Icon only: the button itself never paints a
+         background — the halo Circle behind the arrow is what fades in on hover,
+         so the scale/fade can be eased from the controller (JavaFX 21 has no
+         -fx-transition). The 24px margin keeps the 40px hit area clear of both
+         the window edge and the decorative corner wave. -->
+    <Button fx:id="backButton" styleClass="back-arrow-button"
             maxWidth="-Infinity" maxHeight="-Infinity"
             StackPane.alignment="TOP_LEFT" onAction="#handleBack">
-        <StackPane.margin><Insets top="20" right="0" bottom="0" left="24"/></StackPane.margin>
+        <StackPane.margin><Insets top="24" right="0" bottom="0" left="24"/></StackPane.margin>
+        <graphic>
+            <StackPane fx:id="backGraphic" prefWidth="40" prefHeight="40">
+                <Circle fx:id="backHoverCircle" radius="20" opacity="0" styleClass="back-arrow-halo"/>
+                <SVGPath styleClass="back-arrow-icon"
+                         content="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+            </StackPane>
+        </graphic>
     </Button>
 
     <VBox styleClass="login-content" alignment="CENTER" spacing="17" maxWidth="390" maxHeight="-Infinity">

@@ -1,5 +1,0 @@
-SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
-SLF4J: Defaulting to no-operation (NOP) logger implementation
-SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-Aug 05, 2026 12:43:40 AM javafx.css.CssParser declaration
-WARNING: CSS Error parsing file:/C:/Users/Admin/Desktop/universitysystem/target/classes/css/app.css: Unexpected function 'gaussianblur(' while parsing '-fx-effect' at [57,16]

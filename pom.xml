@@ -46,6 +46,23 @@
             <version>5.1.0</version>
         </dependency>
 
+        <!-- HikariCP logs through SLF4J and pulls in slf4j-api 1.7.36, but an API
+             with no binding behind it prints "Failed to load class
+             org.slf4j.impl.StaticLoggerBinder" and then silently discards every
+             message. That is not cosmetic: the pool reports connection failures
+             through exactly this channel, so without a binding a database that
+             refuses connections produces no explanation at all.
+
+             slf4j-simple is pinned to the same 1.7.36 as the API on purpose. A
+             2.x binding uses the ServiceLoader mechanism that 1.7.x does not
+             look for, so the warning would come back and the logs would still
+             go nowhere. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.36</version>
+        </dependency>
+
         <!-- Password hashing. The users table stores BCrypt hashes, never
              plain text, so signing in needs this to verify them. -->
         <dependency>

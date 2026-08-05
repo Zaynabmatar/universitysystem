@@ -57,7 +57,7 @@ public class TranscriptDAO extends AbstractDAO {
           + "          AND ee.status = 'ENROLLED')";
 
     private static final String SQL_HEADER =
-            "SELECT s.student_id, s.student_number, s.first_name, s.last_name, "
+            "SELECT s.student_id, s.user_id, s.first_name, s.last_name, "
           + "       s.admission_date, s.academic_standing, s.cumulative_gpa, s.completed_credits, "
           + "       p.program_name, p.total_credits_required "
           + "FROM dbo.students s "
@@ -89,7 +89,7 @@ public class TranscriptDAO extends AbstractDAO {
           + "ORDER BY sem.start_date, sem.semester_id, c.course_code";
 
     private static final String SQL_PROGRESS_SUMMARY =
-            "SELECT s.student_id, s.student_number, s.first_name, s.last_name, "
+            "SELECT s.student_id, s.user_id, s.first_name, s.last_name, "
           + "       s.cumulative_gpa, s.completed_credits, "
           + "       p.program_name, p.total_credits_required, "
           + "       (SELECT COUNT(*) FROM dbo.program_requirements pr "
@@ -118,7 +118,7 @@ public class TranscriptDAO extends AbstractDAO {
         return queryOne(SQL_HEADER, resultSet -> {
             Transcript transcript      = new Transcript();
             transcript.studentId       = resultSet.getInt("student_id");
-            transcript.studentNumber   = resultSet.getNString("student_number");
+            transcript.studentUserId   = resultSet.getInt("user_id");
             transcript.firstName       = resultSet.getNString("first_name");
             transcript.lastName        = resultSet.getNString("last_name");
             transcript.programName     = resultSet.getNString("program_name");
@@ -165,7 +165,7 @@ public class TranscriptDAO extends AbstractDAO {
         return queryOne(SQL_PROGRESS_SUMMARY, resultSet -> {
             DegreeProgress progress   = new DegreeProgress();
             progress.studentId        = resultSet.getInt("student_id");
-            progress.studentNumber    = resultSet.getNString("student_number");
+            progress.studentUserId    = resultSet.getInt("user_id");
             progress.fullName         = (resultSet.getNString("first_name") + " "
                                        + resultSet.getNString("last_name")).trim();
             progress.programName      = resultSet.getNString("program_name");

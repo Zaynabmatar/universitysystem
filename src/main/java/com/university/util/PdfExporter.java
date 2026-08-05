@@ -214,7 +214,7 @@ public final class PdfExporter {
         box.setWidthPercentage(100f);
         box.setSpacingAfter(12f);
 
-        addField(box, "Student number", t.studentNumber);
+        addField(box, "Student ID",     String.valueOf(t.studentUserId));
         addField(box, "Program",        t.programName);
         addField(box, "Name",           t.fullName());
         addField(box, "Admitted",       t.admissionDate == null ? "—" : t.admissionDate.format(D));

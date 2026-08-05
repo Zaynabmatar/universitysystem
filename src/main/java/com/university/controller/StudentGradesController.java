@@ -155,7 +155,7 @@ public class StudentGradesController {
             Integer semesterId = chosen == null ? null : chosen.getSemesterId();
             rows.setAll(academicService.gradeRows(studentId, semesterId));
 
-            boolean anyRepeated = rows.stream().anyMatch(StudentGradeRow::isRepeated);
+            boolean anyRepeated = rows.stream().anyMatch(row -> row.isRepeated());
             repeatNote.setVisible(anyRepeated);
             repeatNote.setManaged(anyRepeated);
 

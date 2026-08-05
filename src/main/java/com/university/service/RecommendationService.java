@@ -492,7 +492,7 @@ public class RecommendationService {
             }
             met.add(prereq.prerequisiteCode + " (" + got.letterGrade + ")");
         }
-        met.sort(String::compareTo);
+        met.sort((a, b) -> a.compareTo(b));
         candidate.eligibility.add(Reason.check("Prerequisites met: " + String.join(", ", met)));
         return true;
     }

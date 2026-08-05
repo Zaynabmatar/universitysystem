@@ -165,8 +165,17 @@ BEGIN TRY
     /* ---- B1. users : ONE login row per person, three roles ---------------- */
     CREATE TABLE dbo.users
     (
+        -- user_id IS the identity of the person: it is shown as "Student ID"
+        -- on a STUDENT account and "Instructor ID" on an INSTRUCTOR account,
+        -- and it is what is typed on the sign-in screen. SQL Server assigns
+        -- it; the application reads it back with OUTPUT INSERTED.user_id and
+        -- never computes one of its own.
         user_id       INT           IDENTITY(1,1) NOT NULL,
         username      NVARCHAR(50)  NOT NULL,
+        -- The one university email address per account, unique across all
+        -- three roles. NULL only for an ADMIN, who has no role table to carry
+        -- an address; see UQ_users_email below.
+        email         NVARCHAR(100) NULL,
         password_hash NVARCHAR(255) NOT NULL,   -- BCrypt hash, NEVER plain text
         role          NVARCHAR(20)  NOT NULL,
         is_active     BIT           NOT NULL
@@ -179,6 +188,13 @@ BEGIN TRY
         CONSTRAINT UQ_users_username UNIQUE      (username),
         CONSTRAINT CK_users_role     CHECK (role IN (N'ADMIN', N'INSTRUCTOR', N'STUDENT'))
     );
+
+    /* One address, one account — enforced here rather than in Java.
+       FILTERED so that the NULL email of every ADMIN row does not collide:
+       an ordinary UNIQUE index treats two NULLs as equal and would allow
+       only one administrator to exist. */
+    CREATE UNIQUE NONCLUSTERED INDEX UQ_users_email
+        ON dbo.users (email) WHERE email IS NOT NULL;
 
     /* ---- B2. students -----------------------------------------------------
        cumulative_gpa / completed_credits are CACHED values
@@ -1088,16 +1104,16 @@ BEGIN TRY
        5 = o.saleh   (STUDENT)     login User ID 5, password 5@iuL
        Real BCrypt hashes (cost 12) - see the password note above.
     ---------------------------------------------------------------------- */
-    INSERT INTO dbo.users (username, password_hash, role) VALUES
-        (N'admin',    N'$2a$12$qzkxkx5uLhTF.WCug9QZbuXOkd7K0RfJt/aOsacfXesZiVQZd1UzO', N'ADMIN'),
-        (N'a.khoury', N'$2a$12$iavXLZMGTQ5HcfJpzdaae.7m60PEq.osd8FM5yJjVq5Lg0ebclosW', N'INSTRUCTOR'),
-        (N's.haddad', N'$2a$12$NUbHWmzUAyeMJDBGTFgueeGfZe199rkns2XEhi.u3qk/XVvvdqk.C', N'INSTRUCTOR'),
-        (N'z.matar',  N'$2a$12$hswCE1bYn2pYxyUA9ordN.2P.AarIv2u0CvTAtpcWJXiMlqK3fe2K', N'STUDENT'),
-        (N'o.saleh',  N'$2a$12$5UhcsfS05DJ8wBHMlrkW3eBrURRU0lH19d5Y58MqMloTB2.2ihqEq', N'STUDENT');
+    INSERT INTO dbo.users (username, email, password_hash, role) VALUES
+        (N'admin',    NULL,                                     N'$2a$12$qzkxkx5uLhTF.WCug9QZbuXOkd7K0RfJt/aOsacfXesZiVQZd1UzO', N'ADMIN'),
+        (N'a.khoury', N'a.khoury@university.edu.lb',            N'$2a$12$iavXLZMGTQ5HcfJpzdaae.7m60PEq.osd8FM5yJjVq5Lg0ebclosW', N'INSTRUCTOR'),
+        (N's.haddad', N's.haddad@university.edu.lb',            N'$2a$12$NUbHWmzUAyeMJDBGTFgueeGfZe199rkns2XEhi.u3qk/XVvvdqk.C', N'INSTRUCTOR'),
+        (N'z.matar',  N'z.matar@student.university.edu.lb',     N'$2a$12$hswCE1bYn2pYxyUA9ordN.2P.AarIv2u0CvTAtpcWJXiMlqK3fe2K', N'STUDENT'),
+        (N'o.saleh',  N'o.saleh@student.university.edu.lb',     N'$2a$12$5UhcsfS05DJ8wBHMlrkW3eBrURRU0lH19d5Y58MqMloTB2.2ihqEq', N'STUDENT');
 
     /* ---- admins (1 -> user 1) ---------------------------------------------
-       Every ADMIN row in dbo.users needs a matching dbo.admins row so login
-       can resolve "Admin ID" -> admin_id -> user_id.
+       Every ADMIN row in dbo.users needs a matching dbo.admins row: sign-in
+       is by user_id, and this row is what says the account is still usable.
     ---------------------------------------------------------------------- */
     INSERT INTO dbo.admins (user_id) VALUES (1);
 

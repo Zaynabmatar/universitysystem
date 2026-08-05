@@ -7,6 +7,7 @@ import com.university.service.Session;
 import com.university.util.AlertUtil;
 import com.university.util.SceneManager;
 import javafx.animation.Animation;
+import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -19,6 +20,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -36,7 +38,8 @@ import java.util.List;
 public class MainShellController {
 
     @FXML private VBox sidebar;
-    @FXML private VBox sidebarShell;
+    @FXML private StackPane sidebarShell;
+    @FXML private VBox sidebarPanel;
     @FXML private Button hamburgerButton;
     @FXML private StackPane contentArea;
     @FXML private Label welcomeNameLabel;
@@ -46,6 +49,7 @@ public class MainShellController {
     @FXML private MenuButton avatarMenu;
 
     private static final double SIDEBAR_WIDTH = 260;
+    private static final double SIDEBAR_ANIMATION_MILLIS = 270;
 
     private final AuthService authService = new AuthService();
     private final NotificationService notificationService = new NotificationService();
@@ -97,6 +101,7 @@ public class MainShellController {
         Session session = Session.current();
 
         SceneManager.getInstance().registerContentArea(contentArea);
+        clipSidebarShell();
 
         welcomeNameLabel.setText(session.getDisplayName());
 
@@ -108,6 +113,18 @@ public class MainShellController {
         SceneManager.getInstance().navigateTo(home.fxml(), home.label());
 
         initNotificationBell();
+    }
+
+    /**
+     * Clips the sidebar to its own bounds. The panel inside stays 260px wide while the
+     * shell shrinks, so without this the logo and menu buttons would paint straight over
+     * the dashboard for the length of the animation.
+     */
+    private void clipSidebarShell() {
+        Rectangle clip = new Rectangle();
+        clip.widthProperty().bind(sidebarShell.widthProperty());
+        clip.heightProperty().bind(sidebarShell.heightProperty());
+        sidebarShell.setClip(clip);
     }
 
     /** The bell is visible for all three roles — admins and instructors get notifications too. */
@@ -180,17 +197,40 @@ public class MainShellController {
         }
     }
 
-    /** Slides the sidebar between its full width and hidden, matching the header's hamburger icon. */
+    /**
+     * Two states only — full 260px sidebar, or nothing at all. There is no narrow
+     * icon-rail in between.
+     *
+     * <p>Two properties move together: the shell's width (which is what the
+     * BorderPane measures, so the top bar and content reclaim the space) and the
+     * panel's translateX (so the logo and menu slide out bodily instead of
+     * reflowing into a narrow layout). The shell's clip, installed in
+     * {@link #initialize()}, keeps the sliding panel from ever painting over the
+     * content area.</p>
+     */
     @FXML
     private void handleToggleSidebar() {
         if (sidebarAnimation != null) {
             sidebarAnimation.stop();
         }
-        double target = sidebarCollapsed ? SIDEBAR_WIDTH : 0;
-        sidebarAnimation = new Timeline(new KeyFrame(Duration.millis(180),
-                new KeyValue(sidebarShell.prefWidthProperty(), target),
-                new KeyValue(sidebarShell.minWidthProperty(), target),
-                new KeyValue(sidebarShell.maxWidthProperty(), target)));
+        boolean opening = sidebarCollapsed;
+        double targetWidth = opening ? SIDEBAR_WIDTH : 0;
+        double targetShift = opening ? 0 : -SIDEBAR_WIDTH;
+
+        if (opening) {
+            sidebarPanel.setVisible(true);   // before the slide, so it is seen coming in
+        }
+
+        sidebarAnimation = new Timeline(new KeyFrame(Duration.millis(SIDEBAR_ANIMATION_MILLIS),
+                new KeyValue(sidebarShell.prefWidthProperty(), targetWidth, Interpolator.EASE_BOTH),
+                new KeyValue(sidebarShell.minWidthProperty(), targetWidth, Interpolator.EASE_BOTH),
+                new KeyValue(sidebarShell.maxWidthProperty(), targetWidth, Interpolator.EASE_BOTH),
+                new KeyValue(sidebarPanel.translateXProperty(), targetShift, Interpolator.EASE_BOTH)));
+
+        // Width 0 plus the clip already hides everything; dropping visibility as well
+        // guarantees no stray pixel, focus target or hit area survives in the closed state.
+        sidebarAnimation.setOnFinished(e -> sidebarPanel.setVisible(opening));
+
         sidebarAnimation.play();
         sidebarCollapsed = !sidebarCollapsed;
     }

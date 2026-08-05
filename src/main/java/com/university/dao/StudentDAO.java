@@ -72,22 +72,17 @@ public class StudentDAO extends AbstractDAO implements GenericDAO<Student> {
 
     @Override
     public List<Student> findAll() {
-        return queryList(SELECT + " ORDER BY student_number", MAPPER);
+        return queryList(SELECT + " ORDER BY user_id", MAPPER);
     }
 
     /**
-     * Finds the student record attached to a login account.
+     * Finds the student record behind a Student ID ({@code users.user_id}).
      *
      * <p>Called straight after signing in, to turn a user into the student
      * whose timetable and grades the screens will show.</p>
      */
     public Optional<Student> findByUserId(int userId) {
         return queryOne(SELECT + " WHERE user_id = ?", MAPPER, userId);
-    }
-
-    /** Finds a student by the number printed on the card. */
-    public Optional<Student> findByStudentNumber(String studentNumber) {
-        return queryOne(SELECT + " WHERE student_number = ?", MAPPER, studentNumber);
     }
 
     /** Finds a student by their email address, which is also unique. */
@@ -97,12 +92,12 @@ public class StudentDAO extends AbstractDAO implements GenericDAO<Student> {
 
     /** Every student enrolled on one degree plan. */
     public List<Student> findByProgram(int programId) {
-        return queryList(SELECT + " WHERE program_id = ? ORDER BY student_number", MAPPER, programId);
+        return queryList(SELECT + " WHERE program_id = ? ORDER BY user_id", MAPPER, programId);
     }
 
     /** Every student in one state, for example all suspended students. */
     public List<Student> findByStatus(StudentStatus status) {
-        return queryList(SELECT + " WHERE status = ? ORDER BY student_number", MAPPER, status);
+        return queryList(SELECT + " WHERE status = ? ORDER BY user_id", MAPPER, status);
     }
 
     /** Every student on one academic standing, for the dean's list report. */
@@ -112,15 +107,20 @@ public class StudentDAO extends AbstractDAO implements GenericDAO<Student> {
     }
 
     /**
-     * Searches on number, first name, last name or email.
+     * Searches on Student ID, first name, last name or email.
+     *
+     * <p>The Student ID is {@code users.user_id}, an integer, so it is cast to
+     * text and matched the same partial way as the names: typing {@code 45}
+     * finds 45, 145 and 450. Casting the column rather than parsing the term
+     * keeps one code path for all four fields.</p>
      *
      * @param term matched anywhere in the field, case handled by the database
      *             collation
      */
     public List<Student> search(String term) {
         String pattern = "%" + term + "%";
-        return queryList(SELECT + " WHERE student_number LIKE ? OR first_name LIKE ? "
-                        + "OR last_name LIKE ? OR email LIKE ? ORDER BY student_number",
+        return queryList(SELECT + " WHERE CAST(user_id AS NVARCHAR(20)) LIKE ? OR first_name LIKE ? "
+                        + "OR last_name LIKE ? OR email LIKE ? ORDER BY user_id",
                 MAPPER, pattern, pattern, pattern, pattern);
     }
 

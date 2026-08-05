@@ -11,7 +11,6 @@ import com.university.enums.AcademicStanding;
 import com.university.enums.NotificationType;
 import com.university.enums.StudentStatus;
 import com.university.model.Grade;
-import com.university.model.Program;
 import com.university.model.Semester;
 import com.university.model.Student;
 import com.university.model.StudentGradeRow;
@@ -210,7 +209,7 @@ public class AcademicService {
     public int requiredCredits(int studentId) {
         Student student = requireStudent(studentId);
         return programDao.findById(student.getProgramId())
-                .map(Program::getTotalCreditsRequired)
+                .map(p -> p.getTotalCreditsRequired())
                 .orElseGet(() -> requirementDao.sumRequiredCredits(student.getProgramId()));
     }
 

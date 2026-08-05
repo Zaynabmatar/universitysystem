@@ -1,0 +1,94 @@
+﻿java : Aug 05, 2026 11:19:00 PM com.sun.javafx.application.PlatformImpl startup
+At line:1 char:350
++ ... aw).Trim(); java -cp "scratch/out;target/classes;src/main/resources;$ ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Aug 05, 2026 11...ormImpl startup:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+WARNING: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @1d04c2e9'
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+
+========== SHARED SHELL � ADMIN / INSTRUCTOR / STUDENT ==========
+   saved scratch\role_shell_admin.png
+MEASURED ADMIN � menu [Dashboard, Students, Instructors, Departments & Programs, Courses, Prerequisites, Semesters, Sections, Reports & Analytics, Audit Log, Log out]
+   saved scratch\role_shell_instructor.png
+MEASURED INSTRUCTOR � menu [Dashboard, My Sections, Enter Grades, My Timetable, Log out]
+   saved scratch\role_shell_student.png
+MEASURED STUDENT � menu [Dashboard, Register for Courses, My Timetable, My Grades, Transcript, Degree Progress, Course Recommendation, Log out]
+
+---- hamburger / welcome gap (the requested adjustment) ----
+   ADMIN: button-box gap = 2.4px, visible glyph-to-text gap = 10.8px
+   INSTRUCTOR: button-box gap = 2.4px, visible glyph-to-text gap = 10.8px
+   STUDENT: button-box gap = 2.4px, visible glyph-to-text gap = 10.8px
+PASS  gap between hamburger button and welcome text is small and positive (2.4px)
+   top bar height = 59.2px, hamburger height = 31.4px, welcome font = 13.0px
+
+---- every shared metric, across the three roles ----
+PASS  sidebar.x                     A=0.0  I=0.0  S=0.0  
+PASS  sidebar.y                     A=0.0  I=0.0  S=0.0  
+PASS  sidebar.width                 A=260.0  I=260.0  S=260.0  
+PASS  sidebar.height                A=743.2  I=743.2  S=743.2  
+PASS  sidebar.fullWindowHeight      A=true  I=true  S=true  
+PASS  topBar.x                      A=260.0  I=260.0  S=260.0  
+PASS  topBar.y                      A=0.0  I=0.0  S=0.0  
+PASS  topBar.height                 A=59.2  I=59.2  S=59.2  
+PASS  topBar.width                  A=925.6  I=925.6  S=925.6  
+PASS  topBar.startsAtSidebarEdge    A=true  I=true  S=true  
+PASS  content.x                     A=260.0  I=260.0  S=260.0  
+PASS  content.y                     A=59.2  I=59.2  S=59.2  
+PASS  color.sidebar                 A=#082766  I=#082766  S=#082766  
+PASS  color.topBar                  A=#082766  I=#082766  S=#082766  
+PASS  color.sidebarTopBarMatch      A=true  I=true  S=true  
+PASS  logo.count                    A=3  I=3  S=3  
+PASS  logo[0].x                     A=102.4  I=102.4  S=102.4  
+PASS  logo[0].y                     A=22.4  I=22.4  S=22.4  
+PASS  logo[0].width                 A=56.0  I=56.0  S=56.0  
+PASS  logo[0].height                A=56.39  I=56.39  S=56.39  
+PASS  logo[1].x                     A=35.2  I=35.2  S=35.2  
+PASS  logo[1].y                     A=83.2  I=83.2  S=83.2  
+PASS  logo[1].width                 A=190.0  I=190.0  S=190.0  
+PASS  logo[1].height                A=36.03  I=36.03  S=36.03  
+PASS  logo[2].x                     A=35.2  I=35.2  S=35.2  
+PASS  logo[2].y                     A=124.0  I=124.0  S=124.0  
+PASS  logo[2].width                 A=190.0  I=190.0  S=190.0  
+PASS  logo[2].height                A=10.84  I=10.84  S=10.84  
+PASS  hamburger.x                   A=272.0  I=272.0  S=272.0  
+PASS  hamburger.y                   A=15.2  I=15.2  S=15.2  
+PASS  hamburger.width               A=34.4  I=34.4  S=34.4  
+PASS  hamburger.height              A=31.4  I=31.4  S=31.4  
+PASS  hamburgerGlyph.width          A=18.0  I=18.0  S=18.0  
+PASS  hamburgerGlyph.height         A=12.0  I=12.0  S=12.0  
+PASS  welcome.x                     A=308.8  I=308.8  S=308.8  
+PASS  welcome.y                     A=21.6  I=21.6  S=21.6  
+PASS  welcome.fontSize              A=13.0  I=13.0  S=13.0  
+PASS  welcome.fontName              A=Segoe UI  I=Segoe UI  S=Segoe UI  
+PASS  welcome.textFill              A=0xffffffff  I=0xffffffff  S=0xffffffff  
+PASS  gap.buttonBoxToText           A=2.4  I=2.4  S=2.4  
+PASS  gap.glyphToText               A=10.8  I=10.8  S=10.8  
+PASS  welcomeName.x                 A=369.6  I=369.6  S=369.6  
+PASS  hamburger.centreOffset        A=1.3  I=1.3  S=1.3  
+PASS  welcome.centreOffset          A=0.8  I=0.8  S=0.8  
+PASS  bell.rightInset               A=104.0  I=104.0  S=104.0  
+PASS  avatar.rightInset             A=17.6  I=17.6  S=17.6  
+PASS  gap.bellToAvatar              A=12.0  I=12.0  S=12.0  
+PASS  menu.firstItemX               A=0.0  I=0.0  S=0.0  
+PASS  menu.firstItemY               A=191.2  I=191.2  S=191.2  
+PASS  menu.itemWidth                A=260.0  I=260.0  S=260.0  
+PASS  menu.itemHeight               A=38.4  I=38.4  S=38.4  
+PASS  menu.itemSpacing              A=2.4  I=2.4  S=2.4  
+PASS  menu.fontSize                 A=13.0  I=13.0  S=13.0  
+PASS  menu.headerY                  A=157.6  I=157.6  S=157.6  
+PASS  selected.isFirstItem          A=true  I=true  S=true  
+PASS  selected.fillColor            A=#051A4A  I=#051A4A  S=#051A4A  
+PASS  selected.fontWeight           A=Bold  I=Bold  S=Bold  
+PASS  unselected.fillColor          A=#082766  I=#082766  S=#082766  
+
+---- role-specific by design ----
+   ADMIN welcome name = "admin", menu = [Dashboard, Students, Instructors, Departments & Programs, Courses, Prerequisites, Semesters, Sections, Reports & Analytics, Audit Log, Log out]
+   INSTRUCTOR welcome name = "Ahmad Khoury", menu = [Dashboard, My Sections, Enter Grades, My Timetable, Log out]
+   STUDENT welcome name = "Zaynab Matar", menu = [Dashboard, Register for Courses, My Timetable, My Grades, Transcript, Degree Progress, Course Recommendation, Log out]
+PASS  the three roles do have different menus
+================================================================
+ALL CHECKS PASSED

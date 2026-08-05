@@ -7,6 +7,10 @@ import com.university.service.Session;
 import com.university.util.AlertUtil;
 import com.university.util.SceneManager;
 import com.university.util.ValidationUtil;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -14,17 +18,24 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.SVGPath;
+import javafx.util.Duration;
 
 /**
  * The sign-in screen, opened by RoleSelectionController once the user has
  * picked Admin, Instructor or Student.
  *
  * <p>The chosen role arrives via {@link #setRole(UserRole)} right after this
- * screen is loaded: it sets the ID field's placeholder and scopes
- * {@link #attemptLogin()} to that role's table only, so an Admin ID and a
- * Student ID can validly share the same number without ever colliding.</p>
+ * screen is loaded: it sets the ID field's placeholder ("Student ID",
+ * "Instructor ID", "Admin ID") and is handed to the service, which refuses an
+ * account that does not belong to that role.</p>
+ *
+ * <p>One number is typed here and it is {@code users.user_id} — the same
+ * number the rest of the program shows as Student ID or Instructor ID. It is
+ * an IDENTITY column, so it is unique across all three roles and the account
+ * is found by it alone; the role is a gate, not part of the lookup.</p>
  *
  * <p>The two "please enter your…" checks happen here rather than in the service
  * so the wording is a prompt rather than a complaint. Everything else — the
@@ -41,8 +52,14 @@ public class LoginController {
     @FXML private Button loginButton;
     @FXML private Pane dotsTopRight;
     @FXML private Pane dotsBottomLeft;
+    @FXML private Button backButton;
+    @FXML private StackPane backGraphic;
+    @FXML private Circle backHoverCircle;
 
     private UserRole selectedRole;
+
+    /** Runs the back arrow's hover/press easing; kept so a new state can cut the old one short. */
+    private Timeline backAnimation;
 
     private static final String EYE_OPEN =
             "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z";
@@ -71,6 +88,43 @@ public class LoginController {
         // Decorative dotted halftone corners — dots fade out from the near screen corner.
         buildHalftone(dotsTopRight, dotsTopRight.getPrefWidth(), 0);
         buildHalftone(dotsBottomLeft, 0, dotsBottomLeft.getPrefHeight());
+
+        wireBackArrow();
+    }
+
+    /**
+     * Hover and press feedback for the back arrow.
+     *
+     * <p>Done here rather than in CSS because {@code -fx-transition} only exists
+     * from JavaFX 23 and this project builds against 21, so a CSS {@code :hover}
+     * rule would snap instead of easing. Pressed is checked before hovered: the
+     * pointer is by definition over the button while pressing it, and the smaller
+     * pressed scale has to win.</p>
+     */
+    private void wireBackArrow() {
+        backButton.hoverProperty().addListener((o, was, isHovered) -> applyBackState());
+        backButton.pressedProperty().addListener((o, was, isPressed) -> applyBackState());
+    }
+
+    private void applyBackState() {
+        if (backButton.isPressed()) {
+            animateBackArrow(0.92, 1, 90);
+        } else if (backButton.isHover()) {
+            animateBackArrow(1.05, 1, 160);
+        } else {
+            animateBackArrow(1.0, 0, 160);
+        }
+    }
+
+    private void animateBackArrow(double scale, double haloOpacity, double millis) {
+        if (backAnimation != null) {
+            backAnimation.stop();
+        }
+        backAnimation = new Timeline(new KeyFrame(Duration.millis(millis),
+                new KeyValue(backGraphic.scaleXProperty(), scale, Interpolator.EASE_BOTH),
+                new KeyValue(backGraphic.scaleYProperty(), scale, Interpolator.EASE_BOTH),
+                new KeyValue(backHoverCircle.opacityProperty(), haloOpacity, Interpolator.EASE_BOTH)));
+        backAnimation.play();
     }
 
     /**

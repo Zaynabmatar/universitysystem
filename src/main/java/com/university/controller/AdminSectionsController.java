@@ -115,22 +115,22 @@ public class AdminSectionsController {
 
         semesterFilter.getItems().add(null);
         semesterFilter.getItems().addAll(semesters);
-        semesterFilter.setConverter(nullableConverter(Semester::toString, "All semesters"));
+        semesterFilter.setConverter(nullableConverter(s -> s.toString(), "All semesters"));
         semesterFilter.setValue(semesterService.getCurrentSemester());
 
         courseFilter.getItems().add(null);
         courseFilter.getItems().addAll(courses);
-        courseFilter.setConverter(nullableConverter(Course::toString, "All courses"));
+        courseFilter.setConverter(nullableConverter(c -> c.toString(), "All courses"));
         courseFilter.getSelectionModel().selectFirst();
 
         instructorFilter.getItems().add(null);
         instructorFilter.getItems().addAll(instructors);
-        instructorFilter.setConverter(nullableConverter(Instructor::getFullName, "All instructors"));
+        instructorFilter.setConverter(nullableConverter(i -> i.getFullName(), "All instructors"));
         instructorFilter.getSelectionModel().selectFirst();
 
         statusFilter.getItems().add(null);
         statusFilter.getItems().addAll(SectionStatus.values());
-        statusFilter.setConverter(nullableConverter(SectionStatus::toString, "All statuses"));
+        statusFilter.setConverter(nullableConverter(st -> st.toString(), "All statuses"));
         statusFilter.getSelectionModel().selectFirst();
 
         searchField.textProperty().addListener((o, a, b) -> reload());
@@ -160,23 +160,23 @@ public class AdminSectionsController {
 
     private String courseCodeOf(int courseId) {
         return courses.stream().filter(c -> c.getCourseId() == courseId).findFirst()
-                .map(Course::getCourseCode).orElse("—");
+                .map(c -> c.getCourseCode()).orElse("—");
     }
 
     private String courseTitleOf(int courseId) {
         return courses.stream().filter(c -> c.getCourseId() == courseId).findFirst()
-                .map(Course::getCourseTitle).orElse("—");
+                .map(c -> c.getCourseTitle()).orElse("—");
     }
 
     private String semesterNameOf(int semesterId) {
         return semesters.stream().filter(s -> s.getSemesterId() == semesterId).findFirst()
-                .map(Semester::getSemesterName).orElse("—");
+                .map(s -> s.getSemesterName()).orElse("—");
     }
 
     private String instructorNameOf(Integer instructorId) {
         if (instructorId == null) return "TBA";
         return instructors.stream().filter(i -> i.getInstructorId() == instructorId).findFirst()
-                .map(Instructor::getFullName).orElse("TBA");
+                .map(i -> i.getFullName()).orElse("TBA");
     }
 
     private String scheduleTextOf(int sectionId) {

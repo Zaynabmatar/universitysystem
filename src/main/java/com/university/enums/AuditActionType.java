@@ -4,9 +4,10 @@ package com.university.enums;
  * The statement that produced an audit row.
  *
  * <p>Mirrors {@code CK_audit_log_action} on
- * {@code dbo.audit_log.action_type}. Audit rows are written by triggers,
- * never by application code, so this enum is used for reading and filtering
- * only.</p>
+ * {@code dbo.audit_log.action_type}. Almost every audit row is written by a
+ * trigger, so this enum is mostly used for reading and filtering; the one
+ * exception is account administration, which only the application can know
+ * about and records through {@code AuditLogDAO.record}.</p>
  */
 public enum AuditActionType {
 

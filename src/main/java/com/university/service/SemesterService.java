@@ -45,7 +45,7 @@ public class SemesterService {
 
     public boolean nameExists(String semesterName, Integer excludeId) {
         return semesterDao.findByName(semesterName)
-                .map(Semester::getSemesterId)
+                .map(s -> s.getSemesterId())
                 .filter(id -> excludeId == null || !id.equals(excludeId))
                 .isPresent();
     }

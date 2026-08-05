@@ -39,7 +39,7 @@ public final class CourseFormDialog extends Dialog<Course> {
         this.model = editMode ? existing : new Course();
 
         setTitle(editMode ? "Edit Course" : "Add Course");
-        setHeaderText(editMode ? "Editing " + existing.getCourseTitle() : "Create a new course.");
+        setHeaderText(existing != null ? "Editing " + existing.getCourseTitle() : "Create a new course.");
         getDialogPane().setMinWidth(560);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         var css = getClass().getResource("/css/app.css");

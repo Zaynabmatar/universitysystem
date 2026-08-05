@@ -58,7 +58,7 @@ public final class PrerequisiteFormDialog extends Dialog<CoursePrerequisite> {
         g.setVgap(9);
         g.setPadding(new Insets(14));
 
-        if (editMode) {
+        if (existing != null) {
             setHeaderText("Editing the rule that " + courseOf(courses, existing.getPrerequisiteCourseId())
                     + " must be passed before " + courseOf(courses, existing.getCourseId()) + ".");
             minGradeBox.setValue(GradeScale.labelFor(existing.getMinGradePoints()));
@@ -110,7 +110,7 @@ public final class PrerequisiteFormDialog extends Dialog<CoursePrerequisite> {
         return courses.stream()
                 .filter(c -> c.getCourseId() == courseId)
                 .findFirst()
-                .map(Course::getCourseCode)
+                .map(c -> c.getCourseCode())
                 .orElse("#" + courseId);
     }
 

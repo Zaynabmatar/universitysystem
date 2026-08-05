@@ -72,20 +72,20 @@ public class CourseService {
     /** Used to warn the admin before deactivating: how many programs would be left orphaned-looking. */
     public int countActiveProgramsInDepartment(int departmentId) {
         return (int) programDao.findByDepartment(departmentId).stream()
-                .filter(Program::isActive)
+                .filter(p -> p.isActive())
                 .count();
     }
 
     /** Used to warn the admin before deactivating: how many courses belong to this department. */
     public int countActiveCoursesInDepartment(int departmentId) {
         return (int) courseDao.findByDepartment(departmentId).stream()
-                .filter(Course::isActive)
+                .filter(c -> c.isActive())
                 .count();
     }
 
     private void requireUniqueDepartmentCode(String code, Integer excludeId) {
         boolean taken = departmentDao.findByCode(code)
-                .map(Department::getDepartmentId)
+                .map(d -> d.getDepartmentId())
                 .filter(id -> excludeId == null || !id.equals(excludeId))
                 .isPresent();
         if (taken) {
@@ -133,7 +133,7 @@ public class CourseService {
 
     private void requireUniqueProgramCode(String code, Integer excludeId) {
         boolean taken = programDao.findByCode(code)
-                .map(Program::getProgramId)
+                .map(p -> p.getProgramId())
                 .filter(id -> excludeId == null || !id.equals(excludeId))
                 .isPresent();
         if (taken) {
@@ -199,7 +199,7 @@ public class CourseService {
 
     private void requireUniqueCourseCode(String code, Integer excludeId) {
         boolean taken = courseDao.findByCode(code)
-                .map(Course::getCourseId)
+                .map(c -> c.getCourseId())
                 .filter(id -> excludeId == null || !id.equals(excludeId))
                 .isPresent();
         if (taken) {
@@ -342,7 +342,7 @@ public class CourseService {
     }
 
     private String codeOf(int courseId) {
-        return courseDao.findById(courseId).map(Course::getCourseCode).orElse("#" + courseId);
+        return courseDao.findById(courseId).map(c -> c.getCourseCode()).orElse("#" + courseId);
     }
 
     // ------------------------------------------------- program requirements (degree plan)
@@ -393,7 +393,7 @@ public class CourseService {
     /** Total mandatory credits in a degree plan — shown as a sanity figure next to the plan. */
     public int sumMandatoryCredits(int programId) {
         return programRequirementDao.findMandatoryByProgram(programId).stream()
-                .mapToInt(r -> courseDao.findById(r.getCourseId()).map(Course::getCredits).orElse(0))
+                .mapToInt(r -> courseDao.findById(r.getCourseId()).map(c -> c.getCredits()).orElse(0))
                 .sum();
     }
 }

@@ -103,7 +103,7 @@ public class InstructorDashboardController {
             List<Section> mine = sectionService.searchSections(
                     current.getSemesterId(), null, instructorId, null);
 
-            int students = mine.stream().mapToInt(Section::getEnrolledCount).sum();
+            int students = mine.stream().mapToInt(section -> section.getEnrolledCount()).sum();
             long pending = mine.stream()
                     .filter(section -> !gradeService.isSectionSubmitted(section.getSectionId()))
                     .count();
@@ -145,7 +145,7 @@ public class InstructorDashboardController {
             return;
         }
         Map<Integer, Course> coursesById = courseService.listCourses(false).stream()
-                .collect(Collectors.toMap(Course::getCourseId, c -> c, (a, b) -> a));
+                .collect(Collectors.toMap(c -> c.getCourseId(), c -> c, (a, b) -> a));
 
         List<TodayClass> found = new ArrayList<>();
         for (Section section : sections) {
@@ -161,7 +161,7 @@ public class InstructorDashboardController {
                         section.getRoom() == null ? "—" : section.getRoom()));
             }
         }
-        found.sort(Comparator.comparing(TodayClass::time));
+        found.sort(Comparator.comparing((TodayClass tc) -> tc.time()));
         todaysClasses.setAll(found);
     }
 

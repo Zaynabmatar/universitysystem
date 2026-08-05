@@ -155,17 +155,35 @@
     -fx-padding: 6 10 6 10;
 }
 
-.back-button {
+/* Login "back to role selection" arrow. Compound selector (.button.back-arrow-button)
+   so it reliably beats the generic .button rule further down, which would otherwise
+   repaint this as a white rectangle — see the .button.icon-toggle-btn comment above.
+   The button paints nothing in any state; the hover halo is the .back-arrow-halo
+   Circle sitting behind the arrow, faded in by LoginController. */
+.button.back-arrow-button {
     -fx-background-color: transparent;
+    -fx-background-insets: 0;
     -fx-border-color: transparent;
-    -fx-text-fill: rgba(255, 255, 255, 0.75);
-    -fx-font-size: 13px;
-    -fx-padding: 6 10 6 10;
+    -fx-border-width: 0;
+    -fx-padding: 0;
     -fx-cursor: hand;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
 }
 
-.back-button:hover {
-    -fx-text-fill: white;
+.button.back-arrow-button:hover,
+.button.back-arrow-button:pressed,
+.button.back-arrow-button:focused {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.back-arrow-halo {
+    -fx-fill: rgba(255, 255, 255, 0.16);
+}
+
+.back-arrow-icon {
+    -fx-fill: white;
 }
 
 .login-button-outline {
@@ -199,14 +217,25 @@
 }
 
 /* ---------- application shell ---------- */
+/* Exactly the sidebar navy (-navy-800, not the lighter -navy-700), with no border,
+   inset or shadow, so the sidebar and the top bar read as one continuous panel with
+   no seam where they meet. Vertical padding is unchanged, so the bar keeps its height. */
 .top-bar {
-    -fx-background-color: -navy-700;
-    -fx-padding: 10 18 10 18;
+    -fx-background-color: -navy-800;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-padding: 10 18 10 12;
 }
 .top-bar .label { -fx-text-fill: white; }
 
 .welcome-label { -fx-font-size: 13px; -fx-font-weight: normal; -fx-text-fill: white; }
-.top-bar-row { -fx-padding: 0 0 0 252; }
+/* No left indent: the top bar now sits inside the content column (main_shell.fxml),
+   so it already starts where the sidebar ends. The old 252px padding faked that offset
+   back when the bar spanned the whole window, and it stayed put when the sidebar
+   collapsed, stranding the hamburger in the middle of a full-width bar.
+   The 12px left padding on .top-bar plus the icon button's own 8px puts the hamburger
+   glyph ~20px past the sidebar edge — compact, with no empty gutter. */
+.top-bar-row { -fx-padding: 0; }
 
 /* Compound selector (not just .icon-btn) so this reliably beats the generic
    .button rule below regardless of stylesheet order — every Button also
@@ -238,8 +267,15 @@
 .avatar-person { -fx-fill: -navy-700; }
 
 /* ---------- sidebar ---------- */
-/* Width is driven from MainShellController (collapse/expand animation), not from CSS. */
+/* Width is driven from MainShellController (collapse/expand animation), not from CSS.
+   .sidebar-shell is the clipping viewport that shrinks to 0; .sidebar-panel is the
+   fixed-width panel that slides out inside it. Both carry the same navy so the strip
+   reads as one solid panel at every frame of the animation. */
 .sidebar-shell {
+    -fx-background-color: -navy-800;
+}
+
+.sidebar-panel {
     -fx-background-color: -navy-800;
 }
 

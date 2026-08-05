@@ -19,7 +19,8 @@ public class GradeSheetRow {
     private int enrollmentId;
     private Integer gradeId;
     private int studentId;
-    private String studentNumber;
+    /** users.user_id — the Student ID shown on the sheet, not the internal students.student_id. */
+    private int studentUserId;
     private String studentName;
     private BigDecimal courseworkMark;
     private BigDecimal midtermMark;
@@ -54,12 +55,13 @@ public class GradeSheetRow {
         this.studentId = studentId;
     }
 
-    public String getStudentNumber() {
-        return studentNumber;
+    /** The Student ID the sheet shows: users.user_id. */
+    public int getStudentUserId() {
+        return studentUserId;
     }
 
-    public void setStudentNumber(String studentNumber) {
-        this.studentNumber = studentNumber;
+    public void setStudentUserId(int studentUserId) {
+        this.studentUserId = studentUserId;
     }
 
     public String getStudentName() {
@@ -126,6 +128,6 @@ public class GradeSheetRow {
 
     @Override
     public String toString() {
-        return studentNumber + " " + studentName;
+        return studentUserId + " " + studentName;
     }
 }

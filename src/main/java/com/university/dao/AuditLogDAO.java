@@ -3,6 +3,7 @@ package com.university.dao;
 import com.university.enums.AuditActionType;
 import com.university.model.AuditLog;
 
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -12,12 +13,20 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Reads {@code dbo.audit_log}.
+ * Reads {@code dbo.audit_log}, and writes the one kind of row no trigger can.
  *
- * <p>Read-only on purpose. Those rows are written by database triggers, so an
- * insert from Java would either duplicate what a trigger already recorded or
- * record something that never happened. This class therefore offers no
- * insert, update or delete, and does not implement {@link GenericDAO}.</p>
+ * <p>Almost everything here is read-only on purpose: those rows are written by
+ * database triggers, and an insert from Java would either duplicate what a
+ * trigger already recorded or record something that never happened. The class
+ * therefore implements no update or delete, and does not implement
+ * {@link GenericDAO}.</p>
+ *
+ * <p>{@link #record} is the exception. Account administration — creating a
+ * student or instructor account, changing its email, resetting its password,
+ * deactivating and reactivating it — is a decision an administrator made, and
+ * only the application knows who made it. {@code dbo.users},
+ * {@code dbo.students} and {@code dbo.instructors} carry no audit trigger
+ * (only {@code dbo.grades} does), so nothing here can be a duplicate.</p>
  */
 public class AuditLogDAO extends AbstractDAO {
 
@@ -41,6 +50,35 @@ public class AuditLogDAO extends AbstractDAO {
         log.setDescription(rs.getString("description"));
         log.setCreatedAt(DaoUtils.getLocalDateTime(rs, "created_at"));
         return log;
+    }
+
+    private static final String INSERT =
+            "INSERT INTO dbo.audit_log "
+            + "(user_id, action_type, table_name, record_id, old_value, new_value, description) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+    /**
+     * Records one administrative action against an account.
+     *
+     * <p>Never pass a password, hashed or otherwise, in {@code oldValue},
+     * {@code newValue} or {@code description}. A reset is recorded as the
+     * fact that it happened and to whom, and that is all the log is allowed
+     * to know.</p>
+     *
+     * @param connection the transaction the audited change is part of, so the
+     *                   log entry lives or dies with it; null to log on its own
+     * @param actorUserId the administrator who did it, or null if unknown
+     * @param recordId   the {@code user_id} of the account acted upon
+     */
+    public void record(Connection connection, Integer actorUserId, AuditActionType actionType,
+                       String tableName, Integer recordId, String oldValue, String newValue,
+                       String description) {
+        Object[] params = {actorUserId, actionType, tableName, recordId, oldValue, newValue, description};
+        if (connection == null) {
+            executeUpdate(INSERT, params);
+        } else {
+            executeUpdate(connection, INSERT, params);
+        }
     }
 
     /** Finds one entry by its key. */

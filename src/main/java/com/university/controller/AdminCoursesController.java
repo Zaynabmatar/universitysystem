@@ -123,7 +123,7 @@ public class AdminCoursesController {
         return departments.stream()
                 .filter(d -> d.getDepartmentId() == departmentId)
                 .findFirst()
-                .map(Department::getDepartmentCode)
+                .map(d -> d.getDepartmentCode())
                 .orElse("—");
     }
 
