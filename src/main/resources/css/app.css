@@ -45,6 +45,8 @@
 
 .login-content {
     -fx-alignment: center;
+    -fx-scale-x: 1.201725;
+    -fx-scale-y: 1.201725;
 }
 
 .logo-badge {
@@ -101,16 +103,16 @@
 .input-pill {
     -fx-background-color: white;
     -fx-background-radius: 8;
-    -fx-padding: 11 16 11 16;
-    -fx-pref-width: 340;
-    -fx-max-width: 340;
+    -fx-padding: 12 17 12 17;
+    -fx-pref-width: 367;
+    -fx-max-width: 367;
 }
 
 .input-pill .text-field {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     -fx-padding: 0;
-    -fx-font-size: 13px;
+    -fx-font-size: 14px;
     -fx-text-fill: #12294f;
     -fx-prompt-text-fill: #98a2b8;
     -fx-focus-color: transparent;
@@ -119,6 +121,8 @@
 
 .field-icon {
     -fx-fill: #16308f;
+    -fx-scale-x: 1.08;
+    -fx-scale-y: 1.08;
 }
 
 /* Compound selector (not just .icon-toggle-btn) so this reliably beats the generic
@@ -172,10 +176,10 @@
     -fx-background-radius: 6;
     -fx-text-fill: white;
     -fx-font-weight: bold;
-    -fx-font-size: 14px;
-    -fx-padding: 13 0 13 0;
-    -fx-pref-width: 340;
-    -fx-max-width: 340;
+    -fx-font-size: 15px;
+    -fx-padding: 14 0 14 0;
+    -fx-pref-width: 367;
+    -fx-max-width: 367;
     -fx-cursor: hand;
 }
 
@@ -202,6 +206,7 @@
 .top-bar .label { -fx-text-fill: white; }
 
 .welcome-label { -fx-font-size: 13px; -fx-font-weight: normal; -fx-text-fill: white; }
+.top-bar-row { -fx-padding: 0 0 0 362; }
 
 /* Compound selector (not just .icon-btn) so this reliably beats the generic
    .button rule below regardless of stylesheet order — every Button also

@@ -80,10 +80,10 @@
         <StackPane.margin><Insets top="20" right="0" bottom="0" left="24"/></StackPane.margin>
     </Button>
 
-    <VBox styleClass="login-content" alignment="CENTER" spacing="16" maxWidth="360" maxHeight="-Infinity">
+    <VBox styleClass="login-content" alignment="CENTER" spacing="17" maxWidth="390" maxHeight="-Infinity">
 
         <StackPane styleClass="logo-badge">
-            <ImageView fitWidth="84.0" fitHeight="84.0" preserveRatio="true" smooth="true">
+            <ImageView fitWidth="91.0" fitHeight="91.0" preserveRatio="true" smooth="true">
                 <image>
                     <Image url="@/images/iul-logo.png"/>
                 </image>
@@ -91,19 +91,19 @@
         </StackPane>
 
         <VBox alignment="CENTER" spacing="6">
-            <ImageView fitWidth="300.0" preserveRatio="true" smooth="true">
+            <ImageView fitWidth="324.0" preserveRatio="true" smooth="true">
                 <image>
                     <Image url="@/images/university-name-ar.png"/>
                 </image>
             </ImageView>
-            <ImageView fitWidth="300.0" preserveRatio="true" smooth="true">
+            <ImageView fitWidth="324.0" preserveRatio="true" smooth="true">
                 <image>
                     <Image url="@/images/university-name-en.png"/>
                 </image>
             </ImageView>
         </VBox>
 
-        <VBox fx:id="card" spacing="14" alignment="CENTER">
+        <VBox fx:id="card" spacing="15" alignment="CENTER">
 
             <HBox styleClass="input-pill" alignment="CENTER_LEFT" spacing="10">
                 <SVGPath styleClass="field-icon"

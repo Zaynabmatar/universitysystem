@@ -26,7 +26,7 @@
 
     <top>
         <StackPane styleClass="top-bar">
-            <HBox spacing="10" alignment="CENTER_LEFT">
+            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="top-bar-row">
                 <Button fx:id="hamburgerButton" styleClass="icon-btn" onAction="#handleToggleSidebar">
                     <graphic>
                         <SVGPath styleClass="ikon"
@@ -35,7 +35,7 @@
                 </Button>
 
                 <HBox spacing="6" alignment="CENTER_LEFT">
-                    <Label text="Welcome," styleClass="welcome-label"/>
+                    <Label text="Welcome" styleClass="welcome-label"/>
                     <Label fx:id="welcomeNameLabel" text="" styleClass="welcome-label"/>
                     <Label fx:id="semesterLabel" text="" styleClass="welcome-label"/>
                 </HBox>
