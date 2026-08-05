@@ -91,7 +91,7 @@ public class MainShellController {
     private void initialize() {
         if (!Session.isActive()) {
             // Should be impossible, but never show a shell to nobody.
-            SceneManager.getInstance().switchRoot("login.fxml", "University Registration System — Login");
+            SceneManager.getInstance().switchRoot("role_selection.fxml", "University Registration System — Select Role");
             return;
         }
         Session session = Session.current();
@@ -227,6 +227,6 @@ public class MainShellController {
             bellRefresh.stop();
         }
         authService.logout();
-        SceneManager.getInstance().switchRoot("login.fxml", "University Registration System — Login");
+        SceneManager.getInstance().switchRoot("role_selection.fxml", "University Registration System — Select Role");
     }
 }

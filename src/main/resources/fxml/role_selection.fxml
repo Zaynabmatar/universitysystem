@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+
+<!--
+  The firstpicture.png artwork IS the screen: no labels, icons or buttons are
+  drawn here. Three transparent Regions sit on top of it and are repositioned by
+  RoleSelectionController on every resize so they stay locked onto the ADMIN /
+  INSTRUCTOR / STUDENT boxes already drawn into the image.
+-->
+<StackPane xmlns="http://javafx.com/javafx"
+           xmlns:fx="http://javafx.com/fxml"
+           fx:controller="com.university.controller.RoleSelectionController"
+           fx:id="root"
+           styleClass="role-selection-root">
+
+    <ImageView fx:id="roleImageView" preserveRatio="false" smooth="true" pickOnBounds="false">
+        <image>
+            <Image url="@/images/firstpicture.png"/>
+        </image>
+    </ImageView>
+
+    <Pane fx:id="hitOverlay" pickOnBounds="false">
+        <Region fx:id="instructorHit" onMouseClicked="#handleInstructorClick" style="-fx-cursor: hand;"/>
+        <Region fx:id="adminHit" onMouseClicked="#handleAdminClick" style="-fx-cursor: hand;"/>
+        <Region fx:id="studentHit" onMouseClicked="#handleStudentClick" style="-fx-cursor: hand;"/>
+    </Pane>
+
+</StackPane>

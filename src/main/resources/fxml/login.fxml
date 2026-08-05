@@ -74,6 +74,12 @@
           maxWidth="-Infinity" maxHeight="-Infinity"
           StackPane.alignment="BOTTOM_LEFT" mouseTransparent="true"/>
 
+    <Button fx:id="backButton" text="&#8249; Back" styleClass="back-button"
+            maxWidth="-Infinity" maxHeight="-Infinity"
+            StackPane.alignment="TOP_LEFT" onAction="#handleBack">
+        <StackPane.margin><Insets top="20" right="0" bottom="0" left="24"/></StackPane.margin>
+    </Button>
+
     <VBox styleClass="login-content" alignment="CENTER" spacing="16" maxWidth="360" maxHeight="-Infinity">
 
         <StackPane styleClass="logo-badge">

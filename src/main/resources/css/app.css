@@ -30,6 +30,14 @@
     -fx-padding: 10;
 }
 
+/* ---------- role selection ---------- */
+/* The artwork now covers the root edge-to-edge at every window size (cropped,
+   never letterboxed), so this color never actually shows — it's only a
+   safety net for the instant before the image finishes loading. */
+.role-selection-root {
+    -fx-background-color: #2f6fb0;
+}
+
 /* ---------- login ---------- */
 .login-root {
     -fx-background-color: radial-gradient(center 50% 32%, radius 90%, #0c3690 0%, #082766 55%, #051a4a 100%);
@@ -141,6 +149,19 @@
     -fx-background-color: rgba(255, 255, 255, 0.14);
     -fx-background-radius: 6;
     -fx-padding: 6 10 6 10;
+}
+
+.back-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: rgba(255, 255, 255, 0.75);
+    -fx-font-size: 13px;
+    -fx-padding: 6 10 6 10;
+    -fx-cursor: hand;
+}
+
+.back-button:hover {
+    -fx-text-fill: white;
 }
 
 .login-button-outline {
