@@ -119,9 +119,9 @@ public class InstructorService {
     /**
      * Updates the editable columns only — never the Instructor ID.
      *
-     * <p>A changed university email is written to {@code users.email} and
-     * {@code instructors.email} in one transaction, leaving the id, the role
-     * and the password untouched.</p>
+     * <p>A changed university email is written to {@code instructors.email},
+     * the one column that holds it, in the same transaction as the rest of the
+     * edit — leaving the id, the role and the password untouched.</p>
      */
     public void update(Instructor instructor) {
         Instructor stored = requireInstructor(instructor.getInstructorId());
@@ -141,8 +141,9 @@ public class InstructorService {
             instructorDao.update(connection, instructor);
 
             if (!email.equalsIgnoreCase(stored.getEmail())) {
-                accounts.changeEmail(connection, stored.getUserId(), email);
-                accounts.audit(connection, AuditActionType.UPDATE, "users", stored.getUserId(),
+                // instructorDao.update above has already written the new address;
+                // instructors.email is the only column that holds it.
+                accounts.audit(connection, AuditActionType.UPDATE, "instructors", stored.getUserId(),
                         stored.getEmail(), email,
                         "Admin changed the university email for Instructor ID "
                         + stored.getUserId() + ".");

@@ -26,8 +26,17 @@ import java.util.Optional;
  */
 public class UserDAO extends AbstractDAO implements GenericDAO<User> {
 
+    /**
+     * Every column {@code dbo.users} actually has, and no more.
+     *
+     * <p>There is deliberately no {@code email} here. The university address
+     * lives on {@code dbo.students.email} and {@code dbo.instructors.email} —
+     * that is the schema this application ships with, and each of those two
+     * columns carries its own UNIQUE index, so nothing is lost by not
+     * duplicating the value onto the account row.</p>
+     */
     private static final String SELECT =
-            "SELECT user_id, username, email, password_hash, role, is_active, last_login, created_at "
+            "SELECT user_id, username, password_hash, role, is_active, last_login, created_at "
             + "FROM dbo.users";
 
     /**
@@ -37,9 +46,9 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
      * looking the row up afterwards never is.
      */
     private static final String INSERT =
-            "INSERT INTO dbo.users (username, email, password_hash, role, is_active) "
+            "INSERT INTO dbo.users (username, password_hash, role, is_active) "
             + "OUTPUT INSERTED.user_id "
-            + "VALUES (?, ?, ?, ?, ?)";
+            + "VALUES (?, ?, ?, ?)";
 
     /**
      * Column-filler only: {@code password_hash} is NOT NULL, but the real
@@ -49,7 +58,7 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     private static final String PLACEHOLDER_HASH = "PENDING-DEFAULT-PASSWORD";
 
     private static final String UPDATE =
-            "UPDATE dbo.users SET username = ?, email = ?, password_hash = ?, role = ?, is_active = ? "
+            "UPDATE dbo.users SET username = ?, password_hash = ?, role = ?, is_active = ? "
             + "WHERE user_id = ?";
 
     private static final String DELETE = "DELETE FROM dbo.users WHERE user_id = ?";
@@ -60,7 +69,6 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
         User user = new User();
         user.setUserId(rs.getInt("user_id"));
         user.setUsername(rs.getString("username"));
-        user.setEmail(rs.getString("email"));
         user.setPasswordHash(rs.getString("password_hash"));
         user.setRole(UserRole.fromDb(rs.getString("role")));
         user.setActive(rs.getBoolean("is_active"));
@@ -84,17 +92,12 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
         return queryList(SELECT + " WHERE role = ? ORDER BY username", MAPPER, role);
     }
 
-    /** Finds an account by its university email address, which is unique system-wide. */
-    public Optional<User> findByEmail(String email) {
-        return email == null ? Optional.empty() : queryOne(SELECT + " WHERE email = ?", MAPPER, email);
-    }
-
     /**
      * Is this address already spoken for?
      *
-     * <p>The one place the question is asked, for both roles at once — that is
-     * the whole reason the column lives on {@code users} rather than on
-     * {@code students} and {@code instructors} separately.</p>
+     * <p>The one place the question is asked, for both roles at once — which is
+     * why it lives on the account data access object even though the column
+     * itself does not live on {@code dbo.users}.</p>
      *
      * @param excludeUserId the account being edited, so it never collides with
      *                      the address it already holds; null when creating
@@ -106,12 +109,11 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     /**
      * {@link #emailExists(String, Integer)} inside a transaction already running.
      *
-     * <p>{@code students.email} and {@code instructors.email} are checked as
-     * well as {@code users.email}. The application keeps all three in step, so
-     * the extra two lookups should never be the ones that fire — but each of
-     * those columns carries its own UNIQUE index, and finding the clash here
-     * turns a raw constraint violation into a sentence the administrator can
-     * act on.</p>
+     * <p>{@code students.email} and {@code instructors.email} are the only two
+     * places an address is kept — {@code dbo.users} has no email column — and
+     * each of them carries its own UNIQUE index. Both are checked here so that
+     * a clash is reported as a sentence the administrator can act on rather
+     * than as a raw constraint violation.</p>
      */
     public boolean emailExists(Connection connection, String email, Integer excludeUserId) {
         if (email == null || email.isBlank()) {
@@ -119,9 +121,7 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
         }
         // No account has user_id 0 (IDENTITY starts at 1), so 0 excludes nothing.
         int exclude = excludeUserId == null ? 0 : excludeUserId;
-        return count(connection, "SELECT COUNT(*) FROM dbo.users WHERE email = ? AND user_id <> ?",
-                        email, exclude)
-                + count(connection, "SELECT COUNT(*) FROM dbo.students WHERE email = ? AND user_id <> ?",
+        return count(connection, "SELECT COUNT(*) FROM dbo.students WHERE email = ? AND user_id <> ?",
                         email, exclude)
                 + count(connection, "SELECT COUNT(*) FROM dbo.instructors WHERE email = ? AND user_id <> ?",
                         email, exclude) > 0;
@@ -134,15 +134,6 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     /** Is this login name already taken? Used only to keep the legacy username column unique. */
     public boolean usernameExists(Connection connection, String username) {
         return queryInt(connection, "SELECT COUNT(*) FROM dbo.users WHERE username = ?", username) > 0;
-    }
-
-    /**
-     * Changes the university email address of an existing account, and nothing
-     * else — not the id, not the role, not the password.
-     */
-    public boolean updateEmail(Connection connection, int userId, String email) {
-        return executeUpdate(connection, "UPDATE dbo.users SET email = ? WHERE user_id = ?",
-                email, userId) > 0;
     }
 
     /** Stamps the moment of a successful sign-in. */
@@ -241,7 +232,6 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     private Object[] insertParams(User entity) {
         return new Object[]{
                 entity.getUsername(),
-                entity.getEmail(),
                 PLACEHOLDER_HASH,
                 entity.getRole(),
                 entity.isActive()
@@ -251,7 +241,6 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     private Object[] updateParams(User entity) {
         return new Object[]{
                 entity.getUsername(),
-                entity.getEmail(),
                 entity.getPasswordHash(),
                 entity.getRole(),
                 entity.isActive(),

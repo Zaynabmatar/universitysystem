@@ -12,9 +12,10 @@ import java.time.LocalDateTime;
  * on a STUDENT account and "Instructor ID" on an INSTRUCTOR account — there
  * is no second, hand-typed id anywhere.</p>
  *
- * <p>{@code email} is the university address, unique across every account and
- * every role. It is null only for an ADMIN created before Phase 17, which had
- * no address to inherit.</p>
+ * <p>There is deliberately no email here. {@code dbo.users} has no such column:
+ * the university address belongs to the person, not to the login, and lives on
+ * {@link Student#getEmail()} / {@link Instructor#getEmail()}. An ADMIN account
+ * has no address at all.</p>
  *
  * <p>{@code passwordHash} holds a BCrypt hash. Plain text passwords are never
  * stored in this object or in the database.</p>
@@ -23,7 +24,6 @@ public class User {
 
     private int userId;
     private String username;
-    private String email;
     private String passwordHash;
     private UserRole role;
     private boolean active = true;
@@ -33,11 +33,10 @@ public class User {
     public User() {
     }
 
-    public User(int userId, String username, String email, String passwordHash, UserRole role,
+    public User(int userId, String username, String passwordHash, UserRole role,
                 boolean active, LocalDateTime lastLogin, LocalDateTime createdAt) {
         this.userId = userId;
         this.username = username;
-        this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
         this.active = active;
@@ -59,15 +58,6 @@ public class User {
 
     public void setUsername(String username) {
         this.username = username;
-    }
-
-    /** The university email address, unique across every account. */
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
     }
 
     public String getPasswordHash() {

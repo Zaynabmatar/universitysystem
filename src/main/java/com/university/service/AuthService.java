@@ -6,6 +6,7 @@ import com.university.dao.StudentDAO;
 import com.university.dao.UserDAO;
 import com.university.database.DBConnection;
 import com.university.enums.UserRole;
+import com.university.model.Admin;
 import com.university.model.Instructor;
 import com.university.model.Student;
 import com.university.model.User;
@@ -21,17 +22,21 @@ import java.util.Optional;
  * a stranger that an ID exists, which is worth more to them than to anybody
  * honest.</p>
  *
- * <p>There is one login identifier in this system and it is
- * {@code users.user_id} — the same number the screens call Student ID or
- * Instructor ID. Because it is an IDENTITY column it is unique across every
- * role, so the account is found by that number alone.</p>
+ * <p>The number typed on the sign-in screen is the one the signer-in actually
+ * knows: their Student ID, Instructor ID or Admin ID — which is
+ * {@code students.student_id}, {@code instructors.instructor_id} or
+ * {@code admins.admin_id}, exactly as the field's own prompt says. It is
+ * <em>not</em> {@code users.user_id}. Those two numbers are separate IDENTITY
+ * sequences and they diverge almost immediately: instructor 1 is user 2,
+ * student 3 is user 55, admin 2 is user 405. Reading the typed number as a
+ * user_id therefore looked up a different person's account — the reason a
+ * valid ID and a valid password were still refused.</p>
  *
- * <p>The role picked on the role-selection screen is still required, and is
- * still checked: it is the door the account came in through, and an account
- * may only come in through its own. An instructor who clicks STUDENT is told
- * the same vague thing as somebody who mistyped a password — which door an
- * account belongs to is no more a stranger's business than whether an ID
- * exists.</p>
+ * <p>So the role picked on the role-selection screen does two jobs. It chooses
+ * which table the typed number is looked up in, and it remains the door the
+ * account came in through — an account may only come in through its own. An
+ * unknown ID and a wrong password are told the same vague thing, because which
+ * IDs exist is no more a stranger's business than which door they belong to.</p>
  */
 public class AuthService {
 
@@ -44,19 +49,41 @@ public class AuthService {
     private final AdminDAO adminDao = new AdminDAO();
 
     /**
+     * Console trace of a sign-in, off unless the application is started with
+     * {@code -Duniversity.debug.login=true}.
+     *
+     * <p>Off by default because the console is not the place to announce who is
+     * signing in. On, it names the server and database actually reached, both
+     * IDs, the role on the account and the step that refused — enough to tell a
+     * wrong ID, a wrong password, a wrong door and a wrong database apart on a
+     * machine where sign-in misbehaves. It never prints the password or the
+     * stored hash.</p>
+     */
+    private static final boolean TRACE = Boolean.getBoolean("university.debug.login");
+
+    private static void trace(String message) {
+        if (TRACE) {
+            System.out.println("[LOGIN] " + message);
+        }
+    }
+
+    /**
      * Checks a password and opens a session.
      *
      * <p>The student or instructor record behind the account is loaded here,
      * so no screen has to do it later.</p>
      *
-     * @param selectedRole the role picked on the role-selection screen; the
-     *                     account must belong to it. {@code null} means no role
-     *                     was picked and any account may sign in — nothing in
-     *                     the application passes null, since every route to the
+     * @param selectedRole the role picked on the role-selection screen. It
+     *                     selects the table {@code idText} is looked up in, and
+     *                     the account must belong to it. {@code null} means no
+     *                     role was picked, in which case the number can only be
+     *                     read as {@code users.user_id} — nothing in the
+     *                     application passes null, since every route to the
      *                     sign-in screen goes through role selection first.
-     * @param idText       the User ID as typed on the sign-in screen — a
-     *                     student's Student ID, an instructor's Instructor ID,
-     *                     and in every case {@code users.user_id}
+     * @param idText       the ID as typed on the sign-in screen: a student's
+     *                     Student ID, an instructor's Instructor ID, an admin's
+     *                     Admin ID — the key of the role's own table, not
+     *                     {@code users.user_id}
      * @return the open session, also reachable through {@link Session#current()}
      * @throws ServiceException if the details are wrong or the account is disabled
      */
@@ -64,62 +91,46 @@ public class AuthService {
         ValidationException.requireText(idText, "User ID");
         ValidationException.requireText(password, "Password");
 
-        int userId;
+        int typedId;
         try {
-            userId = Integer.parseInt(idText.trim());
+            typedId = Integer.parseInt(idText.trim());
         } catch (NumberFormatException e) {
             throw new ServiceException(SIGN_IN_FAILED);
         }
-        if (userId <= 0) {
+        if (typedId <= 0) {
             throw new ServiceException(SIGN_IN_FAILED);
         }
 
-        // ===================== TEMPORARY LOGIN DEBUG — START =====================
-        // Prints what the sign-in screen sent, what the database answered, and
-        // the full stack trace of any SQL failure. Delete this block (and the
-        // one it closes below, plus the [DB] line in DBConnection) once the
-        // restored database is confirmed good.
-        System.out.println("[LOGIN] ---------------------------------------------");
-        System.out.println("[LOGIN] " + DBConnection.describeConnected());
-        System.out.println("[LOGIN] entered user_id = " + userId);
-        System.out.println("[LOGIN] selected role   = " + selectedRole);
-
-        Optional<User> found;
-        try {
-            found = userDao.findById(userId);
-        } catch (RuntimeException e) {
-            System.out.println("[LOGIN] lookup threw — full stack trace follows:");
-            e.printStackTrace(System.out);
-            for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
-                System.out.println("[LOGIN] caused by:");
-                cause.printStackTrace(System.out);
-            }
-            throw e;
+        if (TRACE) {
+            trace("---------------------------------------------");
+            trace(DBConnection.describeConnected());
+            trace("typed " + (selectedRole == null ? "ID" : selectedRole.getLabel() + " ID")
+                    + " = " + typedId);
         }
-        System.out.println("[LOGIN] user found      = " + found.isPresent());
-        found.ifPresent(u -> {
-            System.out.println("[LOGIN] role from DB    = " + u.getRole());
-            System.out.println("[LOGIN] is_active       = " + u.isActive());
-            System.out.println("[LOGIN] hash matches <user_id>@iuL = "
-                    + PasswordHasher.verify(PasswordHasher.defaultPasswordFor(userId),
-                                            u.getPasswordHash()));
-        });
-        // ====================== TEMPORARY LOGIN DEBUG — END ======================
 
-        User user = found.orElseThrow(() -> new ServiceException(SIGN_IN_FAILED));
+        int userId = resolveUserId(selectedRole, typedId);
+        trace("resolved user_id = " + userId);
+
+        User user = userDao.findById(userId).orElseThrow(() -> {
+            trace("no dbo.users row for user_id " + userId);
+            return new ServiceException(SIGN_IN_FAILED);
+        });
+        trace("role on account  = " + user.getRole() + ", is_active = " + user.isActive());
 
         if (!PasswordHasher.verify(password, user.getPasswordHash())) {
-            System.out.println("[LOGIN] password did not verify against the stored hash");
+            trace("refused: password did not verify against the stored hash");
             throw new ServiceException(SIGN_IN_FAILED);
         }
+        trace("password         = verified");
         // Wrong door. Checked after the password so that a stranger cannot use
         // the three buttons to learn which role an ID belongs to.
         if (selectedRole != null && user.getRole() != selectedRole) {
-            System.out.println("[LOGIN] role mismatch: selected " + selectedRole
-                    + " but the account is " + user.getRole());
+            trace("refused: signed in through the " + selectedRole
+                    + " door but the account is " + user.getRole());
             throw new ServiceException(SIGN_IN_FAILED);
         }
         if (!user.isActive()) {
+            trace("refused: users.is_active is false");
             throw new ServiceException("This account has been deactivated. "
                     + "Please contact the registrar.");
         }
@@ -130,6 +141,7 @@ public class AuthService {
                 ? instructorDao.findByUserId(userId).orElse(null) : null;
 
         requireRoleRecordUsable(role, student, instructor, userId);
+        trace("signed in        = OK");
 
         LocalDateTime now = LocalDateTime.now();
         userDao.touchLastLogin(user.getUserId(), now);
@@ -137,6 +149,44 @@ public class AuthService {
 
         Session.begin(user, student, instructor);
         return Session.current();
+    }
+
+    /**
+     * Turns the number typed on the sign-in screen into a {@code users.user_id}.
+     *
+     * <p>The field's prompt is "Student ID", "Instructor ID" or "Admin ID", and
+     * that is precisely what it receives: the key of {@code dbo.students},
+     * {@code dbo.instructors} or {@code dbo.admins}. Each of those is its own
+     * IDENTITY sequence, independent of the one behind {@code users.user_id},
+     * so the two numbers agree only by accident — in the shipped data for
+     * exactly one account out of 682. The lookup therefore has to go through
+     * the role's own table; treating the typed number as a user_id directly is
+     * what silently resolved a valid ID to somebody else's account.</p>
+     *
+     * <p>Scoping the lookup by role also means an Admin ID and a Student ID may
+     * validly be the same number without either being able to sign in through
+     * the other's button.</p>
+     *
+     * @param selectedRole which table to look in; {@code null} only when no role
+     *                     was picked, where the number can only be a user_id
+     * @return the {@code users.user_id} behind the typed ID
+     * @throws ServiceException with the vague message when no such ID exists,
+     *                          so that an unknown ID is indistinguishable from
+     *                          a wrong password
+     */
+    private int resolveUserId(UserRole selectedRole, int typedId) {
+        if (selectedRole == null) {
+            return typedId;
+        }
+        Optional<Integer> userId = switch (selectedRole) {
+            case STUDENT -> studentDao.findById(typedId).map(Student::getUserId);
+            case INSTRUCTOR -> instructorDao.findById(typedId).map(Instructor::getUserId);
+            case ADMIN -> adminDao.findById(typedId).map(Admin::getUserId);
+        };
+        return userId.orElseThrow(() -> {
+            trace("refused: no " + selectedRole.getLabel() + " has ID " + typedId);
+            return new ServiceException(SIGN_IN_FAILED);
+        });
     }
 
     /**

@@ -209,6 +209,12 @@ public class LoginController {
      * ID can validly be the same number without either one being able to sign
      * in through the other's button.
      *
+     * <p>Signing in and opening the dashboard are two separate steps with two
+     * separate failure messages. Rolling them into one {@code try} was what
+     * made a broken screen look like a rejected password: whatever went wrong,
+     * the user was told "something went wrong while signing in" even when the
+     * sign-in itself had already succeeded.</p>
+     *
      * @return null on success (the session is already open and the main
      *         shell already shown), otherwise the message to display
      */
@@ -216,23 +222,67 @@ public class LoginController {
         String id = usernameField.getText();
         String password = passwordField.getText();
 
+        // ---- step 1: authenticate -------------------------------------------------
         try {
             authService.login(selectedRole, id, password);
             passwordField.clear();
+        } catch (ServiceException se) {
+            // Covers ValidationException too — it extends ServiceException.
+            // A refusal, not a fault: the wording is already the user's answer.
+            return se.getMessage();
+        } catch (Exception ex) {
+            report("AUTHENTICATION", ex);
+            AlertUtil.error("Login failed",
+                    "Signing in could not be completed. " + technicalSummary(ex), ex);
+            return null;
+        }
 
+        // ---- step 2: open the dashboard -------------------------------------------
+        // Past this line the account is verified and the session is open, so any
+        // failure below belongs to the screen, not to the credentials.
+        try {
             String username = Session.current().getUser().getUsername();
             SceneManager.getInstance().switchRoot("main_shell.fxml",
                     "University Registration System — " + username);
             return null;
-
-        } catch (ServiceException se) {
-            // Covers ValidationException too — it extends ServiceException.
-            return se.getMessage();
         } catch (Exception ex) {
-            AlertUtil.error("Login failed",
-                    "Something went wrong while signing in. Please try again.", ex);
+            report("DASHBOARD LOADING", ex);
+            AlertUtil.error("Cannot open the dashboard",
+                    "You were signed in, but the main screen could not be opened. "
+                    + technicalSummary(ex), ex);
             return null;
         }
+    }
+
+    /**
+     * Puts the whole failure on the console — message, stack trace and every
+     * nested cause — so the real problem is readable in the run log instead of
+     * only behind "Show details" in a popup that may already have been closed.
+     */
+    private void report(String stage, Throwable failure) {
+        System.out.println("[LOGIN] FAILED during " + stage);
+        failure.printStackTrace(System.out);
+        for (Throwable cause = failure.getCause(); cause != null; cause = cause.getCause()) {
+            System.out.println("[LOGIN] caused by:");
+            cause.printStackTrace(System.out);
+        }
+        System.out.flush();
+    }
+
+    /**
+     * The innermost cause in one line — that is the sentence that actually names
+     * the problem ("Invalid column name 'email'."), where the outer wrapper only
+     * says which query it happened in.
+     */
+    private String technicalSummary(Throwable failure) {
+        Throwable root = failure;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+        String message = root.getMessage();
+        return message == null || message.isBlank()
+                ? root.getClass().getSimpleName()
+                : root.getClass().getSimpleName() + ": " + message;
     }
 
     private void showError(String message) {
