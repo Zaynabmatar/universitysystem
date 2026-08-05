@@ -2,37 +2,119 @@
 
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.MenuButton?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.Circle?>
+<?import javafx.scene.shape.CubicCurveTo?>
+<?import javafx.scene.shape.MoveTo?>
+<?import javafx.scene.shape.Path?>
+<?import javafx.scene.shape.SVGPath?>
 
 <BorderPane xmlns="http://javafx.com/javafx"
             xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.university.controller.MainShellController"
-            prefWidth="1200" prefHeight="700">
+            prefWidth="1200" prefHeight="780"
+            styleClass="content-shell">
 
     <top>
-        <HBox styleClass="top-bar" spacing="12" alignment="CENTER_LEFT">
-            <Label text="University Registration System" styleClass="app-name"/>
-            <Region HBox.hgrow="ALWAYS"/>
-            <Label fx:id="semesterLabel" text=""/>
-            <StackPane styleClass="bell-stack">
-                <Button fx:id="notificationsButton" text="🔔 Notifications" onAction="#handleNotifications"/>
-                <Label fx:id="unreadBadge" text="0" styleClass="bell-badge"
-                       StackPane.alignment="TOP_RIGHT" managed="false" visible="false"/>
-            </StackPane>
-            <Label fx:id="userLabel" text=""/>
-            <Button fx:id="logoutButton" text="Log out" onAction="#handleLogout"/>
-        </HBox>
+        <StackPane styleClass="top-bar">
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Button fx:id="hamburgerButton" styleClass="icon-btn" onAction="#handleToggleSidebar">
+                    <graphic>
+                        <SVGPath styleClass="ikon"
+                                 content="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/>
+                    </graphic>
+                </Button>
+
+                <HBox spacing="6" alignment="CENTER_LEFT">
+                    <Label text="Welcome," styleClass="welcome-label"/>
+                    <Label fx:id="welcomeNameLabel" text="" styleClass="welcome-label"/>
+                    <Label fx:id="semesterLabel" text="" styleClass="welcome-label"/>
+                </HBox>
+
+                <Region HBox.hgrow="ALWAYS"/>
+
+                <StackPane styleClass="bell-stack">
+                    <Button fx:id="notificationsButton" styleClass="icon-btn" onAction="#handleNotifications">
+                        <graphic>
+                            <SVGPath styleClass="ikon"
+                                     content="M12 2c-1.1 0-2 .9-2 2v.29C7.16 5.15 5 7.83 5 11v5l-2 2v1h18v-1l-2-2v-5c0-3.17-2.16-5.85-5-6.71V4c0-1.1-.9-2-2-2zm0 19a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 21z"/>
+                        </graphic>
+                    </Button>
+                    <Label fx:id="unreadBadge" text="0" styleClass="bell-badge"
+                           StackPane.alignment="TOP_RIGHT" managed="false" visible="false"/>
+                </StackPane>
+
+                <MenuButton fx:id="avatarMenu" styleClass="avatar-menu">
+                    <graphic>
+                        <StackPane>
+                            <Circle radius="13" styleClass="avatar-circle"/>
+                            <SVGPath styleClass="avatar-person"
+                                     content="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
+                                     scaleX="0.72" scaleY="0.72"/>
+                        </StackPane>
+                    </graphic>
+                    <items>
+                        <MenuItem fx:id="profileMenuItem" text="Profile" disable="true"/>
+                        <MenuItem fx:id="logoutMenuItem" text="Log out" onAction="#handleLogout"/>
+                    </items>
+                </MenuButton>
+            </HBox>
+        </StackPane>
     </top>
 
     <left>
-        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="sidebar-scroll">
-            <VBox fx:id="sidebar" styleClass="sidebar" spacing="2"/>
-        </ScrollPane>
+        <VBox fx:id="sidebarShell" styleClass="sidebar-shell" prefWidth="260" minWidth="260" maxWidth="260">
+
+            <VBox styleClass="sidebar-logo-block" spacing="4" alignment="CENTER">
+                <ImageView fitWidth="56.0" preserveRatio="true" smooth="true">
+                    <image>
+                        <Image url="@/images/iul-logo.png"/>
+                    </image>
+                </ImageView>
+                <ImageView fitWidth="190.0" preserveRatio="true" smooth="true" styleClass="sidebar-name-ar">
+                    <image>
+                        <Image url="@/images/university-name-ar.png"/>
+                    </image>
+                </ImageView>
+                <ImageView fitWidth="190.0" preserveRatio="true" smooth="true" styleClass="sidebar-name-en">
+                    <image>
+                        <Image url="@/images/university-name-en.png"/>
+                    </image>
+                </ImageView>
+            </VBox>
+
+            <VBox fx:id="sidebar" styleClass="sidebar" spacing="2" VBox.vgrow="ALWAYS"/>
+
+            <Pane styleClass="sidebar-wave-pane" prefHeight="64" maxHeight="64" mouseTransparent="true">
+                <Path styleClass="wave-glow">
+                    <elements>
+                        <MoveTo x="249" y="4"/>
+                        <CubicCurveTo controlX1="163" controlY1="17" controlX2="76" controlY2="38" x="-22" y="64"/>
+                    </elements>
+                </Path>
+                <Path styleClass="wave-soft">
+                    <elements>
+                        <MoveTo x="260" y="13"/>
+                        <CubicCurveTo controlX1="173" controlY1="28" controlX2="65" controlY2="49" x="-22" y="64"/>
+                    </elements>
+                </Path>
+                <Path styleClass="wave-main">
+                    <elements>
+                        <MoveTo x="249" y="4"/>
+                        <CubicCurveTo controlX1="163" controlY1="17" controlX2="76" controlY2="38" x="-22" y="64"/>
+                    </elements>
+                </Path>
+            </Pane>
+        </VBox>
     </left>
 
     <center>

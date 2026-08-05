@@ -27,7 +27,13 @@ public class DBConnection {
             "jdbc:sqlserver://localhost\\SQLEXPRESS"
             + ";databaseName=universitymanagementDB"
             + ";encrypt=true"
-            + ";trustServerCertificate=true";
+            + ";trustServerCertificate=true"
+            // Without this, the driver sends every TIME parameter over the wire as
+            // datetime (legacy SQL Server 2005 compatibility default), which makes SQL
+            // Server reject a bare "? < time_column" comparison with "The data types
+            // datetime and time are incompatible in the less than operator" — this is
+            // what broke the section instructor/room clash checks on Add/Edit Section.
+            + ";sendTimeAsDatetime=false";
 
     private static final String DB_USER = "sa";
 
@@ -88,6 +94,15 @@ public class DBConnection {
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setConnectionTimeout(10_000);
+        // SQL Server Express can still be recovering its databases well after
+        // Windows reports the service as "Running" (measured ~2m24s gap on this
+        // machine between OS boot and the engine actually accepting logins).
+        // Without this, HikariCP validates a connection during construction and,
+        // failing that, throws out of this static initialiser — which permanently
+        // poisons the DBConnection class for the rest of the JVM's life, so no
+        // later retry (see App.start()) could ever succeed. -1 defers all
+        // connection attempts to getConnection() calls, which are retryable.
+        config.setInitializationFailTimeout(-1);
         return new HikariDataSource(config);
     }
 

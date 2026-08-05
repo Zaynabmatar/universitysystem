@@ -8,6 +8,7 @@ import com.university.util.AlertUtil;
 import com.university.util.SceneManager;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -15,6 +16,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
@@ -34,17 +36,23 @@ import java.util.List;
 public class MainShellController {
 
     @FXML private VBox sidebar;
+    @FXML private VBox sidebarShell;
+    @FXML private Button hamburgerButton;
     @FXML private StackPane contentArea;
-    @FXML private Label userLabel;
+    @FXML private Label welcomeNameLabel;
     @FXML private Label semesterLabel;
     @FXML private Button notificationsButton;
     @FXML private Label unreadBadge;
-    @FXML private Button logoutButton;
+    @FXML private MenuButton avatarMenu;
+
+    private static final double SIDEBAR_WIDTH = 260;
 
     private final AuthService authService = new AuthService();
     private final NotificationService notificationService = new NotificationService();
     private Button activeButton;
     private Timeline bellRefresh;
+    private Timeline sidebarAnimation;
+    private boolean sidebarCollapsed = false;
 
     /** One sidebar entry: the text the user sees and the FXML it opens. */
     private record MenuEntry(String label, String fxml) { }
@@ -90,7 +98,7 @@ public class MainShellController {
 
         SceneManager.getInstance().registerContentArea(contentArea);
 
-        userLabel.setText(session.getDisplayName() + "  (" + session.getRole().name() + ")");
+        welcomeNameLabel.setText(session.getDisplayName());
 
         List<MenuEntry> menu = menuFor(session.getRole());
         buildSidebar(menu);
@@ -154,6 +162,12 @@ public class MainShellController {
                 setActive(b);   // first item starts highlighted
             }
         }
+
+        Button logoutButton = new Button("Log out");
+        logoutButton.getStyleClass().add("nav-button");
+        logoutButton.setMaxWidth(Double.MAX_VALUE);
+        logoutButton.setOnAction(e -> handleLogout());
+        sidebar.getChildren().add(logoutButton);
     }
 
     private void setActive(Button b) {
@@ -164,6 +178,21 @@ public class MainShellController {
         if (!b.getStyleClass().contains("active")) {
             b.getStyleClass().add("active");
         }
+    }
+
+    /** Slides the sidebar between its full width and hidden, matching the header's hamburger icon. */
+    @FXML
+    private void handleToggleSidebar() {
+        if (sidebarAnimation != null) {
+            sidebarAnimation.stop();
+        }
+        double target = sidebarCollapsed ? SIDEBAR_WIDTH : 0;
+        sidebarAnimation = new Timeline(new KeyFrame(Duration.millis(180),
+                new KeyValue(sidebarShell.prefWidthProperty(), target),
+                new KeyValue(sidebarShell.minWidthProperty(), target),
+                new KeyValue(sidebarShell.maxWidthProperty(), target)));
+        sidebarAnimation.play();
+        sidebarCollapsed = !sidebarCollapsed;
     }
 
     @FXML

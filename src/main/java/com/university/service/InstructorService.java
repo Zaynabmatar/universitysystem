@@ -95,6 +95,8 @@ public class InstructorService {
             int instructorId = instructorDao.insert(connection, instructor);
             instructor.setInstructorId(instructorId);
 
+            userDao.finalizePassword(connection, userId, instructorId);
+
             connection.commit();
             return instructor;
         } catch (SQLException e) {

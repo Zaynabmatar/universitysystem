@@ -8,6 +8,7 @@ import javafx.application.Platform;
 import javafx.stage.Stage;
 
 import java.sql.Connection;
+import java.sql.SQLException;
 
 /**
  * The JavaFX application.
@@ -33,15 +34,44 @@ public class App extends Application {
         });
 
         // 3. Fail fast, and fail politely, if SQL Server is not reachable.
-        //    Throwable, not Exception: DBConnection builds its pool in a static
-        //    initialiser, so the first touch of the class throws
-        //    ExceptionInInitializerError — an Error, which catch (Exception)
-        //    misses. That is what turned a wrong password into a stack trace on
-        //    the console instead of the popup Section 13 asks for.
-        try (Connection ignored = DBConnection.getConnection()) {
-            // connection OK
+        //    Throwable, not Exception: a genuinely broken config (e.g. driver
+        //    missing) is still an Error/RuntimeException, not a SQLException,
+        //    and retrying that would just waste the whole retry window.
+        //
+        //    SQLException is retried with a short backoff: SQL Server Express
+        //    can still be finishing crash recovery well after the Windows
+        //    service reports "Running" (measured ~2m24s gap on this machine),
+        //    so the first attempt right after login can legitimately fail
+        //    while the database is still starting up.
+        final int maxAttempts = 10;
+        final long retryDelayMillis = 3_000;
+        SQLException lastFailure = null;
+        boolean connected = false;
+        try {
+            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                try (Connection ignored = DBConnection.getConnection()) {
+                    connected = true;
+                    break;
+                } catch (SQLException e) {
+                    lastFailure = e;
+                    if (attempt < maxAttempts) {
+                        Thread.sleep(retryDelayMillis);
+                    }
+                }
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
         } catch (Throwable e) {
             e.printStackTrace();
+            AlertUtil.error("University Registration System",
+                    "Cannot connect to SQL Server. Check that the service is running — see DATABASE_SETUP.md");
+            Platform.exit();
+            return;   // never fall through into a half-built login screen
+        }
+        if (!connected) {
+            if (lastFailure != null) {
+                lastFailure.printStackTrace();
+            }
             // project_details.md Section 13 — the exact wording, character for character.
             AlertUtil.error("University Registration System",
                     "Cannot connect to SQL Server. Check that the service is running — see DATABASE_SETUP.md");
@@ -49,7 +79,7 @@ public class App extends Application {
             return;   // never fall through into a half-built login screen
         }
 
-        // 4. Open the login screen.
+        // 4. Login is the very first screen shown.
         SceneManager.getInstance().init(primaryStage);
         SceneManager.getInstance().switchRoot("login.fxml", "University Registration System — Login");
         primaryStage.show();

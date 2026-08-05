@@ -27,7 +27,7 @@ public final class SceneManager {
     public static final String FXML_DIR = "/fxml/";
     public static final String CSS_PATH = "/css/app.css";
     public static final double MIN_WIDTH  = 1200;   // project_details.md Section 13 — Responsiveness
-    public static final double MIN_HEIGHT = 700;
+    public static final double MIN_HEIGHT = 780;
 
     private Stage primaryStage;
     private Pane contentArea;

@@ -15,10 +15,7 @@
       fx:controller="com.university.controller.StudentDashboardController"
       styleClass="content-page" spacing="12">
 
-    <VBox spacing="2">
-        <Label fx:id="welcomeLabel" text="Welcome" styleClass="page-title"/>
-        <Label fx:id="contextLabel" styleClass="muted-text"/>
-    </VBox>
+    <Label fx:id="contextLabel" styleClass="muted-text"/>
 
     <!-- ===== four KPI cards ===== -->
     <HBox spacing="12">
