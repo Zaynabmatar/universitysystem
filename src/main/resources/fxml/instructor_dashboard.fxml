@@ -18,7 +18,6 @@
         <Region HBox.hgrow="ALWAYS"/>
         <Button text="Refresh" onAction="#handleRefresh"/>
     </HBox>
-    <Label fx:id="welcomeLabel" styleClass="muted-text"/>
     <Label fx:id="semesterLabel" styleClass="muted-text"/>
 
     <HBox spacing="12">

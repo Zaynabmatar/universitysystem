@@ -6,11 +6,19 @@
 .root {
     -fx-font-family: "Segoe UI", "Tahoma", sans-serif;
     -fx-font-size: 13px;
+
+    /* Brand navy — same family as login.fxml's radial gradient, so the shell reads as one system. */
+    -navy-900: #051a4a;
+    -navy-800: #082766;
+    -navy-700: #0c3690;
+    -navy-600: #12409f;
+    -navy-tint: rgba(255, 255, 255, 0.12);
+    -accent: #12409f;
 }
 
 /* ---------- shared text ---------- */
-.page-title      { -fx-font-size: 22px; -fx-font-weight: bold; }
-.section-title   { -fx-font-size: 15px; -fx-font-weight: bold; }
+.page-title      { -fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
+.section-title   { -fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
 .muted-text      { -fx-text-fill: #6b7280; }
 .error-text      { -fx-text-fill: #d32f2f; -fx-font-size: 11.5px; }
 .success-text    { -fx-text-fill: #2e7d32; -fx-font-size: 11.5px; }
@@ -54,7 +62,7 @@
     -fx-stroke: rgba(140, 190, 255, 0.4);
     -fx-stroke-width: 20;
     -fx-stroke-line-cap: round;
-    -fx-effect: gaussianblur(22);
+    -fx-effect: dropshadow(gaussian, rgba(140, 190, 255, 0.4), 22, 0.4, 0, 0);
 }
 
 .wave-soft {
@@ -105,14 +113,24 @@
     -fx-fill: #16308f;
 }
 
-.icon-toggle-btn {
+/* Compound selector (not just .icon-toggle-btn) so this reliably beats the generic
+   .button rule further down regardless of stylesheet order — see the .button.icon-btn
+   comment above for why a single shared class name isn't enough. */
+.button.icon-toggle-btn {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-insets: 0;
     -fx-padding: 0;
     -fx-cursor: hand;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
 }
 
-.icon-toggle-btn:hover {
+.button.icon-toggle-btn:hover,
+.button.icon-toggle-btn:pressed {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
     -fx-opacity: 0.7;
 }
 
@@ -148,49 +166,140 @@
     -fx-background-color: rgba(255, 255, 255, 0.18);
 }
 
+.id-field-label {
+    -fx-text-fill: rgba(255, 255, 255, 0.85);
+    -fx-font-size: 11.5px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 0 0 4;
+}
+
 /* ---------- application shell ---------- */
 .top-bar {
-    -fx-background-color: #1e3a8a;
+    -fx-background-color: -navy-700;
     -fx-padding: 10 18 10 18;
 }
 .top-bar .label { -fx-text-fill: white; }
-.app-name       { -fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white; }
+
+.welcome-label { -fx-font-size: 13px; -fx-font-weight: normal; -fx-text-fill: white; }
+
+/* Compound selector (not just .icon-btn) so this reliably beats the generic
+   .button rule below regardless of stylesheet order — every Button also
+   carries JavaFX's built-in "button" style class, and two equal-specificity
+   class selectors resolve by source order, which previously let the white
+   .button background/border leak onto these icon buttons. */
+.button.icon-btn {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-radius: 8;
+    -fx-padding: 6 8 6 8;
+    -fx-cursor: hand;
+}
+.button.icon-btn:hover    { -fx-background-color: -navy-tint; }
+.button.icon-btn:pressed  { -fx-background-color: rgba(255, 255, 255, 0.2); }
+.icon-btn .ikon    { -fx-fill: white; }
+
+.avatar-menu {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-padding: 2 6 2 6;
+    -fx-cursor: hand;
+    -fx-mark-color: white;
+}
+.avatar-menu:hover  { -fx-background-color: -navy-tint; }
+.avatar-menu .label { -fx-text-fill: white; }
+.avatar-menu .arrow-button .arrow { -fx-background-color: white; }
+.avatar-circle { -fx-fill: white; }
+.avatar-person { -fx-fill: -navy-700; }
+
+/* ---------- sidebar ---------- */
+/* Width is driven from MainShellController (collapse/expand animation), not from CSS. */
+.sidebar-shell {
+    -fx-background-color: -navy-800;
+}
+
+.sidebar-logo-block {
+    -fx-padding: 22 12 16 12;
+    -fx-alignment: CENTER;
+}
+.sidebar-name-ar { -fx-alignment: CENTER; }
+.sidebar-name-en { -fx-alignment: CENTER; }
 
 .sidebar {
-    -fx-background-color: #111827;
-    -fx-padding: 14 0 14 0;
-    -fx-min-width: 240;
-    -fx-pref-width: 240;
-}
-/* main_shell.fxml wraps the sidebar in a ScrollPane; without this it falls back to the
-   default white viewport background instead of blending with the dark sidebar. */
-.sidebar-scroll,
-.sidebar-scroll > .viewport {
-    -fx-background-color: #111827;
+    -fx-background-color: -navy-800;
+    -fx-padding: 6 0 14 0;
 }
 .sidebar-header {
-    -fx-text-fill: #9ca3af;
+    -fx-text-fill: rgba(255, 255, 255, 0.55);
     -fx-font-size: 11px;
-    -fx-padding: 6 18 6 18;
+    -fx-font-weight: bold;
+    -fx-padding: 6 18 10 18;
 }
-.nav-button {
+/* Selectors are scoped under .sidebar (not just .nav-button) so their specificity reliably
+   beats the shared ".button" base rule below, regardless of declaration order in this file. */
+.sidebar .nav-button {
     -fx-background-color: transparent;
-    -fx-text-fill: #e5e7eb;
+    -fx-text-fill: white;
     -fx-alignment: CENTER_LEFT;
     -fx-padding: 10 18 10 18;
     -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
     -fx-cursor: hand;
     -fx-font-size: 13px;
+    -fx-font-weight: normal;
 }
-.nav-button:hover  { -fx-background-color: #1f2937; -fx-text-fill: white; }
-.nav-button.active { -fx-background-color: #2563eb; -fx-text-fill: white; -fx-font-weight: bold; }
+.sidebar .nav-button:hover {
+    -fx-background-color: -navy-tint;
+    -fx-text-fill: white;
+}
+.sidebar .nav-button.active,
+.sidebar .nav-button.active:hover {
+    -fx-background-color: -navy-900;
+    -fx-background-insets: 0 10 0 10;
+    -fx-background-radius: 8;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
 
+.sidebar-wave-pane { -fx-background-color: transparent; }
+
+.content-shell {
+    -fx-background-color: #f4f6fb;
+    -fx-background-radius: 0 0 10 0;
+}
 .content-page { -fx-padding: 22; }
 
+/* ---------- buttons (shared base for every plain <Button> in the app) ---------- */
+.button {
+    -fx-background-color: white;
+    -fx-border-color: -navy-700;
+    -fx-border-width: 1.2;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-text-fill: -navy-700;
+    -fx-font-size: 13px;
+    -fx-padding: 8 16 8 16;
+    -fx-cursor: hand;
+}
+.button:hover   { -fx-background-color: #eef2fb; }
+.button:pressed { -fx-background-color: #e2e9f9; }
+.button:default {
+    -fx-background-color: -navy-700;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+.button:default:hover   { -fx-background-color: -navy-600; }
+.button:default:pressed { -fx-background-color: -navy-800; }
+
+.hyperlink { -fx-text-fill: -navy-700; }
+.hyperlink:visited { -fx-text-fill: -navy-700; }
+
 /* ---------- tables & forms ---------- */
-.table-view { -fx-border-color: #e5e7eb; }
-.table-view .column-header-background { -fx-background-color: #f3f4f6; }
-.table-view .column-header .label { -fx-font-weight: bold; }
+.table-view { -fx-border-color: #dfe5ec; }
+.table-view .column-header-background { -fx-background-color: #eef1f8; }
+.table-view .column-header .label { -fx-font-weight: bold; -fx-text-fill: -navy-900; }
 
 .field-error { -fx-border-color: #d32f2f; -fx-border-width: 1.4; -fx-border-radius: 4; }
 
@@ -262,14 +371,15 @@
 .grade-pass      { -fx-text-fill: #1b7f3b; -fx-font-weight: bold; }
 .grade-fail      { -fx-text-fill: #c62828; -fx-font-weight: bold; }
 .kpi-card        { -fx-background-color: white; -fx-background-radius: 8; -fx-padding: 14;
-                   -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.10), 6, 0, 0, 2);
+                   -fx-border-color: #e4e9f4; -fx-border-radius: 8;
+                   -fx-effect: dropshadow(gaussian, rgba(8,39,102,0.10), 8, 0, 0, 2);
                    -fx-min-width: 170; }
-.kpi-value       { -fx-font-size: 26px; -fx-font-weight: bold; }
+.kpi-value       { -fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
 .kpi-label       { -fx-font-size: 12px; -fx-text-fill: #666666; }
 .standing-good   { -fx-text-fill: #1b7f3b; -fx-font-weight: bold; }
 .standing-bad    { -fx-text-fill: #c62828; -fx-font-weight: bold; }
 .legend-chip     { -fx-padding: 3 10 3 10; -fx-font-size: 11.5px; }
-.table-view .table-row-cell:selected { -fx-background-color: #cfe3ff; }
+.table-view .table-row-cell:selected { -fx-background-color: #dbe4f7; }
 
 /* ---------- Phase 12: transcript, degree progress, student dashboard ---------- */
 .panel {
@@ -326,7 +436,7 @@
 }
 .reco-rank {
     -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: white;
-    -fx-background-color: #1f395c; -fx-background-radius: 12;
+    -fx-background-color: -navy-700; -fx-background-radius: 12;
     -fx-padding: 2 9 2 9;
 }
 .reco-title { -fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #17202e; }

@@ -38,7 +38,6 @@ public class InstructorDashboardController {
 
     private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
 
-    @FXML private Label welcomeLabel;
     @FXML private Label semesterLabel;
     @FXML private Label kpiSections;
     @FXML private Label kpiStudents;
@@ -62,7 +61,6 @@ public class InstructorDashboardController {
     @FXML
     private void initialize() {
         Session.current().requireRole(UserRole.INSTRUCTOR);
-        welcomeLabel.setText("Welcome, " + Session.current().getDisplayName() + ".");
 
         colTime.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().time()));
         colCourse.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().course()));

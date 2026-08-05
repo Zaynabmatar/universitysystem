@@ -97,6 +97,7 @@ BEGIN TRY
     DROP TABLE IF EXISTS dbo.courses;
     DROP TABLE IF EXISTS dbo.instructors;
     DROP TABLE IF EXISTS dbo.students;
+    DROP TABLE IF EXISTS dbo.admins;
     DROP TABLE IF EXISTS dbo.users;
     DROP TABLE IF EXISTS dbo.programs;
     DROP TABLE IF EXISTS dbo.campuses;
@@ -253,6 +254,25 @@ BEGIN TRY
             REFERENCES dbo.departments (dept_id) ON DELETE NO ACTION,
 
         CONSTRAINT CK_instructors_rank CHECK (academic_rank IN (N'PROFESSOR', N'ASSOCIATE', N'ASSISTANT', N'LECTURER'))
+    );
+
+    /* ---- B4. admins ---------------------------------------------------------
+       Mirrors students/instructors: its own IDENTITY(1,1) so admins get their
+       own visible ID sequence (1, 2, 3, ...) independent from students and
+       instructors, one-to-one with dbo.users via a UNIQUE user_id FK.
+    ------------------------------------------------------------------------ */
+    CREATE TABLE dbo.admins
+    (
+        admin_id  INT IDENTITY(1,1) NOT NULL,
+        user_id   INT               NOT NULL,
+        is_active BIT               NOT NULL
+                  CONSTRAINT DF_admins_is_active DEFAULT (1),
+
+        CONSTRAINT PK_admins      PRIMARY KEY (admin_id),
+        CONSTRAINT UQ_admins_user UNIQUE      (user_id),
+
+        CONSTRAINT FK_admins_user FOREIGN KEY (user_id)
+            REFERENCES dbo.users (user_id) ON DELETE NO ACTION
     );
 
 
@@ -1017,15 +1037,27 @@ GO
      Spring 2026 (future)   : exists so registration-window logic has a target.
 
    *** PASSWORD NOTE - READ THIS ***
-   Login is by User ID (dbo.users.user_id) only - usernames below are for
-   display purposes and can no longer be used to sign in.
+   Login signs in with the role-specific ID (Admin ID / Instructor ID /
+   Student ID - dbo.admins.admin_id, dbo.instructors.instructor_id,
+   dbo.students.student_id), never the global dbo.users.user_id. The Login
+   screen has no role selector; it tries each role's table in turn. Usernames
+   below are for display only and cannot sign in.
 
-   Every account's initial password is fixed to "<user_id>@iuL". The
-   password_hash values below are real BCrypt hashes (cost 12) of that rule
-   for user_id 1-5:
-       1 -> 1@iuL   2 -> 2@iuL   3 -> 3@iuL   4 -> 4@iuL   5 -> 5@iuL
-   The same rule is applied automatically by UserDAO.insert for every future
-   account, so this is also the password to use after signing up any new user.
+   Every account's initial password is "<role-specific-id>@iuL" - e.g. Admin
+   ID 1, Instructor ID 1 and Student ID 1 all sign in with "1@iuL", even
+   though they are three different dbo.users rows.
+
+   The five password_hash values inserted below are still BCrypt hashes of
+   the OLD "<user_id>@iuL" rule (1-5), because they were computed before this
+   table existed. For user_id 1 that is harmless - admin_id 1 also happens to
+   be user_id 1 - but user_id 2-5 no longer match their role-specific id
+   (instructor_id 1-2, student_id 1-2). Run
+   RolePasswordMigration.main() once after building this schema (fresh
+   install or existing database) to rehash every account, sample data
+   included, to the new rule. StudentDAO/InstructorDAO-backed account
+   creation applies the new rule automatically from then on
+   (UserDAO.finalizePassword, called by StudentService/InstructorService
+   once the role-specific id exists).
 ============================================================================ */
 BEGIN TRY
     BEGIN TRANSACTION;
@@ -1062,6 +1094,12 @@ BEGIN TRY
         (N's.haddad', N'$2a$12$NUbHWmzUAyeMJDBGTFgueeGfZe199rkns2XEhi.u3qk/XVvvdqk.C', N'INSTRUCTOR'),
         (N'z.matar',  N'$2a$12$hswCE1bYn2pYxyUA9ordN.2P.AarIv2u0CvTAtpcWJXiMlqK3fe2K', N'STUDENT'),
         (N'o.saleh',  N'$2a$12$5UhcsfS05DJ8wBHMlrkW3eBrURRU0lH19d5Y58MqMloTB2.2ihqEq', N'STUDENT');
+
+    /* ---- admins (1 -> user 1) ---------------------------------------------
+       Every ADMIN row in dbo.users needs a matching dbo.admins row so login
+       can resolve "Admin ID" -> admin_id -> user_id.
+    ---------------------------------------------------------------------- */
+    INSERT INTO dbo.admins (user_id) VALUES (1);
 
     /* ---- instructors (1 -> user 2, 2 -> user 3) -------------------------- */
     INSERT INTO dbo.instructors (user_id, employee_number, first_name, last_name, email, phone, dept_id, academic_rank, hire_date) VALUES

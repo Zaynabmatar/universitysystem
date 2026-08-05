@@ -55,7 +55,6 @@ public class StudentDashboardController {
     private static final int MAX_NEXT_CLASSES = 5;
     private static final int MAX_NOTIFICATIONS = 5;
 
-    @FXML private Label       welcomeLabel;
     @FXML private Label       contextLabel;
     @FXML private Label       gpaLabel;
     @FXML private Label       standingLabel;
@@ -81,7 +80,6 @@ public class StudentDashboardController {
         Session.current().requireRole(UserRole.STUDENT);
         studentId = Session.current().requireStudentId();
 
-        welcomeLabel.setText("Welcome, " + Session.current().getDisplayName() + ".");
         configureNotificationCells();
         load();
     }
