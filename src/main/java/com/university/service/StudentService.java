@@ -123,10 +123,10 @@ public class StudentService {
      * Updates the editable columns only. Never touches gpa / credits / standing /
      * probation_count, and never the Student ID.
      *
-     * <p>The administrator may put a different university email on the account.
-     * When they do, {@code users.email} and {@code students.email} are written
-     * together inside one transaction so the two can never disagree — and the
-     * id, the role and the password are all left exactly as they were.</p>
+     * <p>The administrator may put a different university email on the record.
+     * It is written to {@code students.email}, the one column that holds it,
+     * inside the same transaction as the rest of the edit — and the id, the
+     * role and the password are all left exactly as they were.</p>
      */
     public void update(Student student) {
         Student stored = requireStudent(student.getStudentId());
@@ -148,8 +148,9 @@ public class StudentService {
 
             boolean emailChanged = !email.equalsIgnoreCase(stored.getEmail());
             if (emailChanged) {
-                accounts.changeEmail(connection, stored.getUserId(), email);
-                accounts.audit(connection, AuditActionType.UPDATE, "users", stored.getUserId(),
+                // studentDao.update above has already written the new address;
+                // students.email is the only column that holds it.
+                accounts.audit(connection, AuditActionType.UPDATE, "students", stored.getUserId(),
                         stored.getEmail(), email,
                         "Admin changed the university email for Student ID " + stored.getUserId() + ".");
             }

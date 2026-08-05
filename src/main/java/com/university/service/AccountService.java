@@ -27,7 +27,10 @@ import java.util.Locale;
  *   <li><b>The email.</b> Built from the person's name
  *       ({@code first initial . last name @ role domain}), lower-cased,
  *       stripped of accents and punctuation, and made unique by a numeric
- *       suffix when the obvious address is already taken.</li>
+ *       suffix when the obvious address is already taken. It is generated here
+ *       but stored by the caller on {@code students.email} /
+ *       {@code instructors.email}, the only two columns that hold one —
+ *       {@code dbo.users} has no email column.</li>
  *   <li><b>The password.</b> {@code <user_id>@iuL}, hashed with BCrypt the
  *       moment the id exists. Only the hash reaches the database. The plain
  *       text is returned once, to be shown on screen, and is never logged,
@@ -56,7 +59,10 @@ public class AccountService {
      */
     public static final String LEGACY_INSTRUCTOR_EMAIL_DOMAIN = "university.edu.lb";
 
-    /** The longest an address may be: {@code users.email} is NVARCHAR(100). */
+    /**
+     * The longest an address may be: {@code students.email} and
+     * {@code instructors.email} are both NVARCHAR(100).
+     */
     private static final int EMAIL_MAX_LENGTH = 100;
 
     /** Gives up rather than looping forever if a hundred variants are all taken. */
@@ -85,6 +91,10 @@ public class AccountService {
      * returns the id, and only then can the password — which is built from
      * that id — be hashed and stored.</p>
      *
+     * <p>The generated address is returned rather than written here: it belongs
+     * on the {@code students} or {@code instructors} row, which is the caller's
+     * to insert, inside this same transaction.</p>
+     *
      * @param connection the caller's open transaction
      * @param role       STUDENT or INSTRUCTOR
      * @return the generated id, address and one-time password
@@ -95,7 +105,6 @@ public class AccountService {
 
         User account = new User();
         account.setUsername(uniqueUsernameFor(connection, email));
-        account.setEmail(email);
         account.setRole(role);
         account.setActive(true);
 
@@ -207,16 +216,6 @@ public class AccountService {
         }
         return role == UserRole.INSTRUCTOR
                 && lower.endsWith("@" + LEGACY_INSTRUCTOR_EMAIL_DOMAIN);
-    }
-
-    /**
-     * Writes a new address onto an existing account.
-     *
-     * <p>Touches {@code users.email} and nothing else: the id stays, the role
-     * stays, the password stays, and no second account is created.</p>
-     */
-    public void changeEmail(Connection connection, int userId, String email) {
-        userDao.updateEmail(connection, userId, email);
     }
 
     // ============================================================== password

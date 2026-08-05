@@ -157,9 +157,14 @@ public class DBConnection {
         DriverManager.setLoginTimeout(LOGIN_TIMEOUT_SECONDS);
         try (Connection connection =
                      DriverManager.getConnection(CONNECTION_URL, DB_USER, readPassword())) {
-            // Reaching here is the whole result: the server answered and accepted the login.
-            // TEMPORARY DEBUG — remove with the block in AuthService.login.
-            System.out.println("[DB] " + describeConnected(connection));
+            // Reaching here is the whole result: the server answered and accepted
+            // the login. Which server and which database it actually reached is
+            // worth saying out loud when asked, because a machine with more than
+            // one SQL Server instance can hold more than one copy of this database
+            // and every "the data is wrong" symptom starts there.
+            if (Boolean.getBoolean("university.debug.login")) {
+                System.out.println("[DB] " + describeConnected(connection));
+            }
         }
     }
 
