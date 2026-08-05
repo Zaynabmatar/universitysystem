@@ -206,7 +206,7 @@
 .top-bar .label { -fx-text-fill: white; }
 
 .welcome-label { -fx-font-size: 13px; -fx-font-weight: normal; -fx-text-fill: white; }
-.top-bar-row { -fx-padding: 0 0 0 362; }
+.top-bar-row { -fx-padding: 0 0 0 252; }
 
 /* Compound selector (not just .icon-btn) so this reliably beats the generic
    .button rule below regardless of stylesheet order — every Button also
