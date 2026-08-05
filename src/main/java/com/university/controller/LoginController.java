@@ -18,12 +18,13 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.SVGPath;
 
 /**
- * The sign-in screen, and the very first screen the application shows.
+ * The sign-in screen, opened by RoleSelectionController once the user has
+ * picked Admin, Instructor or Student.
  *
- * <p>There is no separate role-selection step: the ID typed is not scoped to
- * a role ahead of time, so sign-in tries each role in turn (Admin, then
- * Instructor, then Student) against the same ID and password — see
- * {@link #attemptLogin()}.</p>
+ * <p>The chosen role arrives via {@link #setRole(UserRole)} right after this
+ * screen is loaded: it sets the ID field's placeholder and scopes
+ * {@link #attemptLogin()} to that role's table only, so an Admin ID and a
+ * Student ID can validly share the same number without ever colliding.</p>
  *
  * <p>The two "please enter your…" checks happen here rather than in the service
  * so the wording is a prompt rather than a complaint. Everything else — the
@@ -40,6 +41,8 @@ public class LoginController {
     @FXML private Button loginButton;
     @FXML private Pane dotsTopRight;
     @FXML private Pane dotsBottomLeft;
+
+    private UserRole selectedRole;
 
     private static final String EYE_OPEN =
             "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z";
@@ -68,6 +71,21 @@ public class LoginController {
         // Decorative dotted halftone corners — dots fade out from the near screen corner.
         buildHalftone(dotsTopRight, dotsTopRight.getPrefWidth(), 0);
         buildHalftone(dotsBottomLeft, 0, dotsBottomLeft.getPrefHeight());
+    }
+
+    /**
+     * Called by RoleSelectionController right after this screen is loaded.
+     * Scopes sign-in to one role and sets the ID field's placeholder to match.
+     */
+    public void setRole(UserRole role) {
+        this.selectedRole = role;
+        usernameField.setPromptText(role.getLabel() + " ID");
+    }
+
+    @FXML
+    private void handleBack() {
+        SceneManager.getInstance().switchRoot("role_selection.fxml",
+                "University Registration System — Select Role");
     }
 
     private void buildHalftone(Pane pane, double anchorX, double anchorY) {
@@ -132,10 +150,10 @@ public class LoginController {
     }
 
     /**
-     * Tries the ID and password against each role in turn (Admin, then
-     * Instructor, then Student) since there is no longer a role-selection
-     * step to scope the attempt ahead of time. Each role's ID sequence is
-     * independent, so at most one of the three can ever match.
+     * Checks the ID and password against the role picked on the role-selection
+     * screen only — never the other two tables — so an Admin ID and a Student
+     * ID can validly be the same number without either one being able to sign
+     * in through the other's button.
      *
      * @return null on success (the session is already open and the main
      *         shell already shown), otherwise the message to display
@@ -144,35 +162,23 @@ public class LoginController {
         String id = usernameField.getText();
         String password = passwordField.getText();
 
-        ServiceException genericFailure = null;
-        for (UserRole role : UserRole.values()) {
-            try {
-                authService.login(role, id, password);
-                passwordField.clear();
+        try {
+            authService.login(selectedRole, id, password);
+            passwordField.clear();
 
-                String username = Session.current().getUser().getUsername();
-                SceneManager.getInstance().switchRoot("main_shell.fxml",
-                        "University Registration System — " + username);
-                return null;
+            String username = Session.current().getUser().getUsername();
+            SceneManager.getInstance().switchRoot("main_shell.fxml",
+                    "University Registration System — " + username);
+            return null;
 
-            } catch (ServiceException se) {
-                // Covers ValidationException too — it extends ServiceException.
-                // A generic "wrong ID or password" just means this role's table
-                // didn't have a match — try the next role. Anything else (e.g.
-                // "account deactivated") means the ID matched this role, so it
-                // is the real answer — stop and show it.
-                if (AuthService.SIGN_IN_FAILED.equals(se.getMessage())) {
-                    genericFailure = se;
-                    continue;
-                }
-                return se.getMessage();
-            } catch (Exception ex) {
-                AlertUtil.error("Login failed",
-                        "Something went wrong while signing in. Please try again.", ex);
-                return null;
-            }
+        } catch (ServiceException se) {
+            // Covers ValidationException too — it extends ServiceException.
+            return se.getMessage();
+        } catch (Exception ex) {
+            AlertUtil.error("Login failed",
+                    "Something went wrong while signing in. Please try again.", ex);
+            return null;
         }
-        return genericFailure != null ? genericFailure.getMessage() : AuthService.SIGN_IN_FAILED;
     }
 
     private void showError(String message) {

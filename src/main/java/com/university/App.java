@@ -79,9 +79,10 @@ public class App extends Application {
             return;   // never fall through into a half-built login screen
         }
 
-        // 4. Login is the very first screen shown.
+        // 4. Role selection is the very first screen shown; it hands off to
+        //    login.fxml once Admin/Instructor/Student is picked.
         SceneManager.getInstance().init(primaryStage);
-        SceneManager.getInstance().switchRoot("login.fxml", "University Registration System — Login");
+        SceneManager.getInstance().switchRoot("role_selection.fxml", "University Registration System — Select Role");
         primaryStage.show();
         primaryStage.centerOnScreen();
     }
