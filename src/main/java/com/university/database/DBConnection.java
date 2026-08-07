@@ -13,55 +13,83 @@ import java.sql.SQLException;
 import java.util.Properties;
 
 /**
- * Single point of access to the UniversityManagementDB database.
+ * Single point of access to the university database.
  *
  * <p>Backed by a small connection pool (HikariCP) rather than opening a fresh
  * physical connection on every call. A new SQL Server connection means a TCP
  * handshake, a TLS negotiation and a login round trip every time, and the rest
  * of the code asks for one very often, so pooling is what keeps the UI from
  * stalling on ordinary screens.</p>
+ *
+ * <h2>Where the connection settings come from</h2>
+ *
+ * <p>Nothing about <em>which</em> server to reach is in this file, and nothing
+ * about it is in Git. Every developer's SQL Server instance has a different
+ * name, so a hardcoded one is not a setting — it is one machine's private
+ * detail committed on top of everyone else's. That is not hypothetical here: a
+ * commit changing this line from one instance name to another silently
+ * repointed the application at a second, older copy of the database. The schema
+ * matched, the application started, and the only symptom was that the data
+ * looked wrong.</p>
+ *
+ * <p>The settings live in {@code ~/.universitysystem/db.properties}, outside
+ * the project directory — which is where the password already was, for the same
+ * reason. {@code db.properties.example} in the project root lists every key.
+ * Any key can be overridden for a single run with {@code -Ddb.<key>=<value>},
+ * and the file itself can be moved with {@code -Duniversity.db.config=<path>}.</p>
  */
 public class DBConnection {
 
-    /** Seconds the driver may spend on a single login attempt before giving up. */
-    public static final int LOGIN_TIMEOUT_SECONDS = 5;
+    /* ------------------------------------------------------------------ */
+    /* configuration keys — see db.properties.example                      */
+    /* ------------------------------------------------------------------ */
 
-    /** The one and only place the connection string is defined. */
-    private static final String CONNECTION_URL =
-            "jdbc:sqlserver://localhost\\SQLEXPRESS"
-            + ";databaseName=universitymanagementDB"
-            + ";encrypt=true"
-            + ";trustServerCertificate=true"
-            // Without this, the driver sends every TIME parameter over the wire as
-            // datetime (legacy SQL Server 2005 compatibility default), which makes SQL
-            // Server reject a bare "? < time_column" comparison with "The data types
-            // datetime and time are incompatible in the less than operator" — this is
-            // what broke the section instructor/room clash checks on Add/Edit Section.
-            + ";sendTimeAsDatetime=false"
-            // Bound every login attempt. The driver's default is 30 seconds per try,
-            // which is what let a misconfigured server turn startup into a long,
-            // silent stall instead of a prompt error message.
-            + ";loginTimeout=" + LOGIN_TIMEOUT_SECONDS;
+    /** A complete JDBC URL, for a setup the parts below cannot describe. */
+    private static final String KEY_URL = "db.url";
 
-    private static final String DB_USER = "sa";
+    private static final String KEY_SERVER = "db.server";
+    private static final String KEY_INSTANCE = "db.instance";
+    private static final String KEY_PORT = "db.port";
+    private static final String KEY_NAME = "db.name";
+    private static final String KEY_USER = "db.user";
+    private static final String KEY_PASSWORD = "db.password";
+    private static final String KEY_ENCRYPT = "db.encrypt";
+    private static final String KEY_TRUST_CERT = "db.trustServerCertificate";
+    private static final String KEY_LOGIN_TIMEOUT = "db.loginTimeoutSeconds";
+    private static final String KEY_INTEGRATED_SECURITY = "db.integratedSecurity";
 
     /**
-     * Credentials file, deliberately outside the project directory so the
-     * password cannot be committed by accident.
+     * The database name is a fact about this project rather than about anybody's
+     * machine, so it is the one part of the target that may sensibly default.
      */
-    private static final Path CREDENTIALS_FILE =
+    private static final String DEFAULT_DATABASE = "universitymanagementDB";
+
+    private static final String DEFAULT_SERVER = "localhost";
+
+    /** Seconds the driver may spend on a single login attempt before giving up. */
+    public static final int DEFAULT_LOGIN_TIMEOUT_SECONDS = 5;
+
+    /**
+     * Settings file, deliberately outside the project directory so that neither
+     * the password nor one developer's server name can be committed by accident.
+     */
+    private static final Path DEFAULT_CONFIG_FILE =
             Path.of(System.getProperty("user.home"), ".universitysystem", "db.properties");
 
-    private static final String PASSWORD_KEY = "db.password";
+    private static final String CONFIG_FILE_PROPERTY = "university.db.config";
+
+    /* ------------------------------------------------------------------ */
 
     /**
      * Built on first use rather than in a static initialiser. If the pool
-     * cannot be constructed (for example the credentials file is missing), a
+     * cannot be constructed (for example the settings file is missing), a
      * static initialiser would throw {@code ExceptionInInitializerError} and
      * every later touch of this class would then fail with a bare
      * {@code NoClassDefFoundError} that says nothing about the real problem.
      */
     private static HikariDataSource dataSource;
+
+    private static Properties settings;
 
     private DBConnection() {
     }
@@ -73,43 +101,177 @@ public class DBConnection {
         return dataSource;
     }
 
+    /* ------------------------------------------------------------------ */
+    /* settings                                                            */
+    /* ------------------------------------------------------------------ */
+
+    private static Path configFile() {
+        String override = System.getProperty(CONFIG_FILE_PROPERTY);
+        return (override == null || override.isBlank())
+                ? DEFAULT_CONFIG_FILE
+                : Path.of(override);
+    }
+
     /**
-     * Reads the database password from the local credentials file.
+     * Reads the settings file once and keeps it.
      *
-     * <p>Kept out of the source tree on purpose: the password is specific to
-     * one machine's SQL Server instance, and hardcoding it here would put it
-     * into version control.</p>
-     *
-     * @return the configured password
-     * @throws IllegalStateException if the file is missing, unreadable, or has
-     *         no password set, with a message saying how to fix it
+     * @throws IllegalStateException if the file is missing or unreadable, with
+     *         a message saying exactly what to create
      */
-    private static String readPassword() {
-        Properties properties = new Properties();
-        try (InputStream in = Files.newInputStream(CREDENTIALS_FILE)) {
-            properties.load(in);
+    private static synchronized Properties settings() {
+        if (settings != null) {
+            return settings;
+        }
+        Path file = configFile();
+        Properties loaded = new Properties();
+        try (InputStream in = Files.newInputStream(file)) {
+            loaded.load(in);
         } catch (IOException e) {
             throw new IllegalStateException(
-                    "Cannot read the database credentials file at " + CREDENTIALS_FILE
-                    + ". Create it and add a line: " + PASSWORD_KEY + "=<password for the '"
-                    + DB_USER + "' login>", e);
+                    "Cannot read the database settings file at " + file + ". "
+                    + "Copy db.properties.example from the project root to that path and fill it in. "
+                    + "It lives outside the project so that it is never committed: every developer "
+                    + "points at their own SQL Server instance.", e);
         }
-
-        String password = properties.getProperty(PASSWORD_KEY);
-        if (password == null || password.isBlank()) {
-            throw new IllegalStateException(
-                    "No " + PASSWORD_KEY + " set in " + CREDENTIALS_FILE
-                    + ". Add a line: " + PASSWORD_KEY + "=<password for the '"
-                    + DB_USER + "' login>");
-        }
-        return password;
+        settings = loaded;
+        return settings;
     }
+
+    /**
+     * One setting, with {@code -Ddb.<key>} winning over the file.
+     *
+     * @param fallback returned when neither is set
+     */
+    private static String setting(String key, String fallback) {
+        String fromSystem = System.getProperty(key);
+        if (fromSystem != null && !fromSystem.isBlank()) {
+            return fromSystem.trim();
+        }
+        String fromFile = settings().getProperty(key);
+        if (fromFile != null && !fromFile.isBlank()) {
+            return fromFile.trim();
+        }
+        return fallback;
+    }
+
+    private static String requiredSetting(String key) {
+        String value = setting(key, null);
+        if (value == null) {
+            throw new IllegalStateException(
+                    "No " + key + " set in " + configFile()
+                    + ". See db.properties.example in the project root for the keys this file needs.");
+        }
+        return value;
+    }
+
+    private static boolean booleanSetting(String key, boolean fallback) {
+        String value = setting(key, null);
+        return value == null ? fallback : Boolean.parseBoolean(value);
+    }
+
+    private static int intSetting(String key, int fallback) {
+        String value = setting(key, null);
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException(
+                    key + " in " + configFile() + " must be a whole number, but is \"" + value + "\".", e);
+        }
+    }
+
+    /** True when the configuration asks for Windows authentication rather than a SQL login. */
+    private static boolean usesIntegratedSecurity() {
+        return booleanSetting(KEY_INTEGRATED_SECURITY, false);
+    }
+
+    private static String username() {
+        return requiredSetting(KEY_USER);
+    }
+
+    private static String password() {
+        return requiredSetting(KEY_PASSWORD);
+    }
+
+    /** Seconds allowed for one login attempt, as configured. */
+    public static int loginTimeoutSeconds() {
+        return intSetting(KEY_LOGIN_TIMEOUT, DEFAULT_LOGIN_TIMEOUT_SECONDS);
+    }
+
+    /**
+     * Assembles the JDBC URL from the settings file.
+     *
+     * <p>{@code db.url} short-circuits all of it, for a setup these parts cannot
+     * express (a named listener, a failover partner, Azure). The two driver
+     * options this application depends on are appended to it even so, unless it
+     * already sets them — they are bug fixes, not preferences.</p>
+     */
+    private static String connectionUrl() {
+        String explicit = setting(KEY_URL, null);
+        String url = explicit != null ? explicit : buildUrlFromParts();
+
+        // sendTimeAsDatetime: without it the driver sends every TIME parameter
+        // over the wire as datetime (a SQL Server 2005 compatibility default),
+        // which makes SQL Server reject a bare "? < time_column" comparison with
+        // "The data types datetime and time are incompatible in the less than
+        // operator" — this is what broke the section instructor/room clash
+        // checks on Add/Edit Section.
+        url = appendIfAbsent(url, "sendTimeAsDatetime", "false");
+
+        // Bound every login attempt. The driver's default is 30 seconds per try,
+        // which is what let a misconfigured server turn startup into a long,
+        // silent stall instead of a prompt error message.
+        url = appendIfAbsent(url, "loginTimeout", String.valueOf(loginTimeoutSeconds()));
+
+        if (explicit == null) {
+            url = appendIfAbsent(url, "encrypt", String.valueOf(booleanSetting(KEY_ENCRYPT, true)));
+            url = appendIfAbsent(url, "trustServerCertificate",
+                    String.valueOf(booleanSetting(KEY_TRUST_CERT, true)));
+            if (usesIntegratedSecurity()) {
+                url = appendIfAbsent(url, "integratedSecurity", "true");
+            }
+        }
+        return url;
+    }
+
+    private static String buildUrlFromParts() {
+        String server = setting(KEY_SERVER, DEFAULT_SERVER);
+        String instance = setting(KEY_INSTANCE, null);
+        String port = setting(KEY_PORT, null);
+
+        StringBuilder url = new StringBuilder("jdbc:sqlserver://").append(server);
+        // A named instance and an explicit port are two ways of saying the same
+        // thing. Given both, the port wins: it is the one that does not need the
+        // SQL Server Browser service to be running.
+        if (port != null) {
+            url.append(':').append(port);
+        } else if (instance != null) {
+            url.append('\\').append(instance);
+        }
+        url.append(";databaseName=").append(setting(KEY_NAME, DEFAULT_DATABASE));
+        return url.toString();
+    }
+
+    /** Adds {@code ;key=value} unless the URL already sets that key. */
+    private static String appendIfAbsent(String url, String key, String value) {
+        boolean alreadySet = url.toLowerCase(java.util.Locale.ROOT)
+                .contains(";" + key.toLowerCase(java.util.Locale.ROOT) + "=");
+        return alreadySet ? url : url + ";" + key + "=" + value;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* the pool                                                            */
+    /* ------------------------------------------------------------------ */
 
     private static HikariDataSource buildDataSource() {
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(CONNECTION_URL);
-        config.setUsername(DB_USER);
-        config.setPassword(readPassword());
+        config.setJdbcUrl(connectionUrl());
+        if (!usesIntegratedSecurity()) {
+            config.setUsername(username());
+            config.setPassword(password());
+        }
         config.setPoolName("UniversitySystemPool");
         // A single-user desktop app never needs many connections at once;
         // this just bounds how many can be open if something misbehaves.
@@ -154,9 +316,8 @@ public class DBConnection {
      * @throws SQLException if the database cannot be reached or the login fails
      */
     public static void verifyConnectivity() throws SQLException {
-        DriverManager.setLoginTimeout(LOGIN_TIMEOUT_SECONDS);
-        try (Connection connection =
-                     DriverManager.getConnection(CONNECTION_URL, DB_USER, readPassword())) {
+        DriverManager.setLoginTimeout(loginTimeoutSeconds());
+        try (Connection connection = openDirectConnection()) {
             // Reaching here is the whole result: the server answered and accepted
             // the login. Which server and which database it actually reached is
             // worth saying out loud when asked, because a machine with more than
@@ -166,6 +327,13 @@ public class DBConnection {
                 System.out.println("[DB] " + describeConnected(connection));
             }
         }
+    }
+
+    /** One connection straight from the driver, honouring the configured authentication. */
+    private static Connection openDirectConnection() throws SQLException {
+        return usesIntegratedSecurity()
+                ? DriverManager.getConnection(connectionUrl())
+                : DriverManager.getConnection(connectionUrl(), username(), password());
     }
 
     /**
@@ -200,18 +368,43 @@ public class DBConnection {
         }
     }
 
-    /** The server and database this build talks to, for error messages. */
+    /**
+     * The server and database this run is configured to talk to, for error
+     * messages.
+     *
+     * <p>Reports what the settings file actually says rather than a constant,
+     * so a startup failure names the machine it really tried — and says where
+     * to change it.</p>
+     */
     public static String describeTarget() {
-        return "localhost\\SQLEXPRESS / universitymanagementDB (login '" + DB_USER + "')";
+        try {
+            String login = usesIntegratedSecurity()
+                    ? "Windows authentication"
+                    : "login '" + username() + "'";
+            return connectionUrlWithoutSecrets() + " (" + login + ", configured in " + configFile() + ")";
+        } catch (RuntimeException e) {
+            return "not configured — " + e.getMessage();
+        }
     }
 
     /**
-     * Opens a connection and reports the result on the console.
+     * The URL with any embedded password removed.
+     *
+     * <p>{@link #describeTarget()} ends up in a dialog and in the log, and
+     * {@code db.url} is free-form enough that somebody will eventually put a
+     * password in it.</p>
      */
-    @SuppressWarnings("try")   // the connection is opened only to prove it can be
+    private static String connectionUrlWithoutSecrets() {
+        return connectionUrl().replaceAll("(?i);password=[^;]*", ";password=***");
+    }
+
+    /**
+     * Opens a connection and reports what it actually reached.
+     */
     public static void testConnection() {
         try (Connection connection = getConnection()) {
             System.out.println("Database connected successfully");
+            System.out.println(describeConnected(connection));
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
@@ -227,6 +420,7 @@ public class DBConnection {
     }
 
     public static void main(String[] args) {
+        System.out.println("Configured target: " + describeTarget());
         testConnection();
         shutdown();
     }

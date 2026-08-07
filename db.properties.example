@@ -1,0 +1,84 @@
+# ---------------------------------------------------------------------------
+# Local database settings — TEMPLATE
+#
+# Copy this file to:
+#
+#     Windows   %USERPROFILE%\.universitysystem\db.properties
+#     macOS/*n  ~/.universitysystem/db.properties
+#
+# and fill in the values for YOUR machine.
+#
+# The real file lives outside the project directory on purpose, so it is never
+# committed. Every developer runs a differently named SQL Server instance, so a
+# server name in Git is not a shared setting — it is one machine's private
+# detail imposed on everyone else. When it was committed, a git pull silently
+# repointed the application at a second, older copy of the database: the schema
+# matched, the app started, and the only symptom was that the data looked wrong.
+#
+# Nothing in this template is a real value. Do not put real values in it.
+# ---------------------------------------------------------------------------
+
+
+# --- Which server ----------------------------------------------------------
+
+# Host running SQL Server. Optional; defaults to localhost.
+#db.server=localhost
+
+# Your named instance, WITHOUT the host and without a backslash. Look it up in
+# SQL Server Configuration Manager, or with:
+#     Get-Service | Where-Object Name -like 'MSSQL$*'
+# Leave unset if you use the default (unnamed) instance.
+db.instance=<your SQL Server instance name>
+
+# A static TCP port instead of a named instance. If you set this, it wins over
+# db.instance — and it does not need the SQL Server Browser service running,
+# which makes it the more reliable of the two.
+#db.port=1433
+
+
+# --- Which database --------------------------------------------------------
+
+# Optional; defaults to universitymanagementDB. Set it only if your copy is
+# restored under a different name.
+#db.name=universitymanagementDB
+
+
+# --- How to sign in --------------------------------------------------------
+
+# SQL Server authentication.
+db.user=<your SQL Server login, e.g. sa>
+db.password=<the password for that login>
+
+# ...or Windows authentication instead, in which case db.user and db.password
+# are not used. Needs mssql-jdbc_auth-*.dll on the java.library.path.
+#db.integratedSecurity=true
+
+
+# --- Connection options ----------------------------------------------------
+
+# Defaults are true / true, which is what a local development instance with a
+# self-signed certificate needs. Do not carry trustServerCertificate=true to a
+# real server.
+#db.encrypt=true
+#db.trustServerCertificate=true
+
+# Seconds allowed for one login attempt. Default 5. Startup retries three
+# times, so this bounds how long a wrong setting takes to report itself.
+#db.loginTimeoutSeconds=5
+
+
+# ---------------------------------------------------------------------------
+# Any key here can be overridden for a single run without editing the file:
+#
+#     mvn javafx:run -Djavafx.args=... -Ddb.instance=OTHERINSTANCE
+#     java -Ddb.instance=OTHERINSTANCE -cp ... com.university.Launcher
+#
+# and the file itself can be moved with -Duniversity.db.config=<path>.
+#
+# To check what a build is actually pointed at, without starting the UI:
+#
+#     mvn -q compile exec:java -Dexec.mainClass=com.university.database.DBConnection
+#
+# It prints the configured target and then the server, database and dbo.users
+# row count it really reached.
+# ---------------------------------------------------------------------------

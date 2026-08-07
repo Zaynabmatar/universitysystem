@@ -9,3 +9,12 @@ target/
 # under scratch/ and .github/ keep behaving as they always have.
 /*.log
 logs/
+
+# Local database settings — server name, login, password. These differ for
+# every developer, so committing one machine's copy repoints everybody else's
+# application at a database they do not have. The real file belongs in
+# ~/.universitysystem/db.properties; only db.properties.example, which holds
+# placeholders, is tracked.
+db.properties
+!db.properties.example
+.universitysystem/
