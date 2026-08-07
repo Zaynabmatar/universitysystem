@@ -94,6 +94,30 @@
     </dependencies>
 
     <build>
+
+        <!-- The database migration scripts live next to the code that depends on
+             them, under src/main/java/com/university/database/unidatabase, so a
+             schema change and its Java travel in one commit. That is a source
+             root, not a resource root, so Maven would not copy the .sql files
+             anywhere; this makes it do so. MigrationRunner prefers the copy in
+             the source tree when it can see it (no rebuild needed to pick up a
+             new file) and falls back to this one otherwise.
+
+             Declaring <resources> replaces the default, so src/main/resources
+             has to be listed again here or every FXML, CSS and image would stop
+             being packaged. -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>src/main/java</directory>
+                <includes>
+                    <include>com/university/database/unidatabase/migrations/*.sql</include>
+                </includes>
+            </resource>
+        </resources>
+
         <plugins>
 
             <plugin>
