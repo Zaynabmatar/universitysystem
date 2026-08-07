@@ -1,6 +1,8 @@
 package com.university;
 
 import com.university.database.DBConnection;
+import com.university.database.migration.MigrationException;
+import com.university.database.migration.MigrationRunner;
 import com.university.util.AlertUtil;
 import com.university.util.SceneManager;
 import javafx.application.Application;
@@ -59,12 +61,25 @@ public class App extends Application {
         Platform.setImplicitExit(false);
 
         Thread probe = new Thread(() -> {
-            Throwable failure = connectWithRetries();
+            Throwable connectionFailure = connectWithRetries();
+
+            // 3b. Bring the schema up to date before anything queries it. Also
+            //     off the Application Thread, for the same reason as the
+            //     connection check, and only once the server has answered —
+            //     migrating a database that cannot be reached would just
+            //     produce a second, less clear version of the same error.
+            MigrationException migrationFailure =
+                    connectionFailure == null ? applyPendingMigrations() : null;
+
             Platform.runLater(() -> {
                 Platform.setImplicitExit(true);
-                if (failure != null) {
-                    reportUnreachableDatabase(failure);
+                if (connectionFailure != null) {
+                    reportUnreachableDatabase(connectionFailure);
                     return;   // never fall through into a half-built login screen
+                }
+                if (migrationFailure != null) {
+                    reportFailedMigration(migrationFailure);
+                    return;   // a half-migrated schema must not reach the login screen
                 }
                 showFirstScreen(primaryStage);
             });
@@ -106,6 +121,49 @@ public class App extends Application {
             }
         }
         return lastFailure;
+    }
+
+    /**
+     * Applies any migration files that this database has not seen yet.
+     *
+     * <p>Runs on every start, which is the whole point: after a {@code git
+     * pull} the new {@code .sql} files are already in the working tree, and
+     * nobody has to be told to run anything by hand. A database that is already
+     * up to date costs one small query.</p>
+     *
+     * @return null when the schema is current, otherwise the failure
+     */
+    private MigrationException applyPendingMigrations() {
+        try {
+            MigrationRunner.Result result = MigrationRunner.run();
+            System.out.println("[migration] " + result.summary());
+            return null;
+        } catch (MigrationException e) {
+            return e;
+        } catch (Throwable e) {
+            // A broken migrations directory, a missing driver — anything that
+            // is not the migration itself still has to stop startup, and still
+            // has to say which stage failed.
+            return new MigrationException("Database migrations could not be run.", e);
+        }
+    }
+
+    /**
+     * Names the migration that failed, because that is the only thing the
+     * person reading this can act on.
+     */
+    private void reportFailedMigration(MigrationException failure) {
+        failure.printStackTrace();
+        String which = failure.getMigrationName() != null
+                ? "Migration \"" + failure.getMigrationName() + "\" failed and was rolled back."
+                : "The database migrations could not be run.";
+        AlertUtil.error("University Registration System",
+                "The database could not be brought up to date, so the application stopped "
+                + "before opening.\n\n" + which
+                + "\n\nNothing from that migration was saved, and no later migration was run."
+                + "\n\nDatabase: " + DBConnection.describeTarget(),
+                failure);
+        Platform.exit();
     }
 
     /** Says what went wrong, in plain words, then exits instead of hanging. */
