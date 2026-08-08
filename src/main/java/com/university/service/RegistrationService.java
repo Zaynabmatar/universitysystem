@@ -63,6 +63,7 @@ public class RegistrationService {
     private final NotificationService notifications = new NotificationService();
     private final WaitlistService waitlistService = new WaitlistService();
     private final AcademicService academicService = new AcademicService();
+    private final TuitionService tuitionService = new TuitionService();
 
     /** Gives access to the connection helpers without exposing a whole data access object. */
     private final AbstractDAO transactions = new AbstractDAO() {
@@ -102,6 +103,15 @@ public class RegistrationService {
         if (!student.getStatus().canRegister()) {
             throw new RegistrationException("R2", sectionId,
                     "Your account is " + student.getStatus() + ". Please contact the registrar.");
+        }
+
+        // FINANCIAL HOLD — a required balance left owing from an earlier semester blocks
+        // registration into a later one, until it is settled. Does not block adding more courses
+        // within the semester the balance itself belongs to.
+        if (tuitionService.hasUnpaidPreviousBalance(studentId, semester)) {
+            throw new RegistrationException("FINANCIAL_HOLD", sectionId,
+                    "You have an unpaid balance from a previous semester. "
+                    + "Please settle it before registering for a new semester.");
         }
 
         if (section.getStatus() != SectionStatus.OPEN) {
@@ -484,6 +494,17 @@ public class RegistrationService {
     public List<Enrollment> currentRegistrations(int studentId, int semesterId) {
         return enrollmentDao.findByStudentAndSemester(studentId, semesterId).stream()
                 .filter(e -> e.getStatus() == EnrollmentStatus.ENROLLED)
+                .toList();
+    }
+
+    /**
+     * Every enrollment a student holds in one semester that still belongs on their class list —
+     * ENROLLED, COMPLETED or WITHDRAWN, but not DROPPED. Used by the Classes page, which (unlike
+     * {@link #currentRegistrations}) also needs to show a withdrawn or already-completed course.
+     */
+    public List<Enrollment> myClassesForSemester(int studentId, int semesterId) {
+        return enrollmentDao.findByStudentAndSemester(studentId, semesterId).stream()
+                .filter(e -> e.getStatus() != EnrollmentStatus.DROPPED)
                 .toList();
     }
 

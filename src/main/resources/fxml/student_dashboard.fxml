@@ -1,79 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
-<?import javafx.scene.control.Hyperlink?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ListView?>
-<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx"
-      xmlns:fx="http://javafx.com/fxml"
-      fx:controller="com.university.controller.StudentDashboardController"
-      styleClass="content-page" spacing="12">
+<ScrollPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.university.controller.StudentDashboardController"
+            fitToWidth="true" styleClass="classes-scroll">
+    <content>
+        <VBox styleClass="content-page" spacing="12" minWidth="0">
 
-    <Label fx:id="contextLabel" styleClass="muted-text"/>
+            <Label text="My Registered Courses" styleClass="page-title"/>
+            <Label fx:id="semesterBannerLabel" styleClass="muted-text"/>
 
-    <!-- ===== four KPI cards ===== -->
-    <HBox spacing="12">
-        <VBox styleClass="kpi-card" spacing="2">
-            <Label fx:id="gpaLabel" text="0.00" styleClass="kpi-value"/>
-            <Label text="Cumulative GPA" styleClass="kpi-label"/>
-        </VBox>
-        <VBox styleClass="kpi-card" spacing="2">
-            <Label fx:id="standingLabel" text="—" styleClass="kpi-value"/>
-            <Label text="Academic Standing" styleClass="kpi-label"/>
-        </VBox>
-        <VBox styleClass="kpi-card" spacing="2">
-            <Label fx:id="creditsLabel" text="0" styleClass="kpi-value"/>
-            <Label text="Credits Earned" styleClass="kpi-label"/>
-        </VBox>
-        <VBox styleClass="kpi-card" spacing="2">
-            <Label fx:id="unreadLabel" text="0" styleClass="kpi-value"/>
-            <Label text="Unread Notifications" styleClass="kpi-label"/>
-        </VBox>
-    </HBox>
+            <TableView fx:id="coursesTable" minWidth="0">
+                <columns>
+                    <TableColumn fx:id="colCourseCode" text="Course Code" prefWidth="90"/>
+                    <TableColumn fx:id="colCourseName" text="Course Title" prefWidth="260"/>
+                    <TableColumn fx:id="colSection"    text="Section"     prefWidth="65"/>
+                    <TableColumn fx:id="colCampus"     text="Campus"      prefWidth="90"/>
+                    <TableColumn fx:id="colInstructor" text="Instructor"  prefWidth="130"/>
+                    <TableColumn fx:id="colCrn"        text="CRN"         prefWidth="55"/>
+                    <TableColumn fx:id="colSchedule"   text="Schedule"    prefWidth="220"/>
+                    <TableColumn fx:id="colRoom"       text="Room"        prefWidth="70"/>
+                    <TableColumn fx:id="colGrade"      text="Grade"       prefWidth="60"/>
+                    <TableColumn fx:id="colStatus"     text="Status"      prefWidth="90"/>
+                </columns>
+            </TableView>
 
-    <!-- ===== progress strip ===== -->
-    <VBox spacing="5" styleClass="panel">
-        <padding><Insets top="12" right="16" bottom="12" left="16"/></padding>
-        <HBox spacing="10" alignment="CENTER_LEFT">
-            <Label text="Degree progress" styleClass="section-title"/>
-            <Region HBox.hgrow="ALWAYS"/>
-            <Label fx:id="progressPercentLabel" text="—"/>
-            <Hyperlink text="View details" onAction="#handleOpenProgress"/>
-        </HBox>
-        <ProgressBar fx:id="miniProgressBar" progress="0.0" prefHeight="14"
-                     maxWidth="Infinity" styleClass="degree-progress"/>
-    </VBox>
-
-    <!-- ===== next classes + notifications side by side ===== -->
-    <HBox spacing="12" VBox.vgrow="ALWAYS">
-        <VBox spacing="6" styleClass="panel" HBox.hgrow="ALWAYS" prefWidth="420">
-            <padding><Insets top="12" right="16" bottom="12" left="16"/></padding>
-            <Label text="Your next classes" styleClass="section-title"/>
-            <ListView fx:id="nextClassesList" VBox.vgrow="ALWAYS"/>
-        </VBox>
-        <VBox spacing="6" styleClass="panel" HBox.hgrow="ALWAYS" prefWidth="420">
-            <padding><Insets top="12" right="16" bottom="12" left="16"/></padding>
-            <HBox spacing="8" alignment="CENTER_LEFT">
-                <Label text="Notifications" styleClass="section-title"/>
+            <HBox spacing="24" alignment="CENTER_LEFT">
+                <Label fx:id="totalCoursesLabel" styleClass="section-title"/>
                 <Region HBox.hgrow="ALWAYS"/>
-                <Hyperlink text="See all" onAction="#handleOpenNotifications"/>
+                <Label fx:id="totalCreditsLabel" styleClass="section-title"/>
             </HBox>
-            <ListView fx:id="notificationsList" VBox.vgrow="ALWAYS"/>
-        </VBox>
-    </HBox>
 
-    <!-- ===== quick actions ===== -->
-    <HBox spacing="10">
-        <Button text="Register for courses" onAction="#handleOpenRegistration" defaultButton="true"/>
-        <Button text="Recommended for you"  onAction="#handleOpenRecommendations"/>
-        <Button text="My timetable"         onAction="#handleOpenTimetable"/>
-        <Button text="My grades"            onAction="#handleOpenGrades"/>
-        <Button text="My transcript"        onAction="#handleOpenTranscript"/>
-    </HBox>
-</VBox>
+            <HBox spacing="20" alignment="TOP_LEFT">
+                <VBox spacing="12" minWidth="0" HBox.hgrow="ALWAYS">
+                    <Label text="Exams" styleClass="page-title"/>
+
+                    <TableView fx:id="examsTable" minWidth="0">
+                        <columns>
+                            <TableColumn fx:id="examColCourseCode" text="Course Code"  prefWidth="90"/>
+                            <TableColumn fx:id="examColCourseName" text="Course Title" prefWidth="260"/>
+                            <TableColumn fx:id="examColRoom"       text="Room"         prefWidth="70"/>
+                            <TableColumn fx:id="examColDate"       text="Date"         prefWidth="90"/>
+                            <TableColumn fx:id="examColTime"       text="Start Time"   prefWidth="90"/>
+                            <TableColumn fx:id="examColDuration"   text="Duration"     prefWidth="80"/>
+                        </columns>
+                    </TableView>
+
+                    <HBox alignment="CENTER_RIGHT">
+                        <Button text="View All Exams" onAction="#handleViewAllExams"/>
+                    </HBox>
+                </VBox>
+                <VBox spacing="12" minWidth="0" HBox.hgrow="ALWAYS">
+                    <Label text="Today's Schedule" styleClass="page-title"/>
+
+                    <TableView fx:id="todaysScheduleTable" minWidth="0">
+                        <columns>
+                            <TableColumn fx:id="todayColTime"       text="Time"       prefWidth="120"/>
+                            <TableColumn fx:id="todayColCourse"     text="Course"     prefWidth="220"/>
+                            <TableColumn fx:id="todayColInstructor" text="Instructor" prefWidth="140"/>
+                            <TableColumn fx:id="todayColRoom"       text="Room"       prefWidth="70"/>
+                        </columns>
+                    </TableView>
+
+                    <HBox alignment="CENTER_RIGHT">
+                        <Button text="View My Timetable" onAction="#handleViewMyTimetable"/>
+                    </HBox>
+                </VBox>
+            </HBox>
+        </VBox>
+    </content>
+</ScrollPane>

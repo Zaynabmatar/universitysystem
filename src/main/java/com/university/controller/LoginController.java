@@ -28,14 +28,12 @@ import javafx.util.Duration;
  * picked Admin, Instructor or Student.
  *
  * <p>The chosen role arrives via {@link #setRole(UserRole)} right after this
- * screen is loaded: it sets the ID field's placeholder ("Student ID",
- * "Instructor ID", "Admin ID") and is handed to the service, which refuses an
- * account that does not belong to that role.</p>
+ * screen is loaded: it is handed to the service, which refuses an account
+ * that does not belong to that role.</p>
  *
- * <p>One number is typed here and it is {@code users.user_id} — the same
- * number the rest of the program shows as Student ID or Instructor ID. It is
- * an IDENTITY column, so it is unique across all three roles and the account
- * is found by it alone; the role is a gate, not part of the lookup.</p>
+ * <p>The number typed here is always {@code users.user_id}, for every role
+ * (see {@link AuthService} for why) — the role picked on the previous screen
+ * is a door the account must match, not a table the number is looked up in.</p>
  *
  * <p>The two "please enter your…" checks happen here rather than in the service
  * so the wording is a prompt rather than a complaint. Everything else — the
@@ -129,11 +127,12 @@ public class LoginController {
 
     /**
      * Called by RoleSelectionController right after this screen is loaded.
-     * Scopes sign-in to one role and sets the ID field's placeholder to match.
+     * Scopes sign-in to one role; the ID field always means {@code
+     * users.user_id} regardless of which role was picked.
      */
     public void setRole(UserRole role) {
         this.selectedRole = role;
-        usernameField.setPromptText(role.getLabel() + " ID");
+        usernameField.setPromptText("User ID");
     }
 
     @FXML

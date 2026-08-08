@@ -1,11 +1,13 @@
 package com.university.controller;
 
+import com.university.controller.dialog.ExamFormDialog;
 import com.university.enums.UserRole;
 import com.university.model.Course;
 import com.university.model.Section;
 import com.university.model.SectionSchedule;
 import com.university.model.Semester;
 import com.university.service.CourseService;
+import com.university.service.ExamService;
 import com.university.service.GradeService;
 import com.university.service.SectionService;
 import com.university.service.SemesterService;
@@ -52,11 +54,13 @@ public class InstructorSectionsController {
     @FXML private TableColumn<Section, String> colGradeStatus;
     @FXML private javafx.scene.control.Button enterGradesButton;
     @FXML private javafx.scene.control.Button viewRosterButton;
+    @FXML private javafx.scene.control.Button addExamButton;
 
     private final SectionService sectionService = new SectionService();
     private final SemesterService semesterService = new SemesterService();
     private final CourseService courseService = new CourseService();
     private final GradeService gradeService = new GradeService();
+    private final ExamService examService = new ExamService();
 
     private final ObservableList<Section> rows = FXCollections.observableArrayList();
     private List<Course> courses = List.of();
@@ -106,6 +110,7 @@ public class InstructorSectionsController {
         var selected = sectionTable.getSelectionModel().selectedItemProperty();
         enterGradesButton.disableProperty().bind(selected.isNull());
         viewRosterButton.disableProperty().bind(selected.isNull());
+        addExamButton.disableProperty().bind(selected.isNull());
 
         reload();
     }
@@ -184,6 +189,22 @@ public class InstructorSectionsController {
             dialog.getDialogPane().getStylesheets().add(css.toExternalForm());
         }
         dialog.showAndWait();
+    }
+
+    @FXML
+    private void handleAddExam() {
+        Section selected = sectionTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            return;
+        }
+        String label = courseCodeOf(selected.getCourseId()) + "-" + selected.getSectionNumber();
+        int actingUserId = Session.current().getUser().getUserId();
+
+        ExamFormDialog dialog = new ExamFormDialog(selected, label, examService, actingUserId);
+        Boolean saved = dialog.showAndWait().orElse(false);
+        if (Boolean.TRUE.equals(saved)) {
+            AlertUtil.success("Exam added", "The exam for " + label + " is now visible to every enrolled student.");
+        }
     }
 
     private List<String> rosterNames(int sectionId) {

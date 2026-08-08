@@ -19,21 +19,23 @@ import java.time.LocalDateTime;
  * a stranger that an ID exists, which is worth more to them than to anybody
  * honest.</p>
  *
- * <p>The number typed on the sign-in screen is {@code users.user_id} — the one
- * and only login identity in the system, shown everywhere else in the
- * application as "Student ID" or "Instructor ID" ({@code StudentFormDialog},
- * {@code AdminStudentsController} and their instructor equivalents all display
- * {@code getUserId()}, never a role table's own IDENTITY column). There is no
- * second, per-role id namespace to resolve it against: {@code students},
- * {@code instructors} and (formerly) {@code admins} each have their own
- * IDENTITY primary key for internal joins, but none of them is a login
- * credential.</p>
+ * <p>The number typed on the sign-in screen is always {@code users.user_id} —
+ * the one identity in the system — for every role, Admin included. It is
+ * never {@code students.student_id} or {@code instructors.instructor_id}:
+ * those are separate IDENTITY sequences from {@code user_id} and from each
+ * other, so reading the typed number against the wrong one used to resolve to
+ * a different person (or nobody) depending on how far the sequences had
+ * drifted apart.</p>
  *
- * <p>The role picked on the role-selection screen is a gate, not part of the
- * lookup: the account is found by {@code user_id} alone, and is then refused
- * unless it belongs to the role whose door it came in through. An unknown ID
- * and a wrong password are told the same vague thing, because which IDs exist
- * is no more a stranger's business than which door they belong to.</p>
+ * <p>The role picked on the role-selection screen is a <em>door</em>, not a
+ * lookup table: the typed {@code user_id} is read from {@code dbo.users}
+ * directly, and the role selected must match {@code users.role} on the
+ * account it names, checked after the password so a stranger cannot use the
+ * three buttons to learn which role an ID belongs to. Once the account is
+ * found, its student or instructor profile row (if any) is loaded by
+ * {@code user_id}, and {@code users.role} is what the caller uses afterwards
+ * to route to the STUDENT, INSTRUCTOR or ADMIN area — never the button that
+ * was clicked to get here.</p>
  */
 public class AuthService {
 
@@ -69,15 +71,14 @@ public class AuthService {
      * <p>The student or instructor record behind the account is loaded here,
      * so no screen has to do it later.</p>
      *
-     * @param selectedRole the role picked on the role-selection screen. It
-     *                     selects the table {@code idText} is looked up in, and
-     *                     the account must belong to it. {@code null} means no
-     *                     role was picked, in which case the number can only be
-     *                     read as {@code users.user_id} — nothing in the
-     *                     application passes null, since every route to the
-     *                     sign-in screen goes through role selection first.
+     * @param selectedRole the role picked on the role-selection screen — a
+     *                     door the found account must match, checked after
+     *                     the password. {@code null} means no role was picked;
+     *                     nothing in the application passes null, since every
+     *                     route to the sign-in screen goes through role
+     *                     selection first.
      * @param idText       the ID as typed on the sign-in screen — always
-     *                     {@code users.user_id}, whatever role is signing in
+     *                     {@code users.user_id}, for every role
      * @return the open session, also reachable through {@link Session#current()}
      * @throws ServiceException if the details are wrong or the account is disabled
      */
@@ -85,25 +86,25 @@ public class AuthService {
         ValidationException.requireText(idText, "User ID");
         ValidationException.requireText(password, "Password");
 
-        int typedId;
+        int userId;
         try {
-            typedId = Integer.parseInt(idText.trim());
+            userId = Integer.parseInt(idText.trim());
         } catch (NumberFormatException e) {
             throw new ServiceException(SIGN_IN_FAILED);
         }
-        if (typedId <= 0) {
+        if (userId <= 0) {
             throw new ServiceException(SIGN_IN_FAILED);
         }
 
         if (TRACE) {
             trace("---------------------------------------------");
             trace(DBConnection.describeConnected());
-            trace("typed " + (selectedRole == null ? "ID" : selectedRole.getLabel() + " ID")
-                    + " = " + typedId);
+            trace("typed user_id = " + userId
+                    + (selectedRole == null ? "" : " through the " + selectedRole.getLabel() + " door"));
         }
 
-        int userId = typedId;
-        trace("resolved user_id = " + userId);
+        Student student = null;
+        Instructor instructor = null;
 
         User user = userDao.findById(userId).orElseThrow(() -> {
             trace("no dbo.users row for user_id " + userId);
@@ -129,10 +130,15 @@ public class AuthService {
                     + "Please contact the registrar.");
         }
 
+        // users.role - never the door that was clicked - decides which
+        // profile row to load and, after this method returns, which area the
+        // caller routes to.
         UserRole role = user.getRole();
-        Student student = role == UserRole.STUDENT ? studentDao.findByUserId(userId).orElse(null) : null;
-        Instructor instructor = role == UserRole.INSTRUCTOR
-                ? instructorDao.findByUserId(userId).orElse(null) : null;
+        if (role == UserRole.STUDENT) {
+            student = studentDao.findByUserId(userId).orElse(null);
+        } else if (role == UserRole.INSTRUCTOR) {
+            instructor = instructorDao.findByUserId(userId).orElse(null);
+        }
 
         requireRoleRecordUsable(role, student, instructor, userId);
         trace("signed in        = OK");

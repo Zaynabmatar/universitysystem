@@ -1,78 +1,115 @@
 package com.university.controller;
 
 import com.university.enums.DayOfWeekCode;
+import com.university.enums.EnrollmentStatus;
 import com.university.enums.UserRole;
+import com.university.model.Campus;
 import com.university.model.Course;
 import com.university.model.Enrollment;
-import com.university.model.Notification;
+import com.university.model.Exam;
+import com.university.model.Instructor;
 import com.university.model.Section;
 import com.university.model.SectionSchedule;
 import com.university.model.Semester;
-import com.university.model.Student;
+import com.university.model.StudentGradeRow;
 import com.university.service.AcademicService;
 import com.university.service.CourseService;
-import com.university.service.NotificationService;
+import com.university.service.ExamService;
+import com.university.service.InstructorService;
 import com.university.service.RegistrationService;
 import com.university.service.SectionService;
 import com.university.service.SemesterService;
 import com.university.service.Session;
-import com.university.service.TranscriptService;
-import com.university.service.TranscriptService.DegreeProgress;
 import com.university.util.AlertUtil;
-import com.university.util.GradeCalculator;
 import com.university.util.SceneManager;
 
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.ProgressBar;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Priority;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * The screen a student lands on after logging in. It answers four questions in one glance:
- * how am I doing, how far along am I, what is next, and is anything waiting for me?
+ * The screen a student lands on after logging in: their registered courses for the current
+ * semester and the exams scheduled for those sections.
  *
- * <p>The landing itself is Phase 05's routing — {@code MainShellController} navigates to the
- * first item of the student menu, which is this screen. No second router exists.</p>
+ * <p>Exams are read entirely through the student's own enrollments
+ * ({@link ExamService#examsForStudent}, which joins {@code exams -> sections -> enrollments}), so
+ * a student only ever sees an exam for a section they are actually enrolled in, and a new exam an
+ * instructor creates appears here the next time this screen loads — no per-student copy is ever
+ * written.</p>
  */
 public class StudentDashboardController {
 
     private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("dd MMM HH:mm");
-    private static final int MAX_NEXT_CLASSES = 5;
-    private static final int MAX_NOTIFICATIONS = 5;
+    private static final DateTimeFormatter MD = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    @FXML private Label       contextLabel;
-    @FXML private Label       gpaLabel;
-    @FXML private Label       standingLabel;
-    @FXML private Label       creditsLabel;
-    @FXML private Label       unreadLabel;
-    @FXML private Label       progressPercentLabel;
-    @FXML private ProgressBar miniProgressBar;
-    @FXML private ListView<String>       nextClassesList;
-    @FXML private ListView<Notification> notificationsList;
+    @FXML private Label semesterBannerLabel;
 
-    private final TranscriptService transcriptService = new TranscriptService();
-    private final AcademicService academicService = new AcademicService();
-    private final NotificationService notificationService = new NotificationService();
+    @FXML private TableView<ClassRow> coursesTable;
+    @FXML private TableColumn<ClassRow, String> colCourseCode;
+    @FXML private TableColumn<ClassRow, String> colCourseName;
+    @FXML private TableColumn<ClassRow, String> colSection;
+    @FXML private TableColumn<ClassRow, String> colCampus;
+    @FXML private TableColumn<ClassRow, String> colInstructor;
+    @FXML private TableColumn<ClassRow, String> colCrn;
+    @FXML private TableColumn<ClassRow, String> colSchedule;
+    @FXML private TableColumn<ClassRow, String> colRoom;
+    @FXML private TableColumn<ClassRow, String> colGrade;
+    @FXML private TableColumn<ClassRow, String> colStatus;
+
+    @FXML private Label totalCoursesLabel;
+    @FXML private Label totalCreditsLabel;
+
+    @FXML private TableView<ExamRow> examsTable;
+    @FXML private TableColumn<ExamRow, String> examColCourseCode;
+    @FXML private TableColumn<ExamRow, String> examColCourseName;
+    @FXML private TableColumn<ExamRow, String> examColDate;
+    @FXML private TableColumn<ExamRow, String> examColTime;
+    @FXML private TableColumn<ExamRow, String> examColDuration;
+    @FXML private TableColumn<ExamRow, String> examColRoom;
+
+    @FXML private TableView<TodayRow> todaysScheduleTable;
+    @FXML private TableColumn<TodayRow, String> todayColTime;
+    @FXML private TableColumn<TodayRow, String> todayColCourse;
+    @FXML private TableColumn<TodayRow, String> todayColInstructor;
+    @FXML private TableColumn<TodayRow, String> todayColRoom;
+
     private final RegistrationService registrationService = new RegistrationService();
-    private final SemesterService semesterService = new SemesterService();
     private final SectionService sectionService = new SectionService();
+    private final SemesterService semesterService = new SemesterService();
     private final CourseService courseService = new CourseService();
+    private final InstructorService instructorService = new InstructorService();
+    private final AcademicService academicService = new AcademicService();
+    private final ExamService examService = new ExamService();
 
+    private final ObservableList<ClassRow> rows = FXCollections.observableArrayList();
+    private final ObservableList<ExamRow> examRows = FXCollections.observableArrayList();
+    private final ObservableList<TodayRow> todayRows = FXCollections.observableArrayList();
+    private final Set<Integer> currentSectionIds = new HashSet<>();
+
+    private List<Course> courses = List.of();
+    private List<Instructor> instructors = List.of();
+    private List<Campus> campuses = List.of();
     private int studentId;
 
     @FXML
@@ -80,216 +117,369 @@ public class StudentDashboardController {
         Session.current().requireRole(UserRole.STUDENT);
         studentId = Session.current().requireStudentId();
 
-        configureNotificationCells();
-        load();
+        colCourseCode.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().courseCode));
+        colCourseName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().courseName));
+        colSection.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().section));
+        colCampus.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().campus));
+        colInstructor.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().instructor));
+        colCrn.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().crn));
+        colSchedule.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().schedule));
+        colRoom.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().room));
+        colGrade.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().grade));
+        colStatus.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().status.getLabel()));
+        colStatus.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String value, boolean empty) {
+                super.updateItem(value, empty);
+                getStyleClass().removeAll("badge-ok", "badge-warn", "badge-neutral");
+                if (empty || value == null) {
+                    setText(null);
+                    return;
+                }
+                setText(value);
+                if ("Enrolled".equals(value) || "Completed".equals(value)) {
+                    getStyleClass().add("badge-ok");
+                } else if ("Withdrawn".equals(value)) {
+                    getStyleClass().add("badge-warn");
+                } else {
+                    getStyleClass().add("badge-neutral");
+                }
+            }
+        });
+        coursesTable.setItems(rows);
+        coursesTable.setPlaceholder(new Label("You are not registered in any course this semester."));
+        coursesTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+
+        examColCourseCode.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().courseCode));
+        examColCourseName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().courseName));
+        examColDate.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().date));
+        examColTime.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().time));
+        examColDuration.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().duration));
+        examColRoom.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().room));
+        examsTable.setItems(examRows);
+        examsTable.setPlaceholder(new Label("No exams have been scheduled yet."));
+        examsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+
+        todayColTime.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().time));
+        todayColCourse.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().course));
+        todayColInstructor.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().instructor));
+        todayColRoom.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().room));
+        todaysScheduleTable.setItems(todayRows);
+        todaysScheduleTable.setPlaceholder(new Label("No classes scheduled for today."));
+        todaysScheduleTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+
+        bindHeightToContent(coursesTable, rows);
+        bindHeightToContent(examsTable, examRows);
+        bindHeightToContent(todaysScheduleTable, todayRows);
+
+        reload();
     }
 
-    private void load() {
-        loadHeaderAndProgress();
-        loadNextClasses();
-        loadNotifications();
+    /**
+     * Sizes a table to exactly fit its rows instead of stretching to fill the page, so it never
+     * gets its own vertical scrollbar and the page below it moves up or down as rows are added
+     * or removed. The surrounding page is what scrolls (see student_dashboard.fxml's ScrollPane).
+     */
+    private static void bindHeightToContent(TableView<?> table, ObservableList<?> items) {
+        double rowHeight = 28;
+        double headerHeight = 32;
+        double emptyStateHeight = 70;
+        table.setFixedCellSize(rowHeight);
+        var height = Bindings.createDoubleBinding(
+                () -> headerHeight + (items.isEmpty() ? emptyStateHeight : items.size() * rowHeight + 2),
+                items);
+        table.prefHeightProperty().bind(height);
+        table.minHeightProperty().bind(height);
+        table.maxHeightProperty().bind(height);
     }
 
-    /** The four KPI cards and the mini progress bar — the same figures the other two screens show. */
-    private void loadHeaderAndProgress() {
+    private void reload() {
+        courses = courseService.listCourses(false);
+        instructors = instructorService.listActive();
+        campuses = sectionService.listCampuses();
+
+        loadRegisteredCourses();
+        loadExams();
+        loadTodaysSchedule();
+    }
+
+    private void loadRegisteredCourses() {
+        currentSectionIds.clear();
+
+        Semester currentSemester = semesterService.getCurrentSemester();
+        if (currentSemester == null) {
+            semesterBannerLabel.setText("No current semester is set.");
+            rows.clear();
+            updateTotals();
+            return;
+        }
+        semesterBannerLabel.setText("Semester: " + currentSemester.getSemesterName());
+
         try {
-            DegreeProgress progress = transcriptService.getDegreeProgress(studentId);
-            Student student = academicService.academicRecordOf(studentId);
+            Map<Integer, StudentGradeRow> gradeByEnrollment =
+                    academicService.gradeRows(studentId, currentSemester.getSemesterId()).stream()
+                            .collect(Collectors.toMap(StudentGradeRow::getEnrollmentId, r -> r, (a, b) -> a));
 
-            contextLabel.setText(student.getUserId() + "  •  " + progress.programName);
-            gpaLabel.setText(GradeCalculator.formatGpa(progress.cumulativeGpa));
-            creditsLabel.setText(progress.creditsCompleted + " / " + progress.creditsRequired);
+            List<Enrollment> enrollments =
+                    registrationService.myClassesForSemester(studentId, currentSemester.getSemesterId());
 
-            String standing = student.getAcademicStanding() == null
-                    ? "—" : student.getAcademicStanding().name();
-            standingLabel.setText(standing);
-            standingLabel.getStyleClass().removeAll("standing-good", "standing-bad");
-            standingLabel.getStyleClass().add(
-                    "PROBATION".equals(standing) || "SUSPENDED".equals(standing)
-                            ? "standing-bad" : "standing-good");
+            List<ClassRow> built = new ArrayList<>();
+            for (Enrollment enrollment : enrollments) {
+                Section section = sectionService.findById(enrollment.getSectionId());
+                if (section == null) {
+                    continue;
+                }
+                currentSectionIds.add(section.getSectionId());
 
-            progressPercentLabel.setText(progress.percentText());
-            miniProgressBar.setProgress(progress.progressFraction());
+                Course course = courseOf(section.getCourseId());
+                StudentGradeRow gradeRow = gradeByEnrollment.get(enrollment.getEnrollmentId());
+                String grade = (gradeRow != null && gradeRow.getLetterGrade() != null)
+                        ? gradeRow.getLetterGrade().getLabel() : "--";
+
+                built.add(new ClassRow(
+                        course == null ? "—" : course.getCourseCode(),
+                        course == null ? "—" : course.getCourseTitle(),
+                        section.getSectionNumber(),
+                        campusNameOf(section.getCampusId()),
+                        instructorNameOf(section.getInstructorId()),
+                        String.valueOf(section.getSectionId()),
+                        scheduleTextOf(section.getSectionId()),
+                        section.getRoom() == null || section.getRoom().isBlank() ? "—" : section.getRoom(),
+                        grade,
+                        enrollment.getStatus(),
+                        course == null ? 0 : course.getCredits()));
+            }
+            rows.setAll(built);
         } catch (RuntimeException e) {
-            AlertUtil.error("Dashboard", "Your academic summary could not be loaded.", e);
+            AlertUtil.error("Classes", "Your registered courses could not be loaded.", e);
+        }
+        updateTotals();
+    }
+
+    private void loadExams() {
+        try {
+            List<Exam> mine = examService.examsForStudent(studentId);
+            List<ExamRow> built = mine.stream()
+                    .filter(exam -> currentSectionIds.contains(exam.getSectionId()))
+                    .map(this::toExamRow)
+                    .toList();
+            examRows.setAll(built);
+        } catch (RuntimeException e) {
+            examRows.clear();
         }
     }
 
     /**
-     * The next five meetings, starting from today and wrapping around the week.
-     *
-     * <p>Built from the same services the timetable screen uses, so the dashboard can never
-     * show a class the timetable does not.</p>
+     * The student's real classes meeting today, built from the same registered sections as
+     * {@link #loadRegisteredCourses()} — never a hardcoded sample — filtered to whichever meetings
+     * fall on today's weekday and sorted by start time.
      */
-    private void loadNextClasses() {
+    private void loadTodaysSchedule() {
         try {
-            nextClassesList.getItems().clear();
-
-            Semester semester = semesterService.getCurrentSemester();
-            if (semester == null) {
-                nextClassesList.setPlaceholder(new Label("No semester is open yet."));
-                return;
-            }
-
-            List<Enrollment> mine =
-                    registrationService.currentRegistrations(studentId, semester.getSemesterId());
-            List<Section> sections = mine.stream()
-                    .map(enrollment -> sectionService.findById(enrollment.getSectionId()))
-                    .filter(Objects::nonNull)
-                    .toList();
-
-            if (sections.isEmpty()) {
-                nextClassesList.setPlaceholder(
-                        new Label("No classes yet — register to see your timetable."));
-                return;
-            }
-
-            Map<Integer, Course> coursesById = courseService.listCourses(false).stream()
-                    .collect(Collectors.toMap(course -> course.getCourseId(), course -> course, (a, b) -> a));
-
-            List<Meeting> meetings = new ArrayList<>();
-            for (Section section : sections) {
-                Course course = coursesById.get(section.getCourseId());
-                for (SectionSchedule schedule : sectionService.listMeetings(section.getSectionId())) {
-                    meetings.add(new Meeting(section, course, schedule));
+            DayOfWeekCode today = DayOfWeekCode.fromJavaDayOfWeek(LocalDate.now().getDayOfWeek());
+            List<TodayRow> built = new ArrayList<>();
+            for (int sectionId : currentSectionIds) {
+                Section section = sectionService.findById(sectionId);
+                if (section == null) {
+                    continue;
+                }
+                Course course = courseOf(section.getCourseId());
+                for (SectionSchedule meeting : sectionService.listMeetings(sectionId)) {
+                    if (meeting.getDayOfWeek() != today) {
+                        continue;
+                    }
+                    built.add(new TodayRow(
+                            meeting.getStartTime(),
+                            HM.format(meeting.getStartTime()) + " - " + HM.format(meeting.getEndTime()),
+                            course == null ? "—" : course.getCourseCode() + " — " + course.getCourseTitle(),
+                            instructorNameOf(section.getInstructorId()),
+                            section.getRoom() == null || section.getRoom().isBlank() ? "—" : section.getRoom()));
                 }
             }
-
-            int todayOrder = DayOfWeekCode.fromJavaDayOfWeek(LocalDate.now().getDayOfWeek()).ordinal();
-            meetings.sort((left, right) -> {
-                int a = wrappedOrder(left, todayOrder);
-                int b = wrappedOrder(right, todayOrder);
-                return a != b ? Integer.compare(a, b)
-                              : left.schedule.getStartTime().compareTo(right.schedule.getStartTime());
-            });
-
-            meetings.stream()
-                    .limit(MAX_NEXT_CLASSES)
-                    .map(m -> m.describe())
-                    .forEach(nextClassesList.getItems()::add);
-
+            built.sort(Comparator.comparing(r -> r.startTime));
+            todayRows.setAll(built);
         } catch (RuntimeException e) {
-            nextClassesList.setPlaceholder(new Label("Your classes could not be loaded."));
+            todayRows.clear();
         }
     }
 
-    /** Days from today, so today's classes come first and the week wraps around. */
-    private int wrappedOrder(Meeting meeting, int todayOrder) {
-        int day = meeting.schedule.getDayOfWeek().ordinal();
-        return (day - todayOrder + DayOfWeekCode.values().length) % DayOfWeekCode.values().length;
+    private ExamRow toExamRow(Exam exam) {
+        Section section = sectionService.findById(exam.getSectionId());
+        Course course = section == null ? null : courseOf(section.getCourseId());
+        String day = DayOfWeekCode.fromJavaDayOfWeek(exam.getExamDate().getDayOfWeek()).getLabel();
+        int endMinutes = exam.getDurationMinutes();
+        return new ExamRow(
+                course == null ? "—" : course.getCourseCode(),
+                course == null ? "—" : course.getCourseTitle(),
+                MD.format(exam.getExamDate()),
+                day,
+                HM.format(exam.getStartTime()),
+                durationText(endMinutes),
+                exam.getRoom() == null || exam.getRoom().isBlank() ? "—" : exam.getRoom());
     }
 
-    /** One weekly meeting, with everything the dashboard line needs. */
-    private static final class Meeting {
-        private final Section section;
-        private final Course course;
-        private final SectionSchedule schedule;
-
-        private Meeting(Section section, Course course, SectionSchedule schedule) {
-            this.section = section;
-            this.course = course;
-            this.schedule = schedule;
-        }
-
-        /** {@code MON 09:00–10:30    CS301-01    Database Systems    Room B-204} */
-        private String describe() {
-            String code = course == null ? "—" : course.getCourseCode();
-            String title = course == null ? "" : course.getCourseTitle();
-            String room = section.getRoom() == null || section.getRoom().isBlank()
-                    ? "" : "    Room " + section.getRoom();
-            return schedule.getDayOfWeek().name() + " "
-                 + schedule.getStartTime().format(HM) + "–" + schedule.getEndTime().format(HM)
-                 + "    " + code + "-" + section.getSectionNumber()
-                 + "    " + title + room;
-        }
+    private String durationText(int minutes) {
+        int hours = minutes / 60;
+        int rest = minutes % 60;
+        return hours > 0 ? String.format("%d:%02d", hours, rest) : rest + " min";
     }
 
-    private void loadNotifications() {
+    private void updateTotals() {
+        totalCoursesLabel.setText("Total Courses: " + rows.size());
+        int totalCredits = rows.stream().mapToInt(r -> r.credits).sum();
+        totalCreditsLabel.setText("Total Credits: " + totalCredits);
+    }
+
+    // ------------------------------------------------------------------ lookups
+
+    private Course courseOf(int courseId) {
+        return courses.stream().filter(c -> c.getCourseId() == courseId).findFirst().orElse(null);
+    }
+
+    private String instructorNameOf(Integer instructorId) {
+        if (instructorId == null) {
+            return "TBA";
+        }
+        return instructors.stream().filter(i -> i.getInstructorId() == instructorId).findFirst()
+                .map(Instructor::getFullName).orElse("TBA");
+    }
+
+    private String campusNameOf(int campusId) {
+        return campuses.stream().filter(c -> c.getCampusId() == campusId).findFirst()
+                .map(Campus::getCampusName).orElse("—");
+    }
+
+    private String scheduleTextOf(int sectionId) {
+        List<SectionSchedule> meetings = sectionService.listMeetings(sectionId);
+        if (meetings.isEmpty()) {
+            return "No meetings set";
+        }
+        return meetings.stream()
+                .map(m -> m.getDayOfWeek().name() + " " + HM.format(m.getStartTime()) + "-" + HM.format(m.getEndTime()))
+                .collect(Collectors.joining(", "));
+    }
+
+    // ------------------------------------------------------------------ actions
+
+    /** Every exam this student has, across every semester — not only the ones on this page. */
+    @FXML
+    private void handleViewAllExams() {
+        List<Exam> all;
         try {
-            int userId = Session.current().getUser().getUserId();
-            unreadLabel.setText(String.valueOf(notificationService.unreadCount(userId)));
-
-            List<Notification> latest = notificationService.latest(userId, MAX_NOTIFICATIONS);
-            notificationsList.getItems().setAll(latest);
-            if (latest.isEmpty()) {
-                notificationsList.setPlaceholder(new Label("You have no notifications yet."));
-            }
+            all = examService.examsForStudent(studentId);
         } catch (RuntimeException e) {
-            unreadLabel.setText("0");
-            notificationsList.setPlaceholder(new Label("Your notifications could not be loaded."));
+            AlertUtil.error("Exams", "Your exams could not be loaded.", e);
+            return;
         }
+
+        TableView<ExamRow> table = new TableView<>();
+        TableColumn<ExamRow, String> code = new TableColumn<>("Course Code");
+        code.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().courseCode));
+        TableColumn<ExamRow, String> name = new TableColumn<>("Course Name");
+        name.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().courseName));
+        name.setPrefWidth(170);
+        TableColumn<ExamRow, String> date = new TableColumn<>("Exam Date");
+        date.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().date));
+        TableColumn<ExamRow, String> day = new TableColumn<>("Day");
+        day.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().day));
+        TableColumn<ExamRow, String> time = new TableColumn<>("Time");
+        time.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().time));
+        TableColumn<ExamRow, String> duration = new TableColumn<>("Duration");
+        duration.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().duration));
+        TableColumn<ExamRow, String> room = new TableColumn<>("Room");
+        room.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().room));
+        table.getColumns().setAll(List.of(code, name, date, day, time, duration, room));
+        table.setItems(FXCollections.observableArrayList(all.stream().map(this::toExamRow).toList()));
+        table.setPlaceholder(new Label("You have no exams scheduled."));
+        table.setPrefSize(640, 360);
+        table.setMaxWidth(Double.MAX_VALUE);
+        table.setMaxHeight(Double.MAX_VALUE);
+        GridPane.setHgrow(table, Priority.ALWAYS);
+        GridPane.setVgrow(table, Priority.ALWAYS);
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("All Exams");
+        dialog.setHeaderText("Every exam scheduled for a course you are enrolled or were enrolled in.");
+        dialog.setResizable(true);
+        dialog.getDialogPane().setContent(table);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        var css = getClass().getResource("/css/app.css");
+        if (css != null) {
+            dialog.getDialogPane().getStylesheets().add(css.toExternalForm());
+        }
+        dialog.showAndWait();
     }
 
-    /** Unread notifications are visually distinct — the same convention as the bell popup. */
-    private void configureNotificationCells() {
-        notificationsList.setCellFactory(view -> new ListCell<>() {
-            @Override
-            protected void updateItem(Notification item, boolean empty) {
-                super.updateItem(item, empty);
-                getStyleClass().removeAll("notif-title-unread", "notif-title-read");
-                if (empty || item == null) {
-                    setText(null);
-                    return;
-                }
-                String when = item.getCreatedAt() == null ? "" : "  ·  " + item.getCreatedAt().format(STAMP);
-                setText(item.getTitle() + when);
-                getStyleClass().add(item.isRead() ? "notif-title-read" : "notif-title-unread");
-            }
-        });
-    }
-
-    /* =================== quick actions — all through the Phase 05 SceneManager ============ */
-
+    /** Opens the student's existing read-only weekly timetable screen. */
     @FXML
-    private void handleOpenRegistration() {
-        SceneManager.getInstance().navigateTo("student_registration.fxml", "Register for Courses");
-    }
-
-    @FXML
-    private void handleOpenRecommendations() {
-        SceneManager.getInstance().navigateTo("student_recommendation.fxml", "Course Recommendation");
-    }
-
-    @FXML
-    private void handleOpenTimetable() {
+    private void handleViewMyTimetable() {
         SceneManager.getInstance().navigateTo("student_timetable.fxml", "My Timetable");
     }
 
-    @FXML
-    private void handleOpenGrades() {
-        SceneManager.getInstance().navigateTo("student_grades.fxml", "My Grades");
+    // ------------------------------------------------------------------ row types
+
+    private static final class ClassRow {
+        final String courseCode;
+        final String courseName;
+        final String section;
+        final String campus;
+        final String instructor;
+        final String crn;
+        final String schedule;
+        final String room;
+        final String grade;
+        final EnrollmentStatus status;
+        final int credits;
+
+        ClassRow(String courseCode, String courseName, String section, String campus, String instructor,
+                  String crn, String schedule, String room, String grade, EnrollmentStatus status, int credits) {
+            this.courseCode = courseCode;
+            this.courseName = courseName;
+            this.section = section;
+            this.campus = campus;
+            this.instructor = instructor;
+            this.crn = crn;
+            this.schedule = schedule;
+            this.room = room;
+            this.grade = grade;
+            this.status = status;
+            this.credits = credits;
+        }
     }
 
-    @FXML
-    private void handleOpenTranscript() {
-        SceneManager.getInstance().navigateTo("student_transcript.fxml", "Transcript");
+    private static final class ExamRow {
+        final String courseCode;
+        final String courseName;
+        final String date;
+        final String day;
+        final String time;
+        final String duration;
+        final String room;
+
+        ExamRow(String courseCode, String courseName, String date, String day, String time,
+                 String duration, String room) {
+            this.courseCode = courseCode;
+            this.courseName = courseName;
+            this.date = date;
+            this.day = day;
+            this.time = time;
+            this.duration = duration;
+            this.room = room;
+        }
     }
 
-    @FXML
-    private void handleOpenProgress() {
-        SceneManager.getInstance().navigateTo("student_progress.fxml", "Degree Progress");
-    }
+    private static final class TodayRow {
+        final LocalTime startTime;
+        final String time;
+        final String course;
+        final String instructor;
+        final String room;
 
-    /** Opens the same modal the top-bar bell opens, so there is one notifications window. */
-    @FXML
-    private void handleOpenNotifications() {
-        try {
-            FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource(SceneManager.FXML_DIR + "notifications.fxml"));
-            Parent root = loader.load();
-
-            Stage popup = new Stage();
-            popup.initOwner(notificationsList.getScene().getWindow());
-            popup.initModality(Modality.WINDOW_MODAL);
-            popup.setTitle("Notifications");
-            Scene scene = new Scene(root);
-            SceneManager.getInstance().applyStylesheet(scene);
-            popup.setScene(scene);
-            popup.showAndWait();
-
-            loadNotifications();   // the unread count may have changed while it was open
-        } catch (Exception e) {
-            AlertUtil.error("Notifications", "The notifications window could not be opened.", e);
+        TodayRow(LocalTime startTime, String time, String course, String instructor, String room) {
+            this.startTime = startTime;
+            this.time = time;
+            this.course = course;
+            this.instructor = instructor;
+            this.room = room;
         }
     }
 }
