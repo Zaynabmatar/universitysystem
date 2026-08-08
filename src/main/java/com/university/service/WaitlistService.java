@@ -17,7 +17,6 @@ import com.university.model.Section;
 import com.university.model.Student;
 import com.university.model.Waitlist;
 
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -295,21 +294,15 @@ public class WaitlistService {
         return null;
     }
 
-    /** Section 6.2 — the maximum credits a student may carry, by cumulative GPA. Mirrors
-     *  {@link RegistrationService#creditCapFor}; kept independent so the two services never
-     *  need to reference each other. */
+    /**
+     * The flat maximum credits a student may carry (Phase 20: the same {@code 18} for every
+     * student, no GPA band). Reads {@link RegistrationService#MAX_SEMESTER_CREDITS} directly
+     * rather than holding a {@code RegistrationService} field: that class already holds a
+     * {@code WaitlistService} field of its own, and a field on each side referencing the other
+     * would recurse forever at construction.
+     */
     private int creditCapFor(Student student) {
-        if (student.getCompletedCredits() <= 0) {
-            return 18;
-        }
-        BigDecimal gpa = student.getCumulativeGpa() == null ? BigDecimal.ZERO : student.getCumulativeGpa();
-        if (gpa.compareTo(new BigDecimal("3.00")) >= 0) {
-            return 21;
-        }
-        if (gpa.compareTo(new BigDecimal("2.00")) >= 0) {
-            return 18;
-        }
-        return 12;
+        return RegistrationService.MAX_SEMESTER_CREDITS;
     }
 
     private void notifySkipped(Student student, String sectionLabel, String reason) {

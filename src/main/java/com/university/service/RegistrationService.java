@@ -22,7 +22,6 @@ import com.university.model.Semester;
 import com.university.model.Student;
 import com.university.model.Waitlist;
 
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -35,9 +34,11 @@ import java.util.Optional;
  * Registering for classes, dropping them, and the eight rules that guard the door.
  *
  * <p>Everything here comes from project_details.md Section 6.1 (the eight registration rules,
- * checked in order and stopping at the first failure), Section 6.2 (the GPA-based credit limit)
- * and Section 6.4 (the drop/withdraw deadlines). The exact wording of every message is copied
- * from those sections character for character — the professor reads them off the screen.</p>
+ * checked in order and stopping at the first failure) and Section 6.4 (the drop/withdraw
+ * deadlines). The credit ceiling in {@link #creditCapFor} is a flat 18 credits per semester for
+ * every student (Phase 20 of the database-foundation cleanup; it previously varied by GPA band).
+ * The exact wording of every message is copied from those sections character for character — the
+ * professor reads them off the screen.</p>
  *
  * <p>Every check reads the data fresh; only the seat itself is claimed atomically, by
  * {@link SectionDAO#changeEnrolledCount}, which raises {@code enrolled_count} only while it
@@ -61,6 +62,7 @@ public class RegistrationService {
     private final WaitlistDAO waitlistDao = new WaitlistDAO();
     private final NotificationService notifications = new NotificationService();
     private final WaitlistService waitlistService = new WaitlistService();
+    private final AcademicService academicService = new AcademicService();
 
     /** Gives access to the connection helpers without exposing a whole data access object. */
     private final AbstractDAO transactions = new AbstractDAO() {
@@ -84,11 +86,16 @@ public class RegistrationService {
         Semester semester = requireSemester(section.getSemesterId());
         Course course = requireCourse(section.getCourseId());
 
-        // R1 — the registration window
-        if (!semester.isRegistrationOpen(LocalDateTime.now())) {
-            throw new RegistrationException("R1", sectionId,
-                    "Registration is closed. It opens on "
-                            + DATE_TIME.format(semester.getRegistrationStart()) + ".");
+        // R1 — the registration window. Two distinct reasons share the rule, and are told apart:
+        // "not yet" (before registrationStart) and "no longer" (after registrationEnd) are different
+        // facts about the database, and showing registrationStart for both — as this used to —
+        // told a student registration "opens" on a date already months in the past.
+        LocalDateTime now = LocalDateTime.now();
+        if (!semester.isRegistrationOpen(now)) {
+            String reason = now.isBefore(semester.getRegistrationStart())
+                    ? "Registration is closed. It opens on " + DATE_TIME.format(semester.getRegistrationStart()) + "."
+                    : "Registration is closed. It ended on " + DATE_TIME.format(semester.getRegistrationEnd()) + ".";
+            throw new RegistrationException("R1", sectionId, reason);
         }
 
         // R2 — the student must be ACTIVE
@@ -100,6 +107,14 @@ public class RegistrationService {
         if (section.getStatus() != SectionStatus.OPEN) {
             throw new RegistrationException("SECTION_CLOSED", sectionId,
                     "This section is not open for registration.");
+        }
+
+        // A section with no meeting time at all is an incomplete offering — Admin has not
+        // finished configuring it yet (Section 9/29 of the database-foundation cleanup: no valid
+        // schedule means no registration, checked here rather than left to Admin discipline alone).
+        if (scheduleDao.findBySection(sectionId).isEmpty()) {
+            throw new RegistrationException("SECTION_NOT_SCHEDULED", sectionId,
+                    "This section has not been scheduled yet and cannot be registered for.");
         }
 
         // R3 — every prerequisite must be passed
@@ -198,9 +213,13 @@ public class RegistrationService {
             }
 
             // Section 5.5 repeat policy, step 2 — the new attempt has just been created above;
-            // every older COMPLETED attempt at this course now stops counting in the GPA.
+            // every older COMPLETED attempt at this course now stops counting in the GPA. That
+            // changes the true cumulative GPA immediately, so the cache has to be refreshed in
+            // the same transaction — left alone, students.cumulative_gpa/completed_credits would
+            // still show the retired attempt's contribution until the next grade submission.
             if (repeat) {
                 enrollmentDao.retireOlderCompletedAttempts(connection, studentId, course.getCourseId(), enrollmentId);
+                academicService.refreshAcademicRecord(connection, studentId);
             }
 
             notifications.notify(connection, student.getUserId(), NotificationType.REGISTRATION,
@@ -254,20 +273,19 @@ public class RegistrationService {
         return null;
     }
 
-    /** Section 6.2 — the maximum credits a student may carry this semester, by cumulative GPA. */
+    /**
+     * The maximum credits any student may carry in a normal semester: a flat ceiling, the same
+     * for every student regardless of GPA or completed credits. (This used to vary by GPA band —
+     * 12/18/21 — but that let students validly register above 18 credits, which the university's
+     * registration rules do not allow; {@code student} stays a parameter so a future per-program
+     * or per-student exception has somewhere to plug in without changing every call site.)
+     */
     public int creditCapFor(Student student) {
-        if (student.getCompletedCredits() <= 0) {
-            return 18; // a brand-new student has no GPA yet
-        }
-        BigDecimal gpa = student.getCumulativeGpa() == null ? BigDecimal.ZERO : student.getCumulativeGpa();
-        if (gpa.compareTo(new BigDecimal("3.00")) >= 0) {
-            return 21;
-        }
-        if (gpa.compareTo(new BigDecimal("2.00")) >= 0) {
-            return 18;
-        }
-        return 12;
+        return MAX_SEMESTER_CREDITS;
     }
+
+    /** The flat maximum credits a student may carry in one semester's registration. */
+    public static final int MAX_SEMESTER_CREDITS = 18;
 
     /** The current semester, or null when none is set — Phase 08's `SemesterService` owns the read. */
     public Semester getCurrentSemester() {

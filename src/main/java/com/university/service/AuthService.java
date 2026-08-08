@@ -1,18 +1,15 @@
 package com.university.service;
 
-import com.university.dao.AdminDAO;
 import com.university.dao.InstructorDAO;
 import com.university.dao.StudentDAO;
 import com.university.dao.UserDAO;
 import com.university.database.DBConnection;
 import com.university.enums.UserRole;
-import com.university.model.Admin;
 import com.university.model.Instructor;
 import com.university.model.Student;
 import com.university.model.User;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 /**
  * Signing in, signing out and changing a password.
@@ -22,21 +19,21 @@ import java.util.Optional;
  * a stranger that an ID exists, which is worth more to them than to anybody
  * honest.</p>
  *
- * <p>The number typed on the sign-in screen is the one the signer-in actually
- * knows: their Student ID, Instructor ID or Admin ID — which is
- * {@code students.student_id}, {@code instructors.instructor_id} or
- * {@code admins.admin_id}, exactly as the field's own prompt says. It is
- * <em>not</em> {@code users.user_id}. Those two numbers are separate IDENTITY
- * sequences and they diverge almost immediately: instructor 1 is user 2,
- * student 3 is user 55, admin 2 is user 405. Reading the typed number as a
- * user_id therefore looked up a different person's account — the reason a
- * valid ID and a valid password were still refused.</p>
+ * <p>The number typed on the sign-in screen is {@code users.user_id} — the one
+ * and only login identity in the system, shown everywhere else in the
+ * application as "Student ID" or "Instructor ID" ({@code StudentFormDialog},
+ * {@code AdminStudentsController} and their instructor equivalents all display
+ * {@code getUserId()}, never a role table's own IDENTITY column). There is no
+ * second, per-role id namespace to resolve it against: {@code students},
+ * {@code instructors} and (formerly) {@code admins} each have their own
+ * IDENTITY primary key for internal joins, but none of them is a login
+ * credential.</p>
  *
- * <p>So the role picked on the role-selection screen does two jobs. It chooses
- * which table the typed number is looked up in, and it remains the door the
- * account came in through — an account may only come in through its own. An
- * unknown ID and a wrong password are told the same vague thing, because which
- * IDs exist is no more a stranger's business than which door they belong to.</p>
+ * <p>The role picked on the role-selection screen is a gate, not part of the
+ * lookup: the account is found by {@code user_id} alone, and is then refused
+ * unless it belongs to the role whose door it came in through. An unknown ID
+ * and a wrong password are told the same vague thing, because which IDs exist
+ * is no more a stranger's business than which door they belong to.</p>
  */
 public class AuthService {
 
@@ -46,7 +43,6 @@ public class AuthService {
     private final UserDAO userDao = new UserDAO();
     private final StudentDAO studentDao = new StudentDAO();
     private final InstructorDAO instructorDao = new InstructorDAO();
-    private final AdminDAO adminDao = new AdminDAO();
 
     /**
      * Console trace of a sign-in, off unless the application is started with
@@ -80,10 +76,8 @@ public class AuthService {
      *                     read as {@code users.user_id} — nothing in the
      *                     application passes null, since every route to the
      *                     sign-in screen goes through role selection first.
-     * @param idText       the ID as typed on the sign-in screen: a student's
-     *                     Student ID, an instructor's Instructor ID, an admin's
-     *                     Admin ID — the key of the role's own table, not
-     *                     {@code users.user_id}
+     * @param idText       the ID as typed on the sign-in screen — always
+     *                     {@code users.user_id}, whatever role is signing in
      * @return the open session, also reachable through {@link Session#current()}
      * @throws ServiceException if the details are wrong or the account is disabled
      */
@@ -108,7 +102,7 @@ public class AuthService {
                     + " = " + typedId);
         }
 
-        int userId = resolveUserId(selectedRole, typedId);
+        int userId = typedId;
         trace("resolved user_id = " + userId);
 
         User user = userDao.findById(userId).orElseThrow(() -> {
@@ -152,55 +146,19 @@ public class AuthService {
     }
 
     /**
-     * Turns the number typed on the sign-in screen into a {@code users.user_id}.
-     *
-     * <p>The field's prompt is "Student ID", "Instructor ID" or "Admin ID", and
-     * that is precisely what it receives: the key of {@code dbo.students},
-     * {@code dbo.instructors} or {@code dbo.admins}. Each of those is its own
-     * IDENTITY sequence, independent of the one behind {@code users.user_id},
-     * so the two numbers agree only by accident — in the shipped data for
-     * exactly one account out of 682. The lookup therefore has to go through
-     * the role's own table; treating the typed number as a user_id directly is
-     * what silently resolved a valid ID to somebody else's account.</p>
-     *
-     * <p>Scoping the lookup by role also means an Admin ID and a Student ID may
-     * validly be the same number without either being able to sign in through
-     * the other's button.</p>
-     *
-     * @param selectedRole which table to look in; {@code null} only when no role
-     *                     was picked, where the number can only be a user_id
-     * @return the {@code users.user_id} behind the typed ID
-     * @throws ServiceException with the vague message when no such ID exists,
-     *                          so that an unknown ID is indistinguishable from
-     *                          a wrong password
-     */
-    private int resolveUserId(UserRole selectedRole, int typedId) {
-        if (selectedRole == null) {
-            return typedId;
-        }
-        Optional<Integer> userId = switch (selectedRole) {
-            case STUDENT -> studentDao.findById(typedId).map(Student::getUserId);
-            case INSTRUCTOR -> instructorDao.findById(typedId).map(Instructor::getUserId);
-            case ADMIN -> adminDao.findById(typedId).map(Admin::getUserId);
-        };
-        return userId.orElseThrow(() -> {
-            trace("refused: no " + selectedRole.getLabel() + " has ID " + typedId);
-            return new ServiceException(SIGN_IN_FAILED);
-        });
-    }
-
-    /**
      * The account is real and the password was right; this is the last gate.
      *
-     * <p>An instructor or admin can be switched off on their own record as
-     * well as on {@code users.is_active}, and a role row can be missing
-     * outright if somebody edited the database by hand. Neither is the
-     * password's fault, so neither gets the vague message — except a missing
-     * row, which is exactly the case where saying nothing specific is right.</p>
+     * <p>An instructor can be switched off on their own record as well as on
+     * {@code users.is_active}, and a role row can be missing outright if
+     * somebody edited the database by hand. Neither is the password's fault,
+     * so neither gets the vague message — except a missing row, which is
+     * exactly the case where saying nothing specific is right.</p>
      *
      * <p>Students have no {@code is_active} column of their own, only
      * {@code status}, so {@code users.is_active} (already checked) is their
-     * only gate.</p>
+     * only gate. Admins likewise have no profile row of their own any more —
+     * {@code dbo.admins} was retired in Phase 18 — so {@code users.is_active}
+     * is their only gate too.</p>
      */
     private void requireRoleRecordUsable(UserRole role, Student student, Instructor instructor,
                                          int userId) {
@@ -220,11 +178,7 @@ public class AuthService {
                 }
             }
             case ADMIN -> {
-                boolean usable = adminDao.findByUserId(userId).filter(a -> a.isActive()).isPresent();
-                if (!usable) {
-                    throw new ServiceException("This account has been deactivated. "
-                            + "Please contact the registrar.");
-                }
+                // users.is_active was already checked in login(); nothing further to gate on.
             }
         }
     }

@@ -1,12 +1,12 @@
 package com.university.database;
 
-import com.university.dao.AdminDAO;
 import com.university.dao.InstructorDAO;
 import com.university.dao.StudentDAO;
 import com.university.dao.UserDAO;
-import com.university.model.Admin;
+import com.university.enums.UserRole;
 import com.university.model.Instructor;
 import com.university.model.Student;
+import com.university.model.User;
 import com.university.service.PasswordHasher;
 
 /**
@@ -14,12 +14,12 @@ import com.university.service.PasswordHasher;
  * BCrypt of {@code <user_id>@iuL} — the one id in the system, the same number
  * shown as Student ID or Instructor ID and typed on the sign-in screen.
  *
- * <p>Run this exactly once, after applying
- * {@code migrations/phase16_admins_and_role_login.sql} (or after building
- * {@code universitymanagmentDB.sql} fresh). Every account created by the
- * application from then on already gets the right hash at creation time
- * ({@link UserDAO#finalizePassword}), so this class has nothing left to fix
- * on a second run beyond re-confirming the same hashes.</p>
+ * <p>Admin accounts are read by {@code users.role = 'ADMIN'} directly —
+ * {@code dbo.admins} was retired in Phase 18 as a redundant, unused identity
+ * table. Every account created by the application from then on already gets
+ * the right hash at creation time ({@link UserDAO#finalizePassword}), so this
+ * class has nothing left to fix on a second run beyond re-confirming the same
+ * hashes.</p>
  */
 public final class RolePasswordMigration {
 
@@ -30,7 +30,7 @@ public final class RolePasswordMigration {
         UserDAO userDao = new UserDAO();
 
         int admins = 0;
-        for (Admin admin : new AdminDAO().findAll()) {
+        for (User admin : userDao.findByRole(UserRole.ADMIN)) {
             userDao.updatePasswordHash(admin.getUserId(), PasswordHasher.hashDefaultPassword(admin.getUserId()));
             admins++;
         }

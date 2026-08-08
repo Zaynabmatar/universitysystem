@@ -82,7 +82,11 @@ public class AdminSemestersController {
 
         var selected = semesterTable.getSelectionModel().selectedItemProperty();
         editButton.disableProperty().bind(selected.isNull());
-        setCurrentButton.disableProperty().bind(selected.isNull());
+        // A semester that already ran before the current one can never legally become current
+        // again (Phase 19: chronology only moves forward) — greyed out here, and refused by
+        // SemesterService/the database even if this were somehow bypassed.
+        selected.addListener((obs, oldSel, newSel) -> setCurrentButton.setDisable(!canBecomeCurrent(newSel)));
+        setCurrentButton.setDisable(!canBecomeCurrent(selected.get()));
 
         reload();
     }
@@ -130,6 +134,17 @@ public class AdminSemestersController {
     }
 
     @FXML private void handleRefresh() { reload(); }
+
+    /**
+     * False when {@code candidate} already ran before the current semester (or nothing is
+     * selected) — the one case {@link SemesterService#setCurrent} always refuses.
+     */
+    private boolean canBecomeCurrent(Semester candidate) {
+        if (candidate == null) return false;
+        if (candidate.isCurrent()) return true;
+        Semester current = semesterService.getCurrentSemester();
+        return current == null || !candidate.getStartDate().isBefore(current.getStartDate());
+    }
 
     // ------------------------------------------------------------------ actions
 
@@ -187,6 +202,8 @@ public class AdminSemestersController {
             semesterService.setCurrent(selected.getSemesterId());
             reload();
             AlertUtil.success("Current semester changed", selected.getSemesterName() + " is now the current semester.");
+        } catch (ServiceException se) {
+            AlertUtil.warn("Cannot change the current semester", se.getMessage());
         } catch (Exception e) {
             AlertUtil.error("Could not change the current semester", "The current semester could not be changed.", e);
         }

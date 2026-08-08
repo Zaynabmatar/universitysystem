@@ -69,9 +69,23 @@ public class SemesterService {
      * flag on every row and sets it on one, inside a single transaction, because "only one row
      * may have this value" is not something a plain constraint can express (Section 4.9). There
      * is deliberately no way to un-set the current semester from here — only to move it.
+     *
+     * <p>Chronology may only move forward: a semester that starts before the one currently active
+     * is refused here with a clear message, and refused again — this time unconditionally — by
+     * {@code trg_semesters_block_backward_activation} (Phase 19) if this check is ever bypassed.
+     * The database, not just this service, is the real guard.</p>
+     *
+     * @throws ServiceException when {@code semesterId} starts before the semester now current
      */
     public void setCurrent(int semesterId) {
-        requireSemester(semesterId);
+        Semester target = requireSemester(semesterId);
+        Semester current = getCurrentSemester();
+        if (current != null && current.getSemesterId() != target.getSemesterId()
+                && target.getStartDate().isBefore(current.getStartDate())) {
+            throw new ServiceException("Cannot make " + target.getSemesterName() + " current: it already ran before "
+                    + current.getSemesterName() + ", the semester currently active. "
+                    + "The current semester can only move forward in time.");
+        }
         semesterDao.makeCurrent(semesterId);
     }
 

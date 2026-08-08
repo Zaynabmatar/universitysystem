@@ -1,6 +1,15 @@
 ﻿/* ============================================================================
-   SEED 06 -- Assignments, university_news, advisors_directory
+   SEED 06 -- Assignments, university_news
    ONLY INSERT statements below (Section 14 / user requirement).
+
+   dbo.advisors_directory is no longer seeded here. It was a hand-typed list
+   of 9 "advisors" completely disconnected from dbo.instructors (no FK to
+   instructors, users or departments at all — see its own former Javadoc),
+   duplicating information the real dbo.instructors/dbo.users/dbo.departments
+   tables already hold for all 53 real instructors. Phase 20 of the database-
+   foundation cleanup drops the table; nothing in the application ever read
+   it (grep found zero controller/service references), so there is nothing
+   left here to seed it for.
 ============================================================================ */
 
 USE universitymanagementDB;
@@ -228,23 +237,12 @@ FROM (VALUES
 ) AS v(title, content, category, pubdate, expiry, published, username)
 JOIN dbo.users u ON u.username = v.username;
 
-INSERT INTO dbo.advisors_directory (full_name, department, university_email, office, phone)
-SELECT v.* 
-FROM (VALUES
-    (N'Dr. Samer Fakhoury', N'Business Administration', N's.fakhoury@university.edu.lb', N'Block D, Office 210', N'+9611000444'),
-    (N'Dr. Maya Chalhoub', N'Engineering', N'm.chalhoub@university.edu.lb', N'Block E, Office 112', N'+9611000555'),
-    (N'Dr. Riad Sabbagh', N'Mathematics & Natural Sciences', N'r.sabbagh@university.edu.lb', N'Block A, Office 220', N'+9611000666'),
-    (N'Ms. Layla Fares', N'Arts & Humanities', N'l.fares.adv@university.edu.lb', N'Block C, Office 108', N'+9611000777'),
-    (N'Dr. Nizar Khalife', N'Law', N'n.khalife@university.edu.lb', N'Block F, Office 301', N'+9611000888'),
-    (N'Dr. Rana Estephan', N'Pharmacy', N'r.estephan@university.edu.lb', N'Block G, Office 115', N'+9611000999')
-) AS v(full_name, department, university_email, office, phone);
-
 COMMIT TRANSACTION;
-PRINT N'>>> SEED 06 (assignments/news/advisors) completed.';
+PRINT N'>>> SEED 06 (assignments/news) completed.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    PRINT N'!!! SEED 06 (assignments/news/advisors) FAILED, rolled back: ' + ERROR_MESSAGE();
+    PRINT N'!!! SEED 06 (assignments/news) FAILED, rolled back: ' + ERROR_MESSAGE();
     THROW;
 END CATCH
 GO

@@ -5,40 +5,39 @@ import com.university.service.Session;
 import com.university.service.TranscriptService;
 import com.university.service.TranscriptService.DegreeProgress;
 import com.university.service.TranscriptService.RequirementRow;
+import com.university.service.TranscriptService.SemesterPlan;
 import com.university.util.AlertUtil;
 import com.university.util.GradeCalculator;
 
 import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.layout.VBox;
 
 import java.util.List;
-import java.util.function.Predicate;
 
 /**
- * "Can I graduate?", answered condition by condition.
+ * "Can I graduate?", answered condition by condition — and, underneath, the complete
+ * semester-by-semester Study Plan for the logged-in student's exact program.
  *
  * <p>project_details.md Section 6.9 has three conditions, and this screen shows all three
  * separately, each with its own ✓ or ✗ and its own numbers — never just the overall verdict.
  * A student who is refused must be able to read <em>which</em> condition failed.</p>
  *
+ * <p>The Study Plan section below it is built entirely from
+ * {@link TranscriptService.DegreeProgress#semesterPlans} — one {@link TableView} per semester,
+ * created here rather than declared in FXML because the number of semesters is a property of the
+ * student's own program (4 for the Master's, 8 for most Bachelor's, 9 for Law and Pharmacy), not
+ * a fixed screen layout.</p>
+ *
  * <p>Read-only: nothing here writes to the database, and {@code students.status} is never set
  * to {@code GRADUATED} — conferring a degree is a registrar action, not a screen.</p>
  */
 public class StudentProgressController {
-
-    private static final String ALL_COURSES   = "All courses";
-    private static final String MANDATORY     = "Mandatory only";
-    private static final String NOT_TAKEN     = "Not taken";
-    private static final String IN_PROGRESS   = "In progress";
-    private static final String PASSED        = "Passed";
 
     @FXML private Label       programLabel;
     @FXML private Label       percentLabel;
@@ -51,33 +50,15 @@ public class StudentProgressController {
     @FXML private Label       condition2Label;
     @FXML private Label       condition3Label;
     @FXML private Label       verdictLabel;
-    @FXML private ComboBox<String> filterCombo;
-    @FXML private Label       planCountLabel;
-    @FXML private TableView<RequirementRow> requirementsTable;
-    @FXML private TableColumn<RequirementRow, String> colCode;
-    @FXML private TableColumn<RequirementRow, String> colTitle;
-    @FXML private TableColumn<RequirementRow, String> colCredits;
-    @FXML private TableColumn<RequirementRow, String> colType;
-    @FXML private TableColumn<RequirementRow, String> colSemester;
-    @FXML private TableColumn<RequirementRow, String> colStatus;
+    @FXML private VBox        studyPlanContainer;
 
     private final TranscriptService transcriptService = new TranscriptService();
-    private final ObservableList<RequirementRow> shown = FXCollections.observableArrayList();
 
     private DegreeProgress progress;
 
     @FXML
     private void initialize() {
         Session.current().requireRole(UserRole.STUDENT);
-
-        configureColumns();
-        requirementsTable.setItems(shown);
-        requirementsTable.setPlaceholder(new Label("This program has no degree plan yet."));
-
-        filterCombo.getItems().addAll(ALL_COURSES, MANDATORY, NOT_TAKEN, IN_PROGRESS, PASSED);
-        filterCombo.getSelectionModel().selectFirst();
-        filterCombo.valueProperty().addListener((observable, oldValue, newValue) -> applyFilter());
-
         load();
     }
 
@@ -91,40 +72,10 @@ public class StudentProgressController {
             progress = transcriptService.getDegreeProgress(Session.current().requireStudentId());
             renderSummary();
             renderEligibility();
-            applyFilter();
+            renderStudyPlan();
         } catch (RuntimeException e) {
             AlertUtil.error("Degree progress", "Your degree progress could not be loaded.", e);
         }
-    }
-
-    private void configureColumns() {
-        colCode.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().courseCode));
-        colTitle.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().courseTitle));
-        colCredits.setCellValueFactory(data ->
-                new SimpleStringProperty(String.valueOf(data.getValue().credits)));
-        colType.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().typeText()));
-        colSemester.setCellValueFactory(data ->
-                new SimpleStringProperty(data.getValue().semesterText()));
-        colStatus.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().courseStatus));
-
-        // Colour-coded through style classes, never an inline -fx- string.
-        colStatus.setCellFactory(column -> new TableCell<>() {
-            @Override
-            protected void updateItem(String status, boolean empty) {
-                super.updateItem(status, empty);
-                getStyleClass().removeAll("status-passed", "status-inprogress", "status-nottaken");
-                if (empty || status == null) {
-                    setText(null);
-                    return;
-                }
-                setText(status);
-                switch (status) {
-                    case "PASSED"      -> getStyleClass().add("status-passed");
-                    case "IN PROGRESS" -> getStyleClass().add("status-inprogress");
-                    default            -> getStyleClass().add("status-nottaken");
-                }
-            }
-        });
     }
 
     private void renderSummary() {
@@ -184,25 +135,94 @@ public class StudentProgressController {
         label.getStyleClass().add(ok ? "condition-ok" : "condition-fail");
     }
 
-    private void applyFilter() {
-        if (progress == null) {
+    /**
+     * One {@link TableView} per {@link SemesterPlan}, in order, each with its own "Semester N"
+     * heading — the whole of the student's own program curriculum, nothing hard-coded.
+     */
+    private void renderStudyPlan() {
+        studyPlanContainer.getChildren().clear();
+
+        if (progress.semesterPlans.isEmpty()) {
+            studyPlanContainer.getChildren().add(new Label("This program has no Study Plan yet."));
             return;
         }
-        List<RequirementRow> all = progress.requirements;
-        shown.setAll(all.stream().filter(predicateFor(filterCombo.getValue())).toList());
-        planCountLabel.setText(shown.size() + " of " + all.size() + " courses");
+
+        for (SemesterPlan plan : progress.semesterPlans) {
+            VBox block = new VBox(6);
+            Label heading = new Label(plan.heading());
+            heading.getStyleClass().add("section-title");
+            block.getChildren().addAll(heading, buildSemesterTable(plan));
+            studyPlanContainer.getChildren().add(block);
+        }
     }
 
-    private Predicate<RequirementRow> predicateFor(String filter) {
-        if (filter == null) {
-            return row -> true;
-        }
-        return switch (filter) {
-            case MANDATORY   -> row -> row.isMandatory;
-            case NOT_TAKEN   -> row -> row.isNotTaken();
-            case IN_PROGRESS -> row -> row.isInProgress();
-            case PASSED      -> row -> row.isPassed();
-            default          -> row -> true;
-        };
+    private TableView<RequirementRow> buildSemesterTable(SemesterPlan plan) {
+        TableView<RequirementRow> table = new TableView<>();
+        table.setItems(javafx.collections.FXCollections.observableArrayList(plan.courses));
+
+        TableColumn<RequirementRow, String> colCode = new TableColumn<>("Course Code");
+        colCode.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().courseCode));
+        colCode.setPrefWidth(100);
+
+        TableColumn<RequirementRow, String> colTitle = new TableColumn<>("Course Name");
+        colTitle.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().courseTitle));
+        colTitle.setPrefWidth(240);
+
+        TableColumn<RequirementRow, String> colCredits = new TableColumn<>("Credits");
+        colCredits.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().credits)));
+        colCredits.setPrefWidth(65);
+
+        TableColumn<RequirementRow, String> colType = new TableColumn<>("Requirement Type");
+        colType.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().typeText()));
+        colType.setPrefWidth(150);
+
+        TableColumn<RequirementRow, String> colPrereq = new TableColumn<>("Prerequisites");
+        colPrereq.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().prerequisitesText));
+        colPrereq.setPrefWidth(260);
+
+        TableColumn<RequirementRow, String> colStatus = new TableColumn<>("Status");
+        colStatus.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().statusText()));
+        colStatus.setPrefWidth(140);
+        colStatus.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String status, boolean empty) {
+                super.updateItem(status, empty);
+                getStyleClass().removeAll("status-passed", "status-inprogress", "status-failed",
+                        "status-eligible", "status-locked", "status-notyetavailable");
+                if (empty || status == null) {
+                    setText(null);
+                    return;
+                }
+                setText(status);
+                RequirementRow row = getTableRow() == null ? null : (RequirementRow) getTableRow().getItem();
+                String key = row == null || row.courseStatus == null ? "" : row.courseStatus;
+                getStyleClass().add(switch (key) {
+                    case "PASSED" -> "status-passed";
+                    case "IN_PROGRESS" -> "status-inprogress";
+                    case "FAILED" -> "status-failed";
+                    case "ELIGIBLE" -> "status-eligible";
+                    case "LOCKED" -> "status-locked";
+                    case "NOT_YET_AVAILABLE" -> "status-notyetavailable";
+                    default -> "status-nottaken";
+                });
+            }
+        });
+
+        // List.of(...) + the Collection overload of setAll, rather than the varargs one: passing
+        // six TableColumn<RequirementRow, String> values as a T... varargs forces the compiler to
+        // create a generic array of TableColumn<RequirementRow, ?> to hold them, which is what
+        // produced the unchecked-varargs warning. A List sidesteps that array entirely.
+        table.getColumns().setAll(List.of(colCode, colTitle, colCredits, colType, colPrereq, colStatus));
+
+        // Sized to show every row of this one semester without its own inner scrollbar — the
+        // page-level ScrollPane in the FXML is what scrolls the whole screen if the full
+        // Study Plan runs taller than the window.
+        double rowHeight = 28;
+        table.setFixedCellSize(rowHeight);
+        table.prefHeightProperty().bind(table.fixedCellSizeProperty()
+                .multiply(Math.max(1, plan.courses.size())).add(rowHeight + 2));
+        table.setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+
+        return table;
     }
 }
