@@ -13,6 +13,8 @@ import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Group;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -20,6 +22,12 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Ellipse;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.Polygon;
+import javafx.scene.shape.Polyline;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -44,6 +52,7 @@ public class MainShellController {
     @FXML private StackPane contentArea;
     @FXML private Label welcomeNameLabel;
     @FXML private Label semesterLabel;
+    @FXML private Label studentIdLabel;
     @FXML private Button notificationsButton;
     @FXML private Label unreadBadge;
     @FXML private MenuButton avatarMenu;
@@ -58,8 +67,12 @@ public class MainShellController {
     private Timeline sidebarAnimation;
     private boolean sidebarCollapsed = false;
 
-    /** One sidebar entry: the text the user sees and the FXML it opens. */
-    private record MenuEntry(String label, String fxml) { }
+    /** One sidebar entry: the text the user sees, the FXML it opens, and an optional small icon. */
+    private record MenuEntry(String label, String fxml, String iconKey) {
+        private MenuEntry(String label, String fxml) {
+            this(label, fxml, null);
+        }
+    }
 
     private static final List<MenuEntry> ADMIN_MENU = List.of(
             new MenuEntry("Dashboard",              "admin_dashboard.fxml"),
@@ -81,14 +94,21 @@ public class MainShellController {
             new MenuEntry("My Timetable",    "instructor_timetable.fxml")
     );
 
+    /**
+     * The Student menu (reference: reference image supplied 2026-08-07). "Classes" is the
+     * repurposed former Dashboard screen; My Grades, Course Recommendation and My Timetable
+     * intentionally have no entry here any more (their pages still exist, just unreachable from
+     * the sidebar or Classes page).
+     */
     private static final List<MenuEntry> STUDENT_MENU = List.of(
-            new MenuEntry("Dashboard",              "student_dashboard.fxml"),
-            new MenuEntry("Register for Courses",   "student_registration.fxml"),
-            new MenuEntry("My Timetable",           "student_timetable.fxml"),
-            new MenuEntry("My Grades",              "student_grades.fxml"),
-            new MenuEntry("Transcript",             "student_transcript.fxml"),
-            new MenuEntry("Degree Progress",        "student_progress.fxml"),
-            new MenuEntry("Course Recommendation",  "student_recommendation.fxml")
+            new MenuEntry("Classes",        "student_dashboard.fxml",      "classes"),
+            new MenuEntry("Payments",       "student_payments.fxml",       "payments"),
+            new MenuEntry("Registration",   "student_registration.fxml",   "registration"),
+            new MenuEntry("Transcript",     "student_transcript.fxml",     "transcript"),
+            new MenuEntry("Plan of Study",  "student_progress.fxml",       "plan"),
+            new MenuEntry("Online Service", "student_online_service.fxml", "online"),
+            new MenuEntry("Library",        "student_library.fxml",        "library"),
+            new MenuEntry("Moodle",         "student_moodle.fxml",         "moodle")
     );
 
     @FXML
@@ -105,8 +125,14 @@ public class MainShellController {
 
         welcomeNameLabel.setText(session.getDisplayName());
 
+        if (session.getStudent() != null) {
+            studentIdLabel.setText("ID: " + session.getUser().getUserId());
+            studentIdLabel.setVisible(true);
+            studentIdLabel.setManaged(true);
+        }
+
         List<MenuEntry> menu = menuFor(session.getRole());
-        buildSidebar(menu);
+        buildSidebar(menu, session.getRole());
 
         // Role-based routing: land on the dashboard for this role.
         MenuEntry home = menu.get(0);
@@ -159,17 +185,24 @@ public class MainShellController {
         };
     }
 
-    private void buildSidebar(List<MenuEntry> menu) {
+    /** The student sidebar drops the "MENU" heading; admin and instructor keep it unchanged. */
+    private void buildSidebar(List<MenuEntry> menu, UserRole role) {
         sidebar.getChildren().clear();
 
-        Label header = new Label("MENU");
-        header.getStyleClass().add("sidebar-header");
-        sidebar.getChildren().add(header);
+        if (role != UserRole.STUDENT) {
+            Label header = new Label("MENU");
+            header.getStyleClass().add("sidebar-header");
+            sidebar.getChildren().add(header);
+        }
 
         for (MenuEntry entry : menu) {
             Button b = new Button(entry.label());
             b.getStyleClass().add("nav-button");
             b.setMaxWidth(Double.MAX_VALUE);
+            if (entry.iconKey() != null) {
+                b.setGraphic(navIcon(entry.iconKey()));
+                b.setGraphicTextGap(10);
+            }
             b.setOnAction(e -> {
                 setActive(b);
                 SceneManager.getInstance().navigateTo(entry.fxml(), entry.label());
@@ -185,6 +218,108 @@ public class MainShellController {
         logoutButton.setMaxWidth(Double.MAX_VALUE);
         logoutButton.setOnAction(e -> handleLogout());
         sidebar.getChildren().add(logoutButton);
+    }
+
+    /**
+     * A small (16x16) hand-built glyph for one student menu item — plain shapes rather than an
+     * image asset or an SVG path string, so no new binary is added and there is no path syntax to
+     * get wrong. Every shape uses the same translucent white so it reads correctly against the
+     * navy sidebar in both the resting and the ".active" state.
+     */
+    static Node navIcon(String key) {
+        Color ink = Color.rgb(255, 255, 255, 0.85);
+        Group shape = new Group();
+        switch (key) {
+            case "classes" -> {
+                Polygon cap = new Polygon(8, 2, 15, 6, 8, 10, 1, 6);
+                cap.setFill(ink);
+                Rectangle band = new Rectangle(5, 9, 6, 3);
+                band.setArcWidth(2);
+                band.setArcHeight(2);
+                band.setFill(ink);
+                Line tassel = new Line(13.2, 7, 13.2, 13);
+                tassel.setStroke(ink);
+                tassel.setStrokeWidth(1.3);
+                Circle knot = new Circle(13.2, 13, 1.1, ink);
+                shape.getChildren().addAll(cap, band, tassel, knot);
+            }
+            case "payments" -> {
+                Rectangle card = new Rectangle(1, 3, 14, 10);
+                card.setArcWidth(3);
+                card.setArcHeight(3);
+                card.setFill(ink);
+                Rectangle stripe = new Rectangle(1, 6, 14, 2);
+                stripe.setFill(Color.rgb(8, 39, 102));
+                shape.getChildren().addAll(card, stripe);
+            }
+            case "registration" -> {
+                Rectangle page = outlinedRect(3, 1, 10, 14, ink);
+                Polyline check = new Polyline(5.3, 8, 7.3, 10.3, 11, 5.3);
+                check.setStroke(ink);
+                check.setStrokeWidth(1.5);
+                shape.getChildren().addAll(page, check);
+            }
+            case "transcript" -> {
+                Rectangle page = outlinedRect(3, 1, 10, 14, ink);
+                shape.getChildren().addAll(page, line(5, 5, 11, 5, ink), line(5, 8, 11, 8, ink),
+                        line(5, 11, 9, 11, ink));
+            }
+            case "plan" -> {
+                Rectangle cover = outlinedRect(2, 3, 12, 10, ink);
+                shape.getChildren().addAll(cover, line(8, 3, 8, 13, ink));
+            }
+            case "online" -> {
+                Circle globe = new Circle(8, 8, 6.2);
+                globe.setFill(Color.TRANSPARENT);
+                globe.setStroke(ink);
+                globe.setStrokeWidth(1.2);
+                Ellipse meridian = new Ellipse(8, 8, 2.6, 6.2);
+                meridian.setFill(Color.TRANSPARENT);
+                meridian.setStroke(ink);
+                meridian.setStrokeWidth(1.0);
+                shape.getChildren().addAll(globe, meridian, line(1.8, 8, 14.2, 8, ink));
+            }
+            case "library" -> {
+                Polygon roof = new Polygon(8, 1, 14.5, 5, 1.5, 5);
+                roof.setFill(ink);
+                shape.getChildren().addAll(roof, line(1.5, 14, 14.5, 14, ink),
+                        line(3.5, 6, 3.5, 13, ink), line(8, 6, 8, 13, ink), line(12.5, 6, 12.5, 13, ink));
+            }
+            case "moodle" -> {
+                Rectangle screen = outlinedRect(1.5, 2.5, 13, 9, ink);
+                Polygon play = new Polygon(6.3, 4.7, 6.3, 9.3, 10.3, 7);
+                play.setFill(ink);
+                shape.getChildren().addAll(screen, line(8, 11.5, 8, 13.5, ink), line(5, 13.5, 11, 13.5, ink), play);
+            }
+            case "calendar" -> {
+                Rectangle body = outlinedRect(1.5, 3, 13, 11, ink);
+                shape.getChildren().addAll(body, line(1.5, 6, 14.5, 6, ink),
+                        line(4.5, 1.2, 4.5, 4.2, ink), line(11.5, 1.2, 11.5, 4.2, ink));
+            }
+            default -> { }
+        }
+        StackPane holder = new StackPane(shape);
+        holder.setPrefSize(16, 16);
+        holder.setMinSize(16, 16);
+        holder.setMaxSize(16, 16);
+        return holder;
+    }
+
+    private static Rectangle outlinedRect(double x, double y, double w, double h, Color ink) {
+        Rectangle r = new Rectangle(x, y, w, h);
+        r.setArcWidth(2);
+        r.setArcHeight(2);
+        r.setFill(Color.TRANSPARENT);
+        r.setStroke(ink);
+        r.setStrokeWidth(1.3);
+        return r;
+    }
+
+    private static Line line(double x1, double y1, double x2, double y2, Color ink) {
+        Line l = new Line(x1, y1, x2, y2);
+        l.setStroke(ink);
+        l.setStrokeWidth(1.1);
+        return l;
     }
 
     private void setActive(Button b) {

@@ -99,11 +99,15 @@
                         </graphic>
                     </Button>
 
-                    <HBox spacing="6" alignment="CENTER_LEFT">
-                        <Label text="Welcome" styleClass="welcome-label"/>
-                        <Label fx:id="welcomeNameLabel" text="" styleClass="welcome-label"/>
-                        <Label fx:id="semesterLabel" text="" styleClass="welcome-label"/>
-                    </HBox>
+                    <VBox spacing="1" alignment="CENTER_LEFT">
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <Label text="Welcome," styleClass="welcome-label"/>
+                            <Label fx:id="welcomeNameLabel" text="" styleClass="welcome-label"/>
+                            <Label fx:id="semesterLabel" text="" styleClass="welcome-label"/>
+                        </HBox>
+                        <Label fx:id="studentIdLabel" text="" styleClass="welcome-subtext"
+                               managed="false" visible="false"/>
+                    </VBox>
                 </HBox>
 
                 <Region HBox.hgrow="ALWAYS"/>

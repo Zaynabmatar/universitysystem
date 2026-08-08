@@ -229,6 +229,7 @@
 .top-bar .label { -fx-text-fill: white; }
 
 .welcome-label { -fx-font-size: 13px; -fx-font-weight: normal; -fx-text-fill: white; }
+.welcome-subtext { -fx-font-size: 11px; -fx-font-weight: normal; -fx-text-fill: rgba(255, 255, 255, 0.72); }
 /* No left indent: the top bar now sits inside the content column (main_shell.fxml),
    so it already starts where the sidebar ends. The old 252px padding faked that offset
    back when the bar spanned the whole window, and it stayed put when the sidebar
@@ -451,6 +452,7 @@
     -fx-border-radius: 8;
 }
 .transcript-scroll { -fx-background-color: transparent; }
+.classes-scroll { -fx-background-color: transparent; }
 
 /* Page-level ScrollPane wrapping an entire content-page, so overflow scrolls the whole
    screen instead of a scrollbar appearing inside one inner table/section. */
@@ -542,3 +544,7 @@
                -fx-alignment: center; -fx-padding: 20; }
 .bar-full .bar { -fx-accent: #c62828; }   /* a full section is a problem, not a success */
 .bar-low  .bar { -fx-accent: #f9a825; }   /* an almost-empty section may be cancelled */
+
+/* ---------- Student payments ---------- */
+.charges-total-bar { -fx-background-color: #eef1f8; -fx-background-radius: 6; }
+.voucher-button     { -fx-font-size: 11px; -fx-padding: 4 10 4 10; }
