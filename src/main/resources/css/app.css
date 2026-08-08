@@ -452,6 +452,10 @@
 }
 .transcript-scroll { -fx-background-color: transparent; }
 
+/* Page-level ScrollPane wrapping an entire content-page, so overflow scrolls the whole
+   screen instead of a scrollbar appearing inside one inner table/section. */
+.page-scroll, .page-scroll > .viewport { -fx-background-color: transparent; }
+
 .term-card {
     -fx-background-color: white;
     -fx-background-radius: 8;
@@ -483,6 +487,12 @@
 .status-passed     { -fx-text-fill: #2f7d4f; -fx-font-weight: bold; }
 .status-inprogress { -fx-text-fill: #a86a12; }
 .status-nottaken   { -fx-text-fill: #7a8391; }
+
+/* Study Plan (Degree Progress) — same palette as the statuses above */
+.status-failed          { -fx-text-fill: #b3402f; -fx-font-weight: bold; }
+.status-eligible        { -fx-text-fill: #1b6e8c; -fx-font-weight: bold; }
+.status-locked          { -fx-text-fill: #9a9a9a; }
+.status-notyetavailable { -fx-text-fill: #b0b6bf; }
 
 .empty-state { -fx-text-fill: #7a8391; -fx-font-size: 14px; -fx-padding: 24; }
 

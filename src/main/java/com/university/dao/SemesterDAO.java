@@ -113,29 +113,46 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
     /**
      * Moves the current flag to one semester.
      *
-     * <p>Both statements run on one connection inside a transaction. The
-     * filtered unique index rejects a second current row, so clearing the old
-     * flag and setting the new one cannot be allowed to half succeed.</p>
+     * <p>A single UPDATE, not two: {@code trg_semesters_block_backward_activation}
+     * (Phase 19) rejects the whole statement when the semester losing the flag
+     * ran chronologically after the one gaining it, and a trigger can only see
+     * that both rows changed at once when they change in the same statement —
+     * two separate UPDATEs would each show the trigger only one side of the
+     * change. The filtered unique index on {@code is_current} still guarantees
+     * at most one row ends up flagged, whichever way this resolves.</p>
      *
      * @return true when the flag was moved
+     * @throws DataAccessException wrapping the trigger's message when {@code semesterId}
+     *                             is chronologically before the semester currently active
      */
     public boolean makeCurrent(int semesterId) {
         Connection connection = beginTransaction();
         try {
-            executeUpdate(connection, "UPDATE dbo.semesters SET is_current = 0 WHERE is_current = 1");
             int changed = executeUpdate(connection,
-                    "UPDATE dbo.semesters SET is_current = 1 WHERE semester_id = ?", semesterId);
+                    "UPDATE dbo.semesters SET is_current = CASE WHEN semester_id = ? THEN 1 ELSE 0 END "
+                    + "WHERE is_current = 1 OR semester_id = ?",
+                    semesterId, semesterId);
             connection.commit();
             return changed > 0;
         } catch (SQLException e) {
             rollbackQuietly(connection);
-            throw new DataAccessException("Could not make semester " + semesterId + " current", e);
+            throw new DataAccessException(sqlServerMessage(e, "Could not make semester " + semesterId + " current"), e);
         } catch (DataAccessException e) {
             rollbackQuietly(connection);
             throw e;
         } finally {
             closeQuietly(connection);
         }
+    }
+
+    /**
+     * SQL Server wraps a trigger's {@code THROW} message inside its own
+     * "The transaction ended in the trigger..." wrapper; this pulls the
+     * trigger's own sentence back out so the screen can show it instead of
+     * that wrapper text.
+     */
+    private static String sqlServerMessage(SQLException e, String fallback) {
+        return e.getMessage() != null && !e.getMessage().isBlank() ? e.getMessage() : fallback;
     }
 
     @Override

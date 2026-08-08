@@ -11,6 +11,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 /**
  * Builds the academic transcript and the degree-progress report for one student.
@@ -189,6 +192,7 @@ public class TranscriptService {
         public int        studentId;
         /** users.user_id — the Student ID. */
         public int        studentUserId;
+        public int        programId;
         public String     fullName      = "";
         public String     programName   = "";
         public int        creditsRequired;
@@ -201,6 +205,9 @@ public class TranscriptService {
         public BigDecimal cumulativeGpa = BigDecimal.ZERO;
         public boolean    canGraduate;
         public final List<RequirementRow> requirements = new ArrayList<>();
+        /** {@link #requirements}, grouped by recommended semester, in semester order — what
+         *  Degree Progress' "Show Your Study Plan" section actually renders. */
+        public final List<SemesterPlan> semesterPlans = new ArrayList<>();
 
         /* --- Section 6.9, condition by condition, so the UI can show each one --- */
         public boolean allMandatoryPassed() { return mandatoryMissing == 0; }
@@ -226,21 +233,65 @@ public class TranscriptService {
         }
     }
 
-    /** One course of the degree plan. */
+    /**
+     * One course of the Study Plan (Degree Progress' lower section).
+     *
+     * <p>{@code courseStatus} is one of six values, computed by {@link #buildStudyPlan}
+     * from the student's actual enrollments/grades plus the course's own prerequisite
+     * and credit-threshold requirements — never stored, never guessed from
+     * {@code recommendedSemester} alone:</p>
+     * <ul>
+     *   <li>{@code PASSED} — a completed, submitted, passing attempt exists (even if an
+     *       earlier attempt failed — history is never overwritten, only superseded).</li>
+     *   <li>{@code IN_PROGRESS} — an active ENROLLED attempt exists right now (including a
+     *       repeat of a previously failed course).</li>
+     *   <li>{@code FAILED} — a completed, submitted, failing attempt exists, there is no
+     *       later pass, and the student is not currently repeating it.</li>
+     *   <li>{@code ELIGIBLE} — not yet attempted, every mandatory prerequisite is
+     *       {@code PASSED}, any credit threshold is met, and the student's progression
+     *       has reached this course's semester.</li>
+     *   <li>{@code LOCKED} — not yet attempted, and a specific, nameable requirement is
+     *       unmet (a prerequisite not passed, or a credit threshold not met).</li>
+     *   <li>{@code NOT_YET_AVAILABLE} — not yet attempted, nothing specific blocks it, but
+     *       it belongs to a later stage of the plan than the student has reached.</li>
+     * </ul>
+     */
     public static class RequirementRow {
         public int     courseId;
         public String  courseCode;
         public String  courseTitle;
         public int     credits;
         public boolean isMandatory;
+        public String  requirementType;       // Mandatory / Program Elective / University Requirement / ...
         public Integer recommendedSemester;   // may be null
-        public String  courseStatus;          // PASSED / IN PROGRESS / NOT TAKEN
+        public Integer minCompletedCredits;   // credit-based eligibility threshold, may be null
+        public String  prerequisitesText;     // "None", "MATH101 - Calculus I", "A - B, C - D", ...
+        public String  courseStatus;          // PASSED / IN_PROGRESS / FAILED / ELIGIBLE / LOCKED / NOT_YET_AVAILABLE
 
-        public String  typeText()     { return isMandatory ? "Mandatory" : "Elective"; }
+        public String  typeText()     { return requirementType != null ? requirementType : (isMandatory ? "Mandatory" : "Elective"); }
         public String  semesterText() { return recommendedSemester == null ? "—" : "Sem " + recommendedSemester; }
-        public boolean isPassed()     { return "PASSED".equals(courseStatus); }
-        public boolean isInProgress() { return "IN PROGRESS".equals(courseStatus); }
-        public boolean isNotTaken()   { return "NOT TAKEN".equals(courseStatus); }
+        public String  statusText()   { return courseStatus == null ? "—" : courseStatus.replace('_', ' '); }
+        public boolean isPassed()            { return "PASSED".equals(courseStatus); }
+        public boolean isInProgress()        { return "IN_PROGRESS".equals(courseStatus); }
+        public boolean isFailed()            { return "FAILED".equals(courseStatus); }
+        public boolean isEligible()          { return "ELIGIBLE".equals(courseStatus); }
+        public boolean isLocked()            { return "LOCKED".equals(courseStatus); }
+        public boolean isNotYetAvailable()   { return "NOT_YET_AVAILABLE".equals(courseStatus); }
+        public boolean isNotTaken()          { return !isPassed() && !isInProgress(); }
+    }
+
+    /** All of one program's curriculum rows that share a {@code recommendedSemester}. */
+    public static class SemesterPlan {
+        public final int semesterNumber;
+        public final List<RequirementRow> courses = new ArrayList<>();
+
+        public SemesterPlan(int semesterNumber) {
+            this.semesterNumber = semesterNumber;
+        }
+
+        public String heading() {
+            return "Semester " + semesterNumber;
+        }
     }
 
     /* ================================================================
@@ -347,7 +398,134 @@ public class TranscriptService {
         progress.canGraduate = progress.allMandatoryPassed()
                             && progress.creditsSatisfied()
                             && progress.gpaSatisfied();
+
+        buildStudyPlan(progress);
         return progress;
+    }
+
+    /* ================================================================
+       7. STUDY PLAN — Degree Progress' "Show Your Study Plan" section
+       ================================================================ */
+
+    /**
+     * Turns the raw PASSED / IN_PROGRESS / FAILED / NONE attempt fact already on every
+     * {@link RequirementRow} (from {@link TranscriptDAO#findDegreePlan}) into the six Study Plan
+     * statuses the screen shows, fills in {@code prerequisitesText}, and groups the rows into
+     * {@link SemesterPlan}s in semester order.
+     *
+     * <p>A {@code NONE} row becomes {@code ELIGIBLE} only once every mandatory prerequisite is
+     * {@code PASSED} and any credit threshold is met; otherwise it is {@code LOCKED} (a concrete,
+     * nameable reason exists) if the student's progression has already reached it, or
+     * {@code NOT_YET_AVAILABLE} (nothing specific blocks it — it is simply a later stage of the
+     * plan) if it has not. {@code PASSED}/{@code IN_PROGRESS}/{@code FAILED} rows are real facts
+     * already and are never second-guessed here.</p>
+     */
+    private void buildStudyPlan(DegreeProgress progress) {
+        List<RequirementRow> rows = progress.requirements;
+        if (rows.isEmpty()) {
+            return;
+        }
+
+        Map<Integer, RequirementRow> rowByCourseId = new LinkedHashMap<>();
+        for (RequirementRow row : rows) {
+            rowByCourseId.put(row.courseId, row);
+        }
+
+        Map<Integer, List<TranscriptDAO.PrerequisiteLink>> prereqsByCourseId = new LinkedHashMap<>();
+        for (TranscriptDAO.PrerequisiteLink link : transcriptDao.findProgramPrerequisites(progress.programId)) {
+            prereqsByCourseId.computeIfAbsent(link.courseId, id -> new ArrayList<>()).add(link);
+        }
+
+        int stage = studentStage(rows);
+
+        for (RequirementRow row : rows) {
+            List<TranscriptDAO.PrerequisiteLink> prereqs =
+                    prereqsByCourseId.getOrDefault(row.courseId, List.of());
+            row.prerequisitesText = prerequisitesText(prereqs, row.minCompletedCredits);
+
+            if (!"NONE".equals(row.courseStatus)) {
+                continue; // PASSED / IN_PROGRESS / FAILED — already a real fact, not recomputed
+            }
+
+            boolean unmetPrerequisite = prereqs.stream().anyMatch(link -> {
+                RequirementRow prereqRow = rowByCourseId.get(link.prerequisiteCourseId);
+                // A prerequisite outside this program's own plan cannot be verified as passed,
+                // so it blocks the same as an unmet one — Phase 25 makes sure this does not
+                // happen for any course actually in a program's curriculum.
+                return prereqRow == null || !"PASSED".equals(prereqRow.courseStatus);
+            });
+            boolean creditsShort = row.minCompletedCredits != null
+                    && progress.creditsCompleted < row.minCompletedCredits;
+
+            int semester = row.recommendedSemester == null ? Integer.MAX_VALUE : row.recommendedSemester;
+            if (unmetPrerequisite || creditsShort) {
+                row.courseStatus = "LOCKED";
+            } else if (semester <= stage) {
+                row.courseStatus = "ELIGIBLE";
+            } else {
+                row.courseStatus = "NOT_YET_AVAILABLE";
+            }
+        }
+
+        Map<Integer, SemesterPlan> plansBySemester = new TreeMap<>();
+        for (RequirementRow row : rows) {
+            int semester = row.recommendedSemester == null ? 0 : row.recommendedSemester;
+            plansBySemester.computeIfAbsent(semester, SemesterPlan::new).courses.add(row);
+        }
+        progress.semesterPlans.addAll(plansBySemester.values());
+    }
+
+    /**
+     * The first semester (1-based) in which the student still has an incomplete mandatory
+     * course. Everything before it is fully cleared (passed or in progress); this is where the
+     * student actually stands, and it is what separates a {@code LOCKED} course (something
+     * concrete is missing right now) from one that is merely {@code NOT_YET_AVAILABLE} (its own
+     * requirements are satisfied, it is just later in the plan than the student has reached). A
+     * student who has cleared every mandatory semester is placed one past the plan's last one, so
+     * nothing is left artificially unavailable.
+     */
+    private int studentStage(List<RequirementRow> rows) {
+        int maxSemester = rows.stream()
+                .map(row -> row.recommendedSemester)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(1);
+
+        for (int semester = 1; semester <= maxSemester; semester++) {
+            int current = semester;
+            boolean semesterCleared = rows.stream()
+                    .filter(row -> row.isMandatory
+                            && row.recommendedSemester != null && row.recommendedSemester == current)
+                    .allMatch(row -> "PASSED".equals(row.courseStatus) || "IN_PROGRESS".equals(row.courseStatus));
+            if (!semesterCleared) {
+                return semester;
+            }
+        }
+        return maxSemester + 1;
+    }
+
+    /**
+     * The exact Prerequisites column text (Section 19): {@code "None"}, one or more
+     * {@code "CODE - Title"} entries, a credit threshold, or both combined — never a vague
+     * placeholder.
+     */
+    private String prerequisitesText(List<TranscriptDAO.PrerequisiteLink> prerequisites, Integer minCompletedCredits) {
+        String courseList = prerequisites.stream()
+                .map(link -> link.prerequisiteCode + " - " + link.prerequisiteTitle)
+                .collect(Collectors.joining(", "));
+        boolean hasCourses = !courseList.isEmpty();
+        boolean hasCreditFloor = minCompletedCredits != null;
+
+        if (hasCourses && hasCreditFloor) {
+            return courseList + " passed and minimum " + minCompletedCredits + " completed credits";
+        }
+        if (hasCourses) {
+            return courseList;
+        }
+        if (hasCreditFloor) {
+            return "Minimum " + minCompletedCredits + " completed credits";
+        }
+        return "None";
     }
 
     /** A percentage from 0 to 100 with one decimal, never negative and never past 100. */

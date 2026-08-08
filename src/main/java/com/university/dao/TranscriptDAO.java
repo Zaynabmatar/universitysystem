@@ -56,6 +56,15 @@ public class TranscriptDAO extends AbstractDAO {
           + "        WHERE ee.student_id = s.student_id AND esec.course_id = pr.course_id "
           + "          AND ee.status = 'ENROLLED')";
 
+    /** Failed = a completed, submitted, failing attempt (Study Plan resolves PASSED/ENROLLED first). */
+    private static final String FAILED_EXISTS =
+            "EXISTS (SELECT 1 FROM dbo.enrollments fe "
+          + "        INNER JOIN dbo.sections fsec ON fsec.section_id = fe.section_id "
+          + "        INNER JOIN dbo.grades fg     ON fg.enrollment_id = fe.enrollment_id "
+          + "        WHERE fe.student_id = s.student_id AND fsec.course_id = pr.course_id "
+          + "          AND fe.status = 'COMPLETED' AND fg.is_submitted = 1 "
+          + "          AND fg.result_status = 'FAILED')";
+
     private static final String SQL_HEADER =
             "SELECT s.student_id, s.user_id, s.first_name, s.last_name, "
           + "       s.admission_date, s.academic_standing, s.cumulative_gpa, s.completed_credits, "
@@ -89,7 +98,7 @@ public class TranscriptDAO extends AbstractDAO {
           + "ORDER BY sem.start_date, sem.semester_id, c.course_code";
 
     private static final String SQL_PROGRESS_SUMMARY =
-            "SELECT s.student_id, s.user_id, s.first_name, s.last_name, "
+            "SELECT s.student_id, s.user_id, s.first_name, s.last_name, s.program_id, "
           + "       s.cumulative_gpa, s.completed_credits, "
           + "       p.program_name, p.total_credits_required, "
           + "       (SELECT COUNT(*) FROM dbo.program_requirements pr "
@@ -103,15 +112,30 @@ public class TranscriptDAO extends AbstractDAO {
 
     private static final String SQL_DEGREE_PLAN =
             "SELECT c.course_id, c.course_code, c.course_title, c.credits, "
-          + "       pr.is_mandatory, pr.recommended_semester, "
+          + "       pr.is_mandatory, pr.requirement_type, pr.recommended_semester, pr.min_completed_credits, "
           + "       CASE WHEN " + PASSED_EXISTS + "   THEN N'PASSED' "
-          + "            WHEN " + ENROLLED_EXISTS + " THEN N'IN PROGRESS' "
-          + "            ELSE N'NOT TAKEN' END AS course_status "
+          + "            WHEN " + ENROLLED_EXISTS + " THEN N'IN_PROGRESS' "
+          + "            WHEN " + FAILED_EXISTS + "   THEN N'FAILED' "
+          + "            ELSE N'NONE' END AS attempt_status "
           + "FROM dbo.students s "
           + "INNER JOIN dbo.program_requirements pr ON pr.program_id = s.program_id "
           + "INNER JOIN dbo.courses c               ON c.course_id   = pr.course_id "
           + "WHERE s.student_id = ? "
           + "ORDER BY pr.recommended_semester, c.course_code";
+
+    /**
+     * Every prerequisite relationship touching this program's own curriculum — one row per
+     * (dependent course, prerequisite course) pair, both already courses the program requires.
+     * Loaded once per program rather than once per course: the curriculum is 30-70 rows, and a
+     * per-course query would be a per-course round trip for no reason.
+     */
+    private static final String SQL_PROGRAM_PREREQUISITES =
+            "SELECT cp.course_id, cp.prerequisite_course_id, "
+          + "       pc.course_code AS prereq_code, pc.course_title AS prereq_title "
+          + "FROM dbo.course_prerequisites cp "
+          + "INNER JOIN dbo.courses pc ON pc.course_id = cp.prerequisite_course_id "
+          + "WHERE cp.course_id IN (SELECT pr.course_id FROM dbo.program_requirements pr "
+          + "                        WHERE pr.program_id = ?)";
 
     /** The student box at the top of the transcript, plus the authoritative cached figures. */
     public Optional<Transcript> findHeader(int studentId) {
@@ -166,6 +190,7 @@ public class TranscriptDAO extends AbstractDAO {
             DegreeProgress progress   = new DegreeProgress();
             progress.studentId        = resultSet.getInt("student_id");
             progress.studentUserId    = resultSet.getInt("user_id");
+            progress.programId        = resultSet.getInt("program_id");
             progress.fullName         = (resultSet.getNString("first_name") + " "
                                        + resultSet.getNString("last_name")).trim();
             progress.programName      = resultSet.getNString("program_name");
@@ -178,7 +203,14 @@ public class TranscriptDAO extends AbstractDAO {
         }, studentId);
     }
 
-    /** One row per course of the student's degree plan, each already labelled with its status. */
+    /**
+     * One row per course of the student's degree plan. {@code courseStatus} carries only the
+     * raw attempt fact at this point — {@code PASSED}, {@code IN_PROGRESS}, {@code FAILED} or
+     * {@code NONE} — because whether a {@code NONE} course is actually {@code ELIGIBLE},
+     * {@code LOCKED} or {@code NOT_YET_AVAILABLE} depends on prerequisites and on every other
+     * course's status too, which needs the whole plan assembled first; that refinement is
+     * {@link com.university.service.TranscriptService#buildStudyPlan}'s job, not a single row's.
+     */
     public List<RequirementRow> findDegreePlan(int studentId) {
         return queryList(SQL_DEGREE_PLAN, resultSet -> {
             RequirementRow row = new RequirementRow();
@@ -187,11 +219,34 @@ public class TranscriptDAO extends AbstractDAO {
             row.courseTitle    = resultSet.getNString("course_title");
             row.credits        = resultSet.getInt("credits");
             row.isMandatory    = resultSet.getBoolean("is_mandatory");
+            row.requirementType = resultSet.getNString("requirement_type");
             int recommended    = resultSet.getInt("recommended_semester");
             row.recommendedSemester = resultSet.wasNull() ? null : recommended;
-            row.courseStatus   = resultSet.getNString("course_status");
+            int minCredits     = resultSet.getInt("min_completed_credits");
+            row.minCompletedCredits = resultSet.wasNull() ? null : minCredits;
+            row.courseStatus   = resultSet.getNString("attempt_status");
             return row;
         }, studentId);
+    }
+
+    /** One row per prerequisite link, for every course this program's plan requires. */
+    public List<PrerequisiteLink> findProgramPrerequisites(int programId) {
+        return queryList(SQL_PROGRAM_PREREQUISITES, resultSet -> {
+            PrerequisiteLink link = new PrerequisiteLink();
+            link.courseId             = resultSet.getInt("course_id");
+            link.prerequisiteCourseId = resultSet.getInt("prerequisite_course_id");
+            link.prerequisiteCode     = resultSet.getNString("prereq_code");
+            link.prerequisiteTitle    = resultSet.getNString("prereq_title");
+            return link;
+        }, programId);
+    }
+
+    /** One (course, prerequisite) pair from {@code dbo.course_prerequisites}, with the prerequisite's own label. */
+    public static class PrerequisiteLink {
+        public int    courseId;
+        public int    prerequisiteCourseId;
+        public String prerequisiteCode;
+        public String prerequisiteTitle;
     }
 
     private static BigDecimal orZero(BigDecimal value) {
