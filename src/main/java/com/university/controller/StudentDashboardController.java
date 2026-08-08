@@ -28,6 +28,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -36,6 +37,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -93,6 +95,10 @@ public class StudentDashboardController {
     @FXML private TableColumn<TodayRow, String> todayColCourse;
     @FXML private TableColumn<TodayRow, String> todayColInstructor;
     @FXML private TableColumn<TodayRow, String> todayColRoom;
+
+    @FXML private AIAssistantPanelController aiAssistantController;
+    @FXML private Button aiAssistantToggleButton;
+    @FXML private VBox   aiAssistantExpandedBox;
 
     private final RegistrationService registrationService = new RegistrationService();
     private final SectionService sectionService = new SectionService();
@@ -172,6 +178,12 @@ public class StudentDashboardController {
         bindHeightToContent(todaysScheduleTable, todayRows);
 
         reload();
+
+        aiAssistantController.configure(
+                "Hi! I'm the University AI Assistant. Ask me about registration, your classes, "
+                        + "deadlines, or your GPA — or use one of the quick questions above.",
+                List.of("When does registration open?", "What is my next class?",
+                        "What is the Add/Drop deadline?", "Show my GPA"));
     }
 
     /**
@@ -481,5 +493,19 @@ public class StudentDashboardController {
             this.instructor = instructor;
             this.room = room;
         }
+    }
+
+    /**
+     * The AI panel starts collapsed to a single top-right button and reserves no layout space;
+     * this toggles it open — a vertical panel overlaying the dashboard, anchored below that
+     * button — or closed. The dashboard beneath never resizes or reflows either way.
+     */
+    @FXML
+    private void handleToggleAiAssistant() {
+        boolean expand = !aiAssistantExpandedBox.isVisible();
+        aiAssistantExpandedBox.setVisible(expand);
+        aiAssistantExpandedBox.setManaged(expand);
+        aiAssistantToggleButton.setVisible(!expand);
+        aiAssistantToggleButton.setManaged(!expand);
     }
 }

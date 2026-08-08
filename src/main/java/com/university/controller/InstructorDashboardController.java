@@ -17,9 +17,11 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.layout.VBox;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -48,6 +50,10 @@ public class InstructorDashboardController {
     @FXML private TableColumn<TodayClass, String> colCourse;
     @FXML private TableColumn<TodayClass, String> colRoom;
 
+    @FXML private AIAssistantPanelController aiAssistantController;
+    @FXML private Button aiAssistantToggleButton;
+    @FXML private VBox   aiAssistantExpandedBox;
+
     private final SectionService sectionService = new SectionService();
     private final SemesterService semesterService = new SemesterService();
     private final CourseService courseService = new CourseService();
@@ -70,6 +76,12 @@ public class InstructorDashboardController {
         todayTable.setPlaceholder(new Label("You have no classes today."));
 
         reload();
+
+        aiAssistantController.configure(
+                "Hi! I'm the University AI Assistant. Ask me about your sections, today's classes, "
+                        + "the grade entry window, or your timetable — or use one of the quick questions above.",
+                List.of("What is my next class?", "Is the grade entry window open?",
+                        "How many students do I have?", "What is today's schedule?"));
     }
 
     @FXML
@@ -85,6 +97,20 @@ public class InstructorDashboardController {
     @FXML
     private void handleGoTimetable() {
         SceneManager.getInstance().navigateTo("instructor_timetable.fxml", "My Timetable");
+    }
+
+    /**
+     * The AI panel starts collapsed to a single top-right button and reserves no layout space;
+     * this toggles it open — a vertical panel overlaying the dashboard, anchored below that
+     * button — or closed. The dashboard beneath never resizes or reflows either way.
+     */
+    @FXML
+    private void handleToggleAiAssistant() {
+        boolean expand = !aiAssistantExpandedBox.isVisible();
+        aiAssistantExpandedBox.setVisible(expand);
+        aiAssistantExpandedBox.setManaged(expand);
+        aiAssistantToggleButton.setVisible(!expand);
+        aiAssistantToggleButton.setManaged(!expand);
     }
 
     private void reload() {

@@ -2,54 +2,91 @@
 
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx"
-      xmlns:fx="http://javafx.com/fxml"
-      fx:controller="com.university.controller.InstructorDashboardController"
-      styleClass="content-page" spacing="12">
+<!-- Root is an AnchorPane so the University AI Assistant panel can float as an OVERLAY on top of
+     the dashboard instead of taking part in its layout. The ScrollPane below fills the whole
+     AnchorPane and is completely unaffected by the assistant opening/closing: nothing in it ever
+     resizes, moves, or reflows. The assistant itself is a second AnchorPane child, pinned to the
+     top-right corner; an AnchorPane only sizes a child anchored on just two edges to that child's
+     own preferred size, so it never stretches to cover (or intercept clicks over) the rest of the
+     page — it only occupies the button, and then the panel, in the top-right corner. -->
+<AnchorPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.university.controller.InstructorDashboardController">
+<children>
 
-    <HBox spacing="10" alignment="CENTER_LEFT">
-        <Label text="Instructor Dashboard" styleClass="page-title"/>
-        <Region HBox.hgrow="ALWAYS"/>
-        <Button text="Refresh" onAction="#handleRefresh"/>
-    </HBox>
-    <Label fx:id="semesterLabel" styleClass="muted-text"/>
+    <ScrollPane fitToWidth="true" styleClass="page-scroll"
+                AnchorPane.topAnchor="0" AnchorPane.rightAnchor="0"
+                AnchorPane.bottomAnchor="0" AnchorPane.leftAnchor="0">
+    <content>
+    <VBox styleClass="content-page" spacing="16">
 
-    <HBox spacing="12">
-        <VBox styleClass="kpi-card" spacing="2">
-            <Label fx:id="kpiSections" text="0" styleClass="kpi-value"/>
-            <Label text="Sections this semester" styleClass="kpi-label"/>
-        </VBox>
-        <VBox styleClass="kpi-card" spacing="2">
-            <Label fx:id="kpiStudents" text="0" styleClass="kpi-value"/>
-            <Label text="Students taught" styleClass="kpi-label"/>
-        </VBox>
-        <VBox styleClass="kpi-card" spacing="2">
-            <Label fx:id="kpiPendingGrades" text="0" styleClass="kpi-value"/>
-            <Label text="Sections not yet submitted" styleClass="kpi-label"/>
-        </VBox>
-        <VBox styleClass="kpi-card" spacing="2">
-            <Label fx:id="kpiGradeWindow" text="—" styleClass="kpi-value"/>
-            <Label text="Grade entry window" styleClass="kpi-label"/>
-        </VBox>
-    </HBox>
+        <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 0 210 0 0;">
+            <Label text="Instructor Dashboard" styleClass="page-title"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button text="Refresh" onAction="#handleRefresh"/>
+        </HBox>
+        <Label fx:id="semesterLabel" styleClass="muted-text"/>
 
-    <Label text="Today's classes" styleClass="section-title"/>
-    <TableView fx:id="todayTable" VBox.vgrow="ALWAYS">
-        <columns>
-            <TableColumn fx:id="colTime"   text="Time"   prefWidth="140"/>
-            <TableColumn fx:id="colCourse" text="Course" prefWidth="420"/>
-            <TableColumn fx:id="colRoom"   text="Room"   prefWidth="100"/>
-        </columns>
-    </TableView>
+        <HBox spacing="12">
+            <VBox styleClass="kpi-card" spacing="2">
+                <Label fx:id="kpiSections" text="0" styleClass="kpi-value"/>
+                <Label text="Sections this semester" styleClass="kpi-label"/>
+            </VBox>
+            <VBox styleClass="kpi-card" spacing="2">
+                <Label fx:id="kpiStudents" text="0" styleClass="kpi-value"/>
+                <Label text="Students taught" styleClass="kpi-label"/>
+            </VBox>
+            <VBox styleClass="kpi-card" spacing="2">
+                <Label fx:id="kpiPendingGrades" text="0" styleClass="kpi-value"/>
+                <Label text="Sections not yet submitted" styleClass="kpi-label"/>
+            </VBox>
+            <VBox styleClass="kpi-card" spacing="2">
+                <Label fx:id="kpiGradeWindow" text="—" styleClass="kpi-value"/>
+                <Label text="Grade entry window" styleClass="kpi-label"/>
+            </VBox>
+        </HBox>
 
-    <HBox spacing="10" alignment="CENTER_LEFT">
-        <Button fx:id="goSectionsButton"  text="My Sections"  onAction="#handleGoSections"/>
-        <Button fx:id="goTimetableButton" text="My Timetable" onAction="#handleGoTimetable"/>
-    </HBox>
-</VBox>
+        <Label text="Today's classes" styleClass="section-title"/>
+        <TableView fx:id="todayTable" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="colTime"   text="Time"   prefWidth="140"/>
+                <TableColumn fx:id="colCourse" text="Course" prefWidth="420"/>
+                <TableColumn fx:id="colRoom"   text="Room"   prefWidth="100"/>
+            </columns>
+        </TableView>
+
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <Button fx:id="goSectionsButton"  text="My Sections"  onAction="#handleGoSections"/>
+            <Button fx:id="goTimetableButton" text="My Timetable" onAction="#handleGoTimetable"/>
+        </HBox>
+    </VBox>
+    </content>
+    </ScrollPane>
+
+    <!-- ===== University AI Assistant — floating top-right overlay. Collapsed by default (only
+         this VBox's Button child is visible/managed), so it reserves no space at all. Clicking it
+         opens the chat as a vertical panel directly beneath the button, layered on top of the
+         dashboard above; the dashboard content in the ScrollPane never moves or resizes. ===== -->
+    <VBox spacing="8" alignment="TOP_RIGHT" pickOnBounds="false"
+          AnchorPane.topAnchor="16" AnchorPane.rightAnchor="16" AnchorPane.bottomAnchor="16">
+        <Button fx:id="aiAssistantToggleButton" text="University AI Assistant"
+                onAction="#handleToggleAiAssistant" styleClass="ai-assistant-toggle-btn"/>
+        <VBox fx:id="aiAssistantExpandedBox" spacing="4" visible="false" managed="false"
+              VBox.vgrow="ALWAYS">
+            <HBox alignment="CENTER_RIGHT">
+                <Button text="Collapse ▴" onAction="#handleToggleAiAssistant" styleClass="ai-assistant-collapse-btn"/>
+            </HBox>
+            <fx:include fx:id="aiAssistant" source="ai_assistant_panel.fxml" VBox.vgrow="ALWAYS"/>
+        </VBox>
+    </VBox>
+
+</children>
+</AnchorPane>

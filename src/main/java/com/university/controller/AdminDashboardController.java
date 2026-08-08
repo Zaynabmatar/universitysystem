@@ -9,7 +9,11 @@ import javafx.fxml.FXML;
 import javafx.scene.chart.BarChart;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.PieChart;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.layout.VBox;
+
+import java.util.List;
 
 /**
  * project_details.md Section 10, row 1 — the KPI cards — plus three summary charts. The
@@ -35,12 +39,23 @@ public class AdminDashboardController {
     @FXML private Label gradeEmpty;
     @FXML private Label trendEmpty;
 
+    @FXML private AIAssistantPanelController aiAssistantController;
+    @FXML private Button aiAssistantToggleButton;
+    @FXML private VBox   aiAssistantExpandedBox;
+
     private final ReportService reportService = new ReportService();
 
     @FXML
     private void initialize() {
         Session.current().requireRole(UserRole.ADMIN);
         load();
+
+        aiAssistantController.configure(
+                "Hi! I'm the University AI Assistant. Ask me about programs, courses, instructors, "
+                        + "students, the academic calendar, or university policies — or use one of the "
+                        + "quick questions above.",
+                List.of("How many active students are there?", "What courses are in the catalogue?",
+                        "What is the current semester?", "Show department overview"));
     }
 
     @FXML
@@ -51,6 +66,20 @@ public class AdminDashboardController {
     @FXML
     private void handleOpenReports() {
         SceneManager.getInstance().navigateTo("admin_reports.fxml", "Reports & Analytics");
+    }
+
+    /**
+     * The AI panel starts collapsed to a single top-right button and reserves no layout space;
+     * this toggles it open — a vertical panel overlaying the dashboard, anchored below that
+     * button — or closed. The dashboard beneath never resizes or reflows either way.
+     */
+    @FXML
+    private void handleToggleAiAssistant() {
+        boolean expand = !aiAssistantExpandedBox.isVisible();
+        aiAssistantExpandedBox.setVisible(expand);
+        aiAssistantExpandedBox.setManaged(expand);
+        aiAssistantToggleButton.setVisible(!expand);
+        aiAssistantToggleButton.setManaged(!expand);
     }
 
     private void load() {
