@@ -91,6 +91,15 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Phase 4: builds/parses the Gemini API request and response bodies for the
+             general-question fallback in GeneralAIService. Nothing else in the project
+             talks JSON, so there was no existing library to reuse. -->
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20240303</version>
+        </dependency>
+
     </dependencies>
 
     <build>

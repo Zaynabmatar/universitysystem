@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- ===== University AI Assistant — shared chat panel, included by student/instructor/admin
+     screens via fx:include. See AIAssistantPanelController; each host calls configure() with a
+     role-appropriate greeting and quick questions right after this panel loads. ===== -->
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.university.controller.AIAssistantPanelController"
+      spacing="10" styleClass="ai-assistant-panel"
+      minWidth="300" prefWidth="340" maxWidth="400">
+    <padding><Insets top="14" right="14" bottom="14" left="14"/></padding>
+
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <Label text="University AI Assistant" styleClass="ai-assistant-title"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="New Chat" onAction="#handleNewChat" styleClass="ai-new-chat-btn"/>
+    </HBox>
+
+    <FlowPane fx:id="quickQuestionsPane" hgap="6" vgap="6" styleClass="quick-questions-pane"/>
+
+    <ScrollPane fx:id="chatScrollPane" fitToWidth="true" VBox.vgrow="ALWAYS" styleClass="chat-scroll">
+        <content>
+            <VBox fx:id="chatMessagesBox" spacing="10" styleClass="chat-messages-box">
+                <padding><Insets top="4" right="4" bottom="4" left="4"/></padding>
+            </VBox>
+        </content>
+    </ScrollPane>
+
+    <Label fx:id="typingIndicatorLabel" text="AI is typing..." styleClass="ai-typing-indicator"
+           visible="false" managed="false"/>
+
+    <HBox spacing="8" alignment="CENTER">
+        <TextField fx:id="chatInputField" promptText="Ask the University AI Assistant..."
+                   styleClass="ai-chat-input" HBox.hgrow="ALWAYS" onAction="#handleSendMessage"/>
+        <Button fx:id="sendButton" text="Send" onAction="#handleSendMessage" styleClass="ai-send-btn"/>
+    </HBox>
+</VBox>
