@@ -17,7 +17,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
@@ -47,7 +46,6 @@ public class StudentTranscriptController {
     @FXML private Label      standingLabel;
     @FXML private Label      termCountLabel;
     @FXML private VBox       termContainer;
-    @FXML private ScrollPane scrollPane;
     @FXML private Button     exportPdfButton;
 
     private final TranscriptService transcriptService = new TranscriptService();

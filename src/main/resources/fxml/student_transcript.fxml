@@ -8,10 +8,12 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx"
-      xmlns:fx="http://javafx.com/fxml"
-      fx:controller="com.university.controller.StudentTranscriptController"
-      styleClass="content-page" spacing="12">
+<ScrollPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.university.controller.StudentTranscriptController"
+            fitToWidth="true" styleClass="page-scroll">
+    <content>
+    <VBox styleClass="content-page" spacing="12">
 
     <!-- ===== header ===== -->
     <HBox spacing="10" alignment="CENTER_LEFT">
@@ -46,17 +48,14 @@
     </HBox>
 
     <!-- ===== one card per semester, built in code ===== -->
-    <ScrollPane fx:id="scrollPane" fitToWidth="true" VBox.vgrow="ALWAYS"
-                styleClass="transcript-scroll">
-        <content>
-            <VBox fx:id="termContainer" spacing="16">
-                <padding><Insets top="4" right="4" bottom="4" left="4"/></padding>
-            </VBox>
-        </content>
-    </ScrollPane>
+    <VBox fx:id="termContainer" spacing="16">
+        <padding><Insets top="4" right="4" bottom="4" left="4"/></padding>
+    </VBox>
 
     <Label fx:id="footerLabel" styleClass="muted-label" wrapText="true"
            text="Courses marked “Repeated” are superseded attempts and do not count towards the GPA. Grades of W and I carry no grade points. Dropped courses never appear on a transcript."/>
 
     <fx:include source="student_footer.fxml"/>
-</VBox>
+    </VBox>
+    </content>
+</ScrollPane>

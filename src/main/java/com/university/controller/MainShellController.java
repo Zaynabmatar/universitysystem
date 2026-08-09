@@ -20,6 +20,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -56,6 +57,9 @@ public class MainShellController {
     @FXML private Button notificationsButton;
     @FXML private Label unreadBadge;
     @FXML private MenuButton avatarMenu;
+    @FXML private Label menuNameLabel;
+    @FXML private Label menuIdLabel;
+    @FXML private MenuItem instructorDirectoryMenuItem;
 
     private static final double SIDEBAR_WIDTH = 260;
     private static final double SIDEBAR_ANIMATION_MILLIS = 270;
@@ -131,6 +135,16 @@ public class MainShellController {
             studentIdLabel.setText("ID: " + session.getUser().getUserId());
             studentIdLabel.setVisible(true);
             studentIdLabel.setManaged(true);
+        }
+
+        // Unlike studentIdLabel above, the dropdown header shows the id for every role.
+        menuNameLabel.setText(session.getDisplayName());
+        menuIdLabel.setText("ID: " + session.getUser().getUserId());
+
+        // Instructors already see their colleagues via other screens; the directory entry
+        // in the account dropdown is student/admin-only.
+        if (session.getRole() == UserRole.INSTRUCTOR) {
+            avatarMenu.getItems().remove(instructorDirectoryMenuItem);
         }
 
         List<MenuEntry> menu = menuFor(session.getRole());
@@ -403,6 +417,41 @@ public class MainShellController {
             refreshBell();
         } catch (Exception e) {
             AlertUtil.error("Notifications", "The notifications window could not be opened.", e);
+        }
+    }
+
+    @FXML
+    private void handleOpenChangePassword() {
+        openAccountPage("change_password.fxml", "Change Password");
+    }
+
+    @FXML
+    private void handleOpenMyEmail() {
+        openAccountPage("my_email.fxml", "My Email");
+    }
+
+    @FXML
+    private void handleOpenChangeAddress() {
+        openAccountPage("change_address.fxml", "Change Address");
+    }
+
+    @FXML
+    private void handleOpenInstructorDirectory() {
+        openAccountPage("instructor_directory.fxml", "List of Instructors");
+    }
+
+    /**
+     * Opens one of the four account-settings pages in the content area, and
+     * tells it where its own back arrow should return to — SceneManager keeps
+     * no navigation history, so the page currently on screen is captured here,
+     * right before it is replaced.
+     */
+    private void openAccountPage(String fxml, String title) {
+        String returnFxml = SceneManager.getInstance().getCurrentViewFxml();
+        String returnTitle = SceneManager.getInstance().getCurrentViewTitle();
+        Object controller = SceneManager.getInstance().navigateTo(fxml, title);
+        if (controller instanceof ReturnNavigable navigable) {
+            navigable.setReturnTarget(returnFxml, returnTitle);
         }
     }
 
