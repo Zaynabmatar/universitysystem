@@ -16,6 +16,7 @@ public class Instructor {
     private String lastName;
     private String email;
     private String phone;
+    private String address;
     private int departmentId;
     private AcademicRank academicRank;
     private LocalDate hireDate;
@@ -99,6 +100,14 @@ public class Instructor {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
     }
 
     public int getDepartmentId() {

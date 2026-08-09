@@ -201,6 +201,37 @@ public class AccountService {
     }
 
     /**
+     * Checks an ADMIN's own email address before it is saved.
+     *
+     * <p>Mirrors {@link #validateEditedEmail} but without the student/
+     * instructor domain-suffix rule — an ADMIN account has no role domain of
+     * its own, only {@code users.email}.</p>
+     *
+     * @param excludeUserId the admin's own user id, so keeping the address
+     *                      it already has is never reported as a duplicate
+     * @throws ValidationException with a message meant for the administrator
+     */
+    public String validateAdminEmail(String rawEmail, int excludeUserId) {
+        String email = normalizeEmail(rawEmail);
+
+        if (ValidationUtil.isBlank(email)) {
+            throw new ValidationException("An email address is required.");
+        }
+        if (email.length() > EMAIL_MAX_LENGTH) {
+            throw new ValidationException(
+                    "The email address must be " + EMAIL_MAX_LENGTH + " characters or fewer.");
+        }
+        if (!ValidationUtil.isEmail(email)) {
+            throw new ValidationException("Enter a valid email address.");
+        }
+        if (userDao.emailExistsAmongAdmins(email, excludeUserId)) {
+            throw new ValidationException(
+                    "This email is already assigned to another account.");
+        }
+        return email;
+    }
+
+    /**
      * True when the address sits on the domain its role is supposed to use.
      *
      * <p>Instructors are also allowed the pre-split {@code @university.edu.lb},

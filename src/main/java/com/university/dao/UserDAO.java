@@ -26,11 +26,12 @@ import java.util.Optional;
  */
 public class UserDAO extends AbstractDAO implements GenericDAO<User> {
 
-    // dbo.users has no email column — email lives on dbo.students / dbo.instructors
-    // only, one per role. Nothing below may select, insert or update users.email.
+    // users.email / users.address are the ADMIN role's own contact details only
+    // (see User.java). STUDENT/INSTRUCTOR keep using dbo.students / dbo.instructors
+    // for theirs; this class never writes those columns for those two roles.
     private static final String SELECT =
-            "SELECT user_id, username, password_hash, role, is_active, last_login, created_at "
-            + "FROM dbo.users";
+            "SELECT user_id, username, password_hash, role, is_active, last_login, created_at, "
+            + "email, address FROM dbo.users";
 
     /**
      * {@code OUTPUT INSERTED.user_id} makes SQL Server return the value its
@@ -67,6 +68,8 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
         user.setActive(rs.getBoolean("is_active"));
         user.setLastLogin(DaoUtils.getLocalDateTime(rs, "last_login"));
         user.setCreatedAt(DaoUtils.getLocalDateTime(rs, "created_at"));
+        user.setEmail(rs.getString("email"));
+        user.setAddress(rs.getString("address"));
         return user;
     }
 
@@ -130,13 +133,38 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     }
 
     /**
-     * No-op: {@code dbo.users} has no {@code email} column to change. The
-     * address lives on {@code students.email} / {@code instructors.email}, and
+     * No-op for STUDENT/INSTRUCTOR: their address lives on
+     * {@code students.email} / {@code instructors.email}, and
      * {@code StudentDAO.update} / {@code InstructorDAO.update} already write it
-     * there — this method has nothing left to do.
+     * there. {@code users.email} exists only for ADMIN's own contact details —
+     * see {@link #updateContact} for that.
      */
     public boolean updateEmail(Connection connection, int userId, String email) {
         return false;
+    }
+
+    /**
+     * Writes an ADMIN account's own email and address — the only role that
+     * uses {@code users.email} / {@code users.address}. Deliberately narrower
+     * than {@link #update(User)}, which also writes username/role/active, so a
+     * self-service edit can never touch those.
+     */
+    public boolean updateContact(int userId, String email, String address) {
+        return executeUpdate("UPDATE dbo.users SET email = ?, address = ? WHERE user_id = ?",
+                email, address, userId) > 0;
+    }
+
+    /**
+     * Is this address already used by another ADMIN account? The only place
+     * {@code users.email} is checked for uniqueness — students and instructors
+     * are checked separately by {@link #emailExists(String, Integer)}.
+     */
+    public boolean emailExistsAmongAdmins(String email, int excludeUserId) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        return queryInt("SELECT COUNT(*) FROM dbo.users WHERE email = ? AND user_id <> ?",
+                email, excludeUserId) > 0;
     }
 
     /** Stamps the moment of a successful sign-in. */
