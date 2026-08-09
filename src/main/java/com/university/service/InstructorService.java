@@ -263,6 +263,9 @@ public class InstructorService {
         if (ValidationUtil.notBlank(instructor.getPhone()) && !ValidationUtil.isPhone(instructor.getPhone())) {
             throw new ValidationException("Phone number may contain digits, spaces, +, ( ) and -, 7-20 characters.");
         }
+        if (!ValidationUtil.maxLength(instructor.getAddress(), 200)) {
+            throw new ValidationException("Address must be 200 characters or fewer.");
+        }
         ValidationException.requireId(instructor.getDepartmentId(), "Department");
         if (instructor.getAcademicRank() == null) {
             throw new ValidationException("Select an academic rank.");

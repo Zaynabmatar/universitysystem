@@ -20,6 +20,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -56,6 +57,9 @@ public class MainShellController {
     @FXML private Button notificationsButton;
     @FXML private Label unreadBadge;
     @FXML private MenuButton avatarMenu;
+    @FXML private Label menuNameLabel;
+    @FXML private Label menuIdLabel;
+    @FXML private MenuItem instructorDirectoryMenuItem;
 
     private static final double SIDEBAR_WIDTH = 260;
     private static final double SIDEBAR_ANIMATION_MILLIS = 270;
@@ -75,40 +79,37 @@ public class MainShellController {
     }
 
     private static final List<MenuEntry> ADMIN_MENU = List.of(
-            new MenuEntry("Dashboard",              "admin_dashboard.fxml"),
-            new MenuEntry("Students",               "admin_students.fxml"),
-            new MenuEntry("Instructors",            "admin_instructors.fxml"),
-            new MenuEntry("Departments & Programs", "admin_programs.fxml"),
-            new MenuEntry("Courses",                "admin_courses.fxml"),
-            new MenuEntry("Prerequisites",          "admin_prerequisites.fxml"),
-            new MenuEntry("Semesters",              "admin_semesters.fxml"),
-            new MenuEntry("Sections",               "admin_sections.fxml"),
-            new MenuEntry("Reports & Analytics",    "admin_reports.fxml"),
-            new MenuEntry("Audit Log",              "admin_audit_log.fxml")
+            new MenuEntry("Dashboard",              "admin_dashboard.fxml",     "dashboard"),
+            new MenuEntry("Students",               "admin_students.fxml",      "students"),
+            new MenuEntry("Instructors",            "admin_instructors.fxml",   "instructor"),
+            new MenuEntry("Departments & Programs", "admin_programs.fxml",      "programs"),
+            new MenuEntry("Courses",                "admin_courses.fxml",       "courses"),
+            new MenuEntry("Prerequisites",          "admin_prerequisites.fxml", "prerequisites"),
+            new MenuEntry("Semesters",              "admin_semesters.fxml",     "calendar"),
+            new MenuEntry("Sections",               "admin_sections.fxml",      "sections"),
+            new MenuEntry("Reports & Analytics",    "admin_reports.fxml",       "reports"),
+            new MenuEntry("Audit Log",              "admin_audit_log.fxml",     "auditlog")
     );
 
     private static final List<MenuEntry> INSTRUCTOR_MENU = List.of(
-            new MenuEntry("Dashboard",       "instructor_dashboard.fxml"),
-            new MenuEntry("My Sections",     "instructor_sections.fxml"),
-            new MenuEntry("Enter Grades",    "instructor_grades.fxml"),
-            new MenuEntry("My Timetable",    "instructor_timetable.fxml")
+            new MenuEntry("Dashboard",       "instructor_dashboard.fxml",   "dashboard"),
+            new MenuEntry("My Sections",     "instructor_sections.fxml",    "courses"),
+            new MenuEntry("Enter Grades",    "instructor_grades.fxml",      "grades"),
+            new MenuEntry("My Timetable",    "instructor_timetable.fxml",   "calendar")
     );
 
     /**
      * The Student menu (reference: reference image supplied 2026-08-07). "Classes" is the
-     * repurposed former Dashboard screen; My Grades, Course Recommendation and My Timetable
-     * intentionally have no entry here any more (their pages still exist, just unreachable from
-     * the sidebar or Classes page).
+     * repurposed former Dashboard screen; My Grades and My Timetable intentionally have no entry
+     * here any more (their pages still exist, just unreachable from the sidebar or Classes page).
      */
     private static final List<MenuEntry> STUDENT_MENU = List.of(
-            new MenuEntry("Classes",        "student_dashboard.fxml",      "classes"),
-            new MenuEntry("Payments",       "student_payments.fxml",       "payments"),
-            new MenuEntry("Registration",   "student_registration.fxml",   "registration"),
-            new MenuEntry("Transcript",     "student_transcript.fxml",     "transcript"),
-            new MenuEntry("Plan of Study",  "student_progress.fxml",       "plan"),
-            new MenuEntry("Online Service", "student_online_service.fxml", "online"),
-            new MenuEntry("Library",        "student_library.fxml",        "library"),
-            new MenuEntry("Moodle",         "student_moodle.fxml",         "moodle")
+            new MenuEntry("Classes",               "student_dashboard.fxml",      "classes"),
+            new MenuEntry("Payments",              "student_payments.fxml",       "payments"),
+            new MenuEntry("Registration",          "student_registration.fxml",   "registration"),
+            new MenuEntry("Transcript",            "student_transcript.fxml",     "transcript"),
+            new MenuEntry("Plan of Study",         "student_progress.fxml",       "plan"),
+            new MenuEntry("Course Recommendation", "student_recommendation.fxml", "recommendation")
     );
 
     @FXML
@@ -129,6 +130,16 @@ public class MainShellController {
             studentIdLabel.setText("ID: " + session.getUser().getUserId());
             studentIdLabel.setVisible(true);
             studentIdLabel.setManaged(true);
+        }
+
+        // Unlike studentIdLabel above, the dropdown header shows the id for every role.
+        menuNameLabel.setText(session.getDisplayName());
+        menuIdLabel.setText("ID: " + session.getUser().getUserId());
+
+        // Instructors already see their colleagues via other screens; the directory entry
+        // in the account dropdown is student/admin-only.
+        if (session.getRole() == UserRole.INSTRUCTOR) {
+            avatarMenu.getItems().remove(instructorDirectoryMenuItem);
         }
 
         List<MenuEntry> menu = menuFor(session.getRole());
@@ -212,12 +223,7 @@ public class MainShellController {
                 setActive(b);   // first item starts highlighted
             }
         }
-
-        Button logoutButton = new Button("Log out");
-        logoutButton.getStyleClass().add("nav-button");
-        logoutButton.setMaxWidth(Double.MAX_VALUE);
-        logoutButton.setOnAction(e -> handleLogout());
-        sidebar.getChildren().add(logoutButton);
+        // Log out lives only in the avatar dropdown now (#handleLogout) — not here.
     }
 
     /**
@@ -279,22 +285,86 @@ public class MainShellController {
                 meridian.setStrokeWidth(1.0);
                 shape.getChildren().addAll(globe, meridian, line(1.8, 8, 14.2, 8, ink));
             }
-            case "library" -> {
+            case "calendar" -> {
+                Rectangle body = outlinedRect(1.5, 3, 13, 11, ink);
+                shape.getChildren().addAll(body, line(1.5, 6, 14.5, 6, ink),
+                        line(4.5, 1.2, 4.5, 4.2, ink), line(11.5, 1.2, 11.5, 4.2, ink));
+            }
+            case "recommendation" -> {
+                Polygon star = new Polygon(
+                        8, 1.5,   9.47, 5.98,  14.18, 5.99,
+                        10.38, 8.77,  11.82, 13.26,  8, 10.5,
+                        4.18, 13.26,  5.62, 8.77,  1.82, 5.99,  6.53, 5.98);
+                star.setFill(ink);
+                shape.getChildren().add(star);
+            }
+            case "dashboard" -> {
+                shape.getChildren().addAll(square(1, 1, 6, ink), square(9, 1, 6, ink),
+                        square(1, 9, 6, ink), square(9, 9, 6, ink));
+            }
+            case "students" -> {
+                Polygon body1 = new Polygon(2, 14, 2.6, 9.6, 8.4, 9.6, 9, 14);
+                body1.setFill(ink);
+                Circle head1 = new Circle(5.5, 5.2, 2.2, ink);
+                Polygon body2 = new Polygon(7.6, 14.5, 8.1, 10.4, 13.4, 10.4, 13.9, 14.5);
+                body2.setFill(ink);
+                Circle head2 = new Circle(10.7, 6.3, 2, ink);
+                shape.getChildren().addAll(body2, head2, body1, head1);
+            }
+            case "instructor" -> {
+                Polygon body = new Polygon(3, 14, 3.8, 8.3, 12.2, 8.3, 13, 14);
+                body.setFill(ink);
+                Circle head = new Circle(8, 4.5, 2.6, ink);
+                shape.getChildren().addAll(body, head);
+            }
+            case "library", "programs" -> {
                 Polygon roof = new Polygon(8, 1, 14.5, 5, 1.5, 5);
                 roof.setFill(ink);
                 shape.getChildren().addAll(roof, line(1.5, 14, 14.5, 14, ink),
                         line(3.5, 6, 3.5, 13, ink), line(8, 6, 8, 13, ink), line(12.5, 6, 12.5, 13, ink));
             }
-            case "moodle" -> {
-                Rectangle screen = outlinedRect(1.5, 2.5, 13, 9, ink);
-                Polygon play = new Polygon(6.3, 4.7, 6.3, 9.3, 10.3, 7);
-                play.setFill(ink);
-                shape.getChildren().addAll(screen, line(8, 11.5, 8, 13.5, ink), line(5, 13.5, 11, 13.5, ink), play);
+            case "courses" -> {
+                Polyline leftPage = new Polyline(1.5, 3.2, 8, 4.6, 8, 13, 1.5, 11.6, 1.5, 3.2);
+                leftPage.setStroke(ink);
+                leftPage.setStrokeWidth(1.2);
+                Polyline rightPage = new Polyline(14.5, 3.2, 8, 4.6, 8, 13, 14.5, 11.6, 14.5, 3.2);
+                rightPage.setStroke(ink);
+                rightPage.setStrokeWidth(1.2);
+                shape.getChildren().addAll(leftPage, rightPage);
             }
-            case "calendar" -> {
-                Rectangle body = outlinedRect(1.5, 3, 13, 11, ink);
-                shape.getChildren().addAll(body, line(1.5, 6, 14.5, 6, ink),
-                        line(4.5, 1.2, 4.5, 4.2, ink), line(11.5, 1.2, 11.5, 4.2, ink));
+            case "prerequisites" -> {
+                Circle c1 = new Circle(3, 3.2, 1.8, ink);
+                Circle c2 = new Circle(13, 3.2, 1.8, ink);
+                Circle c3 = new Circle(8, 13, 1.8, ink);
+                shape.getChildren().addAll(line(3, 3.2, 8, 13, ink), line(13, 3.2, 8, 13, ink), c1, c2, c3);
+            }
+            case "sections" -> {
+                shape.getChildren().addAll(bar(1, 2, 14, ink), bar(1, 6.9, 14, ink), bar(1, 11.8, 9, ink));
+            }
+            case "reports" -> {
+                shape.getChildren().addAll(square2(2, 9, 3, 5, ink), square2(6.5, 5, 3, 9, ink),
+                        square2(11, 2, 3, 12, ink));
+            }
+            case "auditlog" -> {
+                Polygon shield = new Polygon(8, 1, 14, 3.5, 14, 8, 8, 15, 2, 8, 2, 3.5);
+                shield.setFill(Color.TRANSPARENT);
+                shield.setStroke(ink);
+                shield.setStrokeWidth(1.3);
+                Polyline check = new Polyline(5, 8, 7, 10, 11, 5.5);
+                check.setStroke(ink);
+                check.setStrokeWidth(1.4);
+                shape.getChildren().addAll(shield, check);
+            }
+            case "grades" -> {
+                Rectangle board = outlinedRect(2, 2, 12, 12, ink);
+                Rectangle tab = new Rectangle(6, 0.5, 4, 2);
+                tab.setArcWidth(1);
+                tab.setArcHeight(1);
+                tab.setFill(ink);
+                Polyline check = new Polyline(4.5, 8, 7, 10.5, 11.5, 5.5);
+                check.setStroke(ink);
+                check.setStrokeWidth(1.4);
+                shape.getChildren().addAll(board, tab, check);
             }
             default -> { }
         }
@@ -320,6 +390,26 @@ public class MainShellController {
         l.setStroke(ink);
         l.setStrokeWidth(1.1);
         return l;
+    }
+
+    private static Rectangle square(double x, double y, double side, Color ink) {
+        return square2(x, y, side, side, ink);
+    }
+
+    private static Rectangle square2(double x, double y, double w, double h, Color ink) {
+        Rectangle r = new Rectangle(x, y, w, h);
+        r.setArcWidth(1.5);
+        r.setArcHeight(1.5);
+        r.setFill(ink);
+        return r;
+    }
+
+    private static Rectangle bar(double x, double y, double w, Color ink) {
+        Rectangle r = new Rectangle(x, y, w, 2.2);
+        r.setArcWidth(1);
+        r.setArcHeight(1);
+        r.setFill(ink);
+        return r;
     }
 
     private void setActive(Button b) {
@@ -390,6 +480,41 @@ public class MainShellController {
             refreshBell();
         } catch (Exception e) {
             AlertUtil.error("Notifications", "The notifications window could not be opened.", e);
+        }
+    }
+
+    @FXML
+    private void handleOpenChangePassword() {
+        openAccountPage("change_password.fxml", "Change Password");
+    }
+
+    @FXML
+    private void handleOpenMyEmail() {
+        openAccountPage("my_email.fxml", "My Email");
+    }
+
+    @FXML
+    private void handleOpenChangeAddress() {
+        openAccountPage("change_address.fxml", "Change Address");
+    }
+
+    @FXML
+    private void handleOpenInstructorDirectory() {
+        openAccountPage("instructor_directory.fxml", "List of Instructors");
+    }
+
+    /**
+     * Opens one of the four account-settings pages in the content area, and
+     * tells it where its own back arrow should return to — SceneManager keeps
+     * no navigation history, so the page currently on screen is captured here,
+     * right before it is replaced.
+     */
+    private void openAccountPage(String fxml, String title) {
+        String returnFxml = SceneManager.getInstance().getCurrentViewFxml();
+        String returnTitle = SceneManager.getInstance().getCurrentViewTitle();
+        Object controller = SceneManager.getInstance().navigateTo(fxml, title);
+        if (controller instanceof ReturnNavigable navigable) {
+            navigable.setReturnTarget(returnFxml, returnTitle);
         }
     }
 
