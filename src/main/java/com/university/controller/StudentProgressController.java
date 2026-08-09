@@ -213,15 +213,18 @@ public class StudentProgressController {
         // create a generic array of TableColumn<RequirementRow, ?> to hold them, which is what
         // produced the unchecked-varargs warning. A List sidesteps that array entirely.
         table.getColumns().setAll(List.of(colCode, colTitle, colCredits, colType, colPrereq, colStatus));
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
         // Sized to show every row of this one semester without its own inner scrollbar — the
         // page-level ScrollPane in the FXML is what scrolls the whole screen if the full
         // Study Plan runs taller than the window.
         double rowHeight = 28;
+        double headerHeight = 32;
         table.setFixedCellSize(rowHeight);
         table.prefHeightProperty().bind(table.fixedCellSizeProperty()
-                .multiply(Math.max(1, plan.courses.size())).add(rowHeight + 2));
-        table.setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+                .multiply(Math.max(1, plan.courses.size())).add(headerHeight + 2));
+        table.minHeightProperty().bind(table.prefHeightProperty());
+        table.maxHeightProperty().bind(table.prefHeightProperty());
 
         return table;
     }

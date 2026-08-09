@@ -32,6 +32,7 @@ public final class SceneManager {
     private Stage primaryStage;
     private Pane contentArea;
     private String currentViewFxml;
+    private String currentViewTitle;
 
     private SceneManager() { }
 
@@ -65,6 +66,11 @@ public final class SceneManager {
         return currentViewFxml;
     }
 
+    /** The title passed alongside the current view — what a "back" action should restore. */
+    public String getCurrentViewTitle() {
+        return currentViewTitle;
+    }
+
     /** true when src/main/resources/fxml/&lt;name&gt; exists on the classpath. */
     public boolean viewExists(String fxmlFileName) {
         return SceneManager.class.getResource(FXML_DIR + fxmlFileName) != null;
@@ -86,6 +92,7 @@ public final class SceneManager {
             // registered".
             this.contentArea = null;
             this.currentViewFxml = null;
+            this.currentViewTitle = null;
 
             FXMLLoader loader = new FXMLLoader(requireResource(fxmlFileName));
             Parent root = loader.load();
@@ -127,6 +134,7 @@ public final class SceneManager {
         if (!viewExists(fxmlFileName)) {
             contentArea.getChildren().setAll(placeholder(title, fxmlFileName));
             currentViewFxml = null;
+            currentViewTitle = null;
             return null;
         }
 
@@ -135,11 +143,13 @@ public final class SceneManager {
             Parent view = loader.load();
             contentArea.getChildren().setAll(view);
             currentViewFxml = fxmlFileName;
+            currentViewTitle = title;
             return loader.getController();
 
         } catch (IOException e) {
             contentArea.getChildren().setAll(placeholder(title, fxmlFileName));
             currentViewFxml = null;
+            currentViewTitle = null;
             AlertUtil.error("Cannot open screen",
                     "The screen '" + title + "' could not be opened.", e);
             return null;

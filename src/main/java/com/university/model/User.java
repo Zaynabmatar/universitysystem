@@ -12,10 +12,13 @@ import java.time.LocalDateTime;
  * on a STUDENT account and "Instructor ID" on an INSTRUCTOR account — there
  * is no second, hand-typed id anywhere.</p>
  *
- * <p>There is deliberately no email here. {@code dbo.users} has no such column:
- * the university address belongs to the person, not to the login, and lives on
- * {@link Student#getEmail()} / {@link Instructor#getEmail()}. An ADMIN account
- * has no address at all.</p>
+ * <p>A STUDENT's or INSTRUCTOR's university email and postal address still
+ * belong to the person, not the login, and live on {@link Student#getEmail()}/
+ * {@link Student#getAddress()} and {@link Instructor#getEmail()}/
+ * {@link Instructor#getAddress()} — {@link #email} and {@link #address} here
+ * are left {@code null} for those two roles. An ADMIN account has no separate
+ * profile row of its own ({@code dbo.admins} was retired), so its own email
+ * and address, when set, live directly on this row instead.</p>
  *
  * <p>{@code passwordHash} holds a BCrypt hash. Plain text passwords are never
  * stored in this object or in the database.</p>
@@ -29,6 +32,8 @@ public class User {
     private boolean active = true;
     private LocalDateTime lastLogin;
     private LocalDateTime createdAt;
+    private String email;
+    private String address;
 
     public User() {
     }
@@ -98,6 +103,24 @@ public class User {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    /** Null for STUDENT/INSTRUCTOR — see the class comment. Only ADMIN uses this. */
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    /** Null for STUDENT/INSTRUCTOR — see the class comment. Only ADMIN uses this. */
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
     }
 
     /** The password hash is deliberately left out of this text. */

@@ -26,10 +26,12 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -58,6 +60,8 @@ public class StudentRegistrationController {
     @FXML private TableColumn<Section, String> colSeats;
     @FXML private TableColumn<Section, String> colStatus;
     @FXML private Button registerButton;
+    @FXML private TextField courseCodeSearchField;
+    @FXML private CheckBox hideFullCheckBox;
 
     @FXML private TableView<Section> myTable;
     @FXML private TableColumn<Section, String> myColCourse;
@@ -77,6 +81,11 @@ public class StudentRegistrationController {
 
     private final ObservableList<Section> availableRows = FXCollections.observableArrayList();
     private final ObservableList<Section> myRows = FXCollections.observableArrayList();
+
+    /** Every section {@link #reloadAvailable()} loaded, before the course-code search and
+     *  Hide Full Sections filter are applied — what {@link #applyAvailableFilters()} filters
+     *  from and {@link #handleClearFilters()} restores. */
+    private List<Section> allAvailableSections = List.of();
 
     private List<Course> courses = List.of();
     private List<Instructor> instructors = List.of();
@@ -129,14 +138,18 @@ public class StudentRegistrationController {
 
         availableTable.setItems(availableRows);
         availableTable.setPlaceholder(new Label("No sections are available to register for right now."));
+        availableTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         myTable.setItems(myRows);
         myTable.setPlaceholder(new Label("You are not registered in any section this semester."));
+        myTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
         // Sized to show every current row without its own inner scrollbar, the same way the
         // Study Plan's per-semester tables are sized — the page-level ScrollPane in the FXML
         // is what scrolls the whole screen if these grow taller than the window.
         bindTableHeightToRowCount(availableTable, availableRows);
         bindTableHeightToRowCount(myTable, myRows);
+
+        courseCodeSearchField.textProperty().addListener((obs, old, val) -> applyAvailableFilters());
 
         registerButton.disableProperty().bind(availableTable.getSelectionModel().selectedItemProperty().isNull());
         dropButton.disableProperty().bind(myTable.getSelectionModel().selectedItemProperty().isNull());
@@ -147,12 +160,14 @@ public class StudentRegistrationController {
 
     private void bindTableHeightToRowCount(TableView<Section> table, ObservableList<Section> items) {
         double rowHeight = 28;
+        double headerHeight = 32;
         table.setFixedCellSize(rowHeight);
         DoubleBinding height = Bindings.createDoubleBinding(
-                () -> (Math.max(1, items.size()) * rowHeight) + rowHeight + 2,
+                () -> headerHeight + Math.max(1, items.size()) * rowHeight + 2,
                 items);
         table.prefHeightProperty().bind(height);
         table.minHeightProperty().bind(height);
+        table.maxHeightProperty().bind(height);
     }
 
     // ------------------------------------------------------------------ lookups
@@ -227,21 +242,41 @@ public class StudentRegistrationController {
 
     private void reloadAvailable() {
         if (currentSemester == null) {
-            availableRows.clear();
+            allAvailableSections = List.of();
+            applyAvailableFilters();
             return;
         }
         try {
             Set<Integer> studyPlanCourseIds = eligibleCourseIds();
 
-            List<Section> result = sectionService
+            allAvailableSections = sectionService
                     .searchSections(currentSemester.getSemesterId(), null, null, SectionStatus.OPEN).stream()
                     .filter(s -> studyPlanCourseIds.contains(s.getCourseId()))
                     .toList();
 
-            availableRows.setAll(result);
+            applyAvailableFilters();
         } catch (Exception e) {
             AlertUtil.error("Could not load sections", "The section list could not be loaded.", e);
         }
+    }
+
+    /**
+     * Re-derives {@link #availableRows} from {@link #allAvailableSections} using the course-code
+     * search and Hide Full Sections checkbox — a display-only filter over sections already
+     * loaded for the current term/student. It never re-queries the database and never changes
+     * which sections exist or how full they are.
+     */
+    private void applyAvailableFilters() {
+        String query = courseCodeSearchField == null || courseCodeSearchField.getText() == null
+                ? "" : courseCodeSearchField.getText().trim().toLowerCase();
+        boolean hideFull = hideFullCheckBox != null && hideFullCheckBox.isSelected();
+
+        List<Section> filtered = allAvailableSections.stream()
+                .filter(s -> query.isEmpty() || courseCodeOf(s.getCourseId()).toLowerCase().contains(query))
+                .filter(s -> !hideFull || !s.isFull())
+                .toList();
+
+        availableRows.setAll(filtered);
     }
 
     private void reloadMine() {
@@ -272,6 +307,23 @@ public class StudentRegistrationController {
     }
 
     // ------------------------------------------------------------------ actions
+
+    @FXML
+    private void handleSearchAvailable() {
+        applyAvailableFilters();
+    }
+
+    @FXML
+    private void handleFiltersChanged() {
+        applyAvailableFilters();
+    }
+
+    @FXML
+    private void handleClearFilters() {
+        courseCodeSearchField.clear();
+        hideFullCheckBox.setSelected(false);
+        applyAvailableFilters();
+    }
 
     @FXML
     private void handleRefresh() {
