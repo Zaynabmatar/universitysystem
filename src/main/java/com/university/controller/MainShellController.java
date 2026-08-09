@@ -25,7 +25,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.scene.shape.Ellipse;
 import javafx.scene.shape.Line;
 import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Polyline;
@@ -112,8 +111,6 @@ public class MainShellController {
             new MenuEntry("Registration",   "student_registration.fxml",   "registration"),
             new MenuEntry("Transcript",     "student_transcript.fxml",     "transcript"),
             new MenuEntry("Plan of Study",  "student_progress.fxml",       "plan"),
-            new MenuEntry("Online Service", "student_online_service.fxml", "online"),
-            new MenuEntry("Library",        "student_library.fxml",        "library"),
             new MenuEntry("Moodle",         "student_moodle.fxml",         "moodle")
     );
 
@@ -294,23 +291,6 @@ public class MainShellController {
             case "plan" -> {
                 Rectangle cover = outlinedRect(2, 3, 12, 10, ink);
                 shape.getChildren().addAll(cover, line(8, 3, 8, 13, ink));
-            }
-            case "online" -> {
-                Circle globe = new Circle(8, 8, 6.2);
-                globe.setFill(Color.TRANSPARENT);
-                globe.setStroke(ink);
-                globe.setStrokeWidth(1.2);
-                Ellipse meridian = new Ellipse(8, 8, 2.6, 6.2);
-                meridian.setFill(Color.TRANSPARENT);
-                meridian.setStroke(ink);
-                meridian.setStrokeWidth(1.0);
-                shape.getChildren().addAll(globe, meridian, line(1.8, 8, 14.2, 8, ink));
-            }
-            case "library" -> {
-                Polygon roof = new Polygon(8, 1, 14.5, 5, 1.5, 5);
-                roof.setFill(ink);
-                shape.getChildren().addAll(roof, line(1.5, 14, 14.5, 14, ink),
-                        line(3.5, 6, 3.5, 13, ink), line(8, 6, 8, 13, ink), line(12.5, 6, 12.5, 13, ink));
             }
             case "moodle" -> {
                 Rectangle screen = outlinedRect(1.5, 2.5, 13, 9, ink);
