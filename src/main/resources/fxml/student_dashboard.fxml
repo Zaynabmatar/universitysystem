@@ -23,6 +23,7 @@
 <children>
 
     <ScrollPane fitToWidth="true" styleClass="classes-scroll"
+                hbarPolicy="NEVER" vbarPolicy="NEVER"
                 AnchorPane.topAnchor="0" AnchorPane.rightAnchor="0"
                 AnchorPane.bottomAnchor="0" AnchorPane.leftAnchor="0">
     <content>

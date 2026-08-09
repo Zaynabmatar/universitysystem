@@ -508,6 +508,11 @@ public class RegistrationService {
                 .toList();
     }
 
+    /** Every enrollment a student has ever held, across every semester. */
+    public List<Enrollment> allEnrollments(int studentId) {
+        return enrollmentDao.findByStudent(studentId);
+    }
+
     // ================================================================= HELPERS
 
     private Student requireStudent(int studentId) {

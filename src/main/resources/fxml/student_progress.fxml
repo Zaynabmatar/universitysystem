@@ -59,6 +59,8 @@
         <VBox fx:id="studyPlanContainer" spacing="18">
             <padding><Insets top="4" right="4" bottom="16" left="4"/></padding>
         </VBox>
+
+        <fx:include source="student_footer.fxml"/>
     </VBox>
     </content>
 </ScrollPane>

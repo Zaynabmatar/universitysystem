@@ -119,6 +119,8 @@
                     <Label fx:id="totalUsdFooterLabel" styleClass="section-title"/>
                 </HBox>
             </VBox>
+
+            <fx:include source="student_footer.fxml"/>
         </VBox>
     </content>
 </ScrollPane>
