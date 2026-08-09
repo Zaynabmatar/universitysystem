@@ -18,6 +18,7 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -28,6 +29,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Callback;
@@ -58,6 +60,7 @@ public class InstructorAttendanceController {
     @FXML private Label dateHintLabel;
     @FXML private ScrollPane calendarScroll;
     @FXML private VBox monthsBox;
+    @FXML private TextField searchField;
     @FXML private TableView<AttendanceRow> attendanceTable;
     @FXML private TableColumn<AttendanceRow, String> colStudentId;
     @FXML private TableColumn<AttendanceRow, String> colStudentName;
@@ -72,6 +75,7 @@ public class InstructorAttendanceController {
     private final CourseService courseService = new CourseService();
 
     private final ObservableList<AttendanceRow> rows = FXCollections.observableArrayList();
+    private final FilteredList<AttendanceRow> filteredRows = new FilteredList<>(rows, r -> true);
 
     private int sectionId;
     private Set<LocalDate> scheduledDates = Set.of();
@@ -100,7 +104,7 @@ public class InstructorAttendanceController {
         colStatus.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getStatus()));
         colStatus.setCellFactory(statusCellFactory());
 
-        attendanceTable.setItems(rows);
+        attendanceTable.setItems(filteredRows);
         attendanceTable.setPlaceholder(new Label("Choose one of your sections, then a scheduled class date."));
 
         saveButton.setDisable(true);
@@ -113,6 +117,19 @@ public class InstructorAttendanceController {
             }
             onSectionChosen(chosen);
         });
+
+        searchField.textProperty().addListener((obs, old, text) -> applySearchFilter(text));
+    }
+
+    private void applySearchFilter(String text) {
+        String needle = text == null ? "" : text.trim().toLowerCase(Locale.ENGLISH);
+        if (needle.isEmpty()) {
+            filteredRows.setPredicate(r -> true);
+            return;
+        }
+        filteredRows.setPredicate(r ->
+                r.getStudentName().toLowerCase(Locale.ENGLISH).contains(needle)
+                        || String.valueOf(r.getStudentUserId()).contains(needle));
     }
 
     // ------------------------------------------------------------------ loading
