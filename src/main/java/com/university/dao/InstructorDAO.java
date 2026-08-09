@@ -16,17 +16,17 @@ public class InstructorDAO extends AbstractDAO implements GenericDAO<Instructor>
 
     private static final String SELECT =
             "SELECT instructor_id, user_id, employee_number, first_name, last_name, email, phone, "
-            + "dept_id, academic_rank, hire_date, is_active FROM dbo.instructors";
+            + "address, dept_id, academic_rank, hire_date, is_active FROM dbo.instructors";
 
     private static final String INSERT =
             "INSERT INTO dbo.instructors (user_id, employee_number, first_name, last_name, email, "
-            + "phone, dept_id, academic_rank, hire_date, is_active) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + "phone, address, dept_id, academic_rank, hire_date, is_active) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String UPDATE =
             "UPDATE dbo.instructors SET employee_number = ?, first_name = ?, last_name = ?, "
-            + "email = ?, phone = ?, dept_id = ?, academic_rank = ?, hire_date = ?, is_active = ? "
-            + "WHERE instructor_id = ?";
+            + "email = ?, phone = ?, address = ?, dept_id = ?, academic_rank = ?, hire_date = ?, "
+            + "is_active = ? WHERE instructor_id = ?";
 
     private static final String DELETE = "DELETE FROM dbo.instructors WHERE instructor_id = ?";
 
@@ -41,6 +41,7 @@ public class InstructorDAO extends AbstractDAO implements GenericDAO<Instructor>
         instructor.setLastName(rs.getString("last_name"));
         instructor.setEmail(rs.getString("email"));
         instructor.setPhone(rs.getString("phone"));
+        instructor.setAddress(rs.getString("address"));
         instructor.setDepartmentId(rs.getInt("dept_id"));
         instructor.setAcademicRank(AcademicRank.fromDb(rs.getString("academic_rank")));
         instructor.setHireDate(DaoUtils.getLocalDate(rs, "hire_date"));
@@ -117,6 +118,7 @@ public class InstructorDAO extends AbstractDAO implements GenericDAO<Instructor>
                 entity.getLastName(),
                 entity.getEmail(),
                 entity.getPhone(),
+                entity.getAddress(),
                 entity.getDepartmentId(),
                 entity.getAcademicRank(),
                 entity.getHireDate(),
@@ -131,6 +133,7 @@ public class InstructorDAO extends AbstractDAO implements GenericDAO<Instructor>
                 entity.getLastName(),
                 entity.getEmail(),
                 entity.getPhone(),
+                entity.getAddress(),
                 entity.getDepartmentId(),
                 entity.getAcademicRank(),
                 entity.getHireDate(),

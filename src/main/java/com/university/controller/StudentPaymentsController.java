@@ -142,10 +142,10 @@ public class StudentPaymentsController {
 
         usdInstallmentsTable.setItems(usdRows);
         usdInstallmentsTable.setPlaceholder(new Label("No USD installments due."));
-        usdInstallmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        usdInstallmentsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         lbpInstallmentsTable.setItems(lbpRows);
         lbpInstallmentsTable.setPlaceholder(new Label("No LBP installments due."));
-        lbpInstallmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        lbpInstallmentsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         bindHeightToContent(usdInstallmentsTable, usdRows);
         bindHeightToContent(lbpInstallmentsTable, lbpRows);
 
@@ -159,7 +159,7 @@ public class StudentPaymentsController {
         colChargeTotalUsd.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().dueUsd));
         chargesTable.setItems(chargeRows);
         chargesTable.setPlaceholder(new Label("You are not registered in any course this semester."));
-        chargesTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        chargesTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         bindHeightToContent(chargesTable, chargeRows);
 
         setUpSemesterSelector();
