@@ -657,3 +657,91 @@
 }
 .ai-send-btn:hover   { -fx-background-color: -indigo-700; }
 .ai-send-btn:pressed { -fx-background-color: -navy-900; }
+
+/* ---------- Instructor Attendance ---------- */
+/* The full-semester calendar: one .calendar-month block per month the semester spans, each a
+   7-column .calendar-grid of .calendar-day-cell labels. Only .scheduled-class-day cells (the
+   section's real weekly meeting dates) get the indigo fill, a hand cursor and a click handler —
+   every other day is left plain and inert, so it simply cannot be selected. */
+.calendar-scroll, .calendar-scroll > .viewport { -fx-background-color: transparent; }
+.calendar-months-box { -fx-background-color: transparent; }
+.calendar-month { -fx-padding: 2 0 2 0; }
+.calendar-day-header {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #6b7280;
+}
+.calendar-day-cell {
+    -fx-background-radius: 6;
+    -fx-font-size: 12px;
+    -fx-text-fill: #9ca3af;
+}
+.calendar-day-disabled {
+    -fx-text-fill: #cbd5e1;
+}
+
+/* The calendar's scheduled-class-day cells: indigo/navy fill so the real meeting dates for the
+   chosen section stand out at a glance. Every other day is left at its normal style and has no
+   click handler, so it cannot be selected. */
+.scheduled-class-day {
+    -fx-background-color: -indigo-600;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+.scheduled-class-day:hover {
+    -fx-background-color: -indigo-700;
+}
+.selected-class-day {
+    -fx-border-color: -navy-900;
+    -fx-border-width: 2;
+    -fx-border-radius: 6;
+}
+
+/* The Present/Absent picker embedded in each attendance row, colored like the other status
+   badges in the app (.badge-ok / .badge-danger) so Absent reads as a warning at a glance. */
+.attendance-status-combo {
+    -fx-background-radius: 10;
+    -fx-font-size: 11.5px;
+    -fx-font-weight: bold;
+    -fx-pref-width: 120;
+}
+.attendance-status-combo.badge-ok         { -fx-background-color: #dcfce7; }
+.attendance-status-combo.badge-ok .label       { -fx-text-fill: #166534; }
+.attendance-status-combo.badge-danger      { -fx-background-color: #fee2e2; }
+.attendance-status-combo.badge-danger .label   { -fx-text-fill: #991b1b; }
+
+/* ---------- Student sidebar page footer ("Student Info + Contact Us") ---------- */
+/* Reused at the end of every Student sidebar page (see student_footer.fxml). Same navy
+   gradient as the sidebar/AI assistant panel so it reads as the app's brand surface, with
+   light text for contrast against the dark background. */
+.page-footer      {
+    -fx-background-color: linear-gradient(to bottom, -navy-800, -navy-900);
+    -fx-background-radius: 10;
+    -fx-padding: 22 30 20 30;
+    -fx-effect: dropshadow(gaussian, rgba(8,39,102,0.20), 12, 0, 0, 3);
+}
+.footer-heading   { -fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: white; }
+.footer-line      { -fx-font-size: 12.5px; -fx-text-fill: rgba(255, 255, 255, 0.82); }
+.footer-copyright { -fx-font-size: 11.5px; -fx-text-fill: rgba(255, 255, 255, 0.6); -fx-padding: 8 0 0 0; }
+.footer-social-row  { -fx-padding: 6 0 0 0; }
+.footer-social-badge {
+    -fx-background-radius: 100;
+    -fx-min-width: 30;
+    -fx-min-height: 30;
+    -fx-pref-width: 30;
+    -fx-pref-height: 30;
+    -fx-max-width: 30;
+    -fx-max-height: 30;
+    -fx-alignment: center;
+    -fx-padding: 6;
+}
+.footer-social-icon { -fx-fill: white; }
+.badge-facebook  { -fx-background-color: #1877F2; }
+.badge-instagram { -fx-background-color: linear-gradient(from 0% 100% to 100% 0%, #FEDA75 0%, #FA7E1E 25%, #D62976 50%, #962FBF 75%, #4F5BD5 100%); }
+.badge-youtube   { -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, #FDC830 0%, #F37335 50%, #D31027 100%); }
+.badge-linkedin  { -fx-background-color: #0A66C2; }
+
+/* ---------- Student Academic Analytics ---------- */
+.analytics-stat-value { -fx-font-size: 19px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
+.gauge-card            { -fx-padding: 16; -fx-min-height: 230; }

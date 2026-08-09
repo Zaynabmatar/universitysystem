@@ -57,4 +57,6 @@
 
     <Label fx:id="footerLabel" styleClass="muted-label" wrapText="true"
            text="Courses marked “Repeated” are superseded attempts and do not count towards the GPA. Grades of W and I carry no grade points. Dropped courses never appear on a transcript."/>
+
+    <fx:include source="student_footer.fxml"/>
 </VBox>

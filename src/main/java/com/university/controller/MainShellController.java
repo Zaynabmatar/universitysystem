@@ -91,6 +91,7 @@ public class MainShellController {
             new MenuEntry("Dashboard",       "instructor_dashboard.fxml"),
             new MenuEntry("My Sections",     "instructor_sections.fxml"),
             new MenuEntry("Enter Grades",    "instructor_grades.fxml"),
+            new MenuEntry("Attendance",      "instructor_attendance.fxml"),
             new MenuEntry("My Timetable",    "instructor_timetable.fxml")
     );
 
@@ -101,7 +102,8 @@ public class MainShellController {
      * the sidebar or Classes page).
      */
     private static final List<MenuEntry> STUDENT_MENU = List.of(
-            new MenuEntry("Classes",        "student_dashboard.fxml",      "classes"),
+            new MenuEntry("Classes",             "student_dashboard.fxml",      "classes"),
+            new MenuEntry("Academic Analytics",  "student_analytics.fxml",      "analytics"),
             new MenuEntry("Payments",       "student_payments.fxml",       "payments"),
             new MenuEntry("Registration",   "student_registration.fxml",   "registration"),
             new MenuEntry("Transcript",     "student_transcript.fxml",     "transcript"),
@@ -242,6 +244,17 @@ public class MainShellController {
                 tassel.setStrokeWidth(1.3);
                 Circle knot = new Circle(13.2, 13, 1.1, ink);
                 shape.getChildren().addAll(cap, band, tassel, knot);
+            }
+            case "analytics" -> {
+                Rectangle bar1 = new Rectangle(2, 10, 3, 5);
+                Rectangle bar2 = new Rectangle(6.5, 6, 3, 9);
+                Rectangle bar3 = new Rectangle(11, 2, 3, 13);
+                for (Rectangle bar : new Rectangle[]{bar1, bar2, bar3}) {
+                    bar.setArcWidth(1);
+                    bar.setArcHeight(1);
+                    bar.setFill(ink);
+                }
+                shape.getChildren().addAll(bar1, bar2, bar3);
             }
             case "payments" -> {
                 Rectangle card = new Rectangle(1, 3, 14, 10);

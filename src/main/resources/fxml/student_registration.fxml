@@ -61,6 +61,8 @@
         <HBox spacing="10" alignment="CENTER_LEFT">
             <Button fx:id="dropButton" text="Drop / Withdraw" onAction="#handleDrop"/>
         </HBox>
+
+        <fx:include source="student_footer.fxml"/>
     </VBox>
     </content>
 </ScrollPane>

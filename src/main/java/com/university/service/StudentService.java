@@ -8,6 +8,7 @@ import com.university.enums.AcademicStanding;
 import com.university.enums.AuditActionType;
 import com.university.enums.StudentStatus;
 import com.university.enums.UserRole;
+import com.university.model.Program;
 import com.university.model.Student;
 import com.university.util.ValidationUtil;
 
@@ -58,6 +59,11 @@ public class StudentService {
 
     public Student findById(int studentId) {
         return requireStudent(studentId);
+    }
+
+    /** The program (major) a student is enrolled in, or null if it can no longer be resolved. */
+    public Program programOf(Student student) {
+        return programDao.findById(student.getProgramId()).orElse(null);
     }
 
     // ------------------------------------------------------------------ create

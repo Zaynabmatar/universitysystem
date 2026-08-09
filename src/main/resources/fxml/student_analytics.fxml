@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.BarChart?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<ScrollPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.university.controller.StudentAnalyticsController"
+            fitToWidth="true" styleClass="page-scroll">
+    <content>
+    <VBox styleClass="content-page" spacing="14">
+
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <VBox spacing="2">
+                <Label fx:id="headerLabel" text="Academic Analytics" styleClass="page-title"/>
+                <Label fx:id="programLabel" styleClass="muted-text"/>
+            </VBox>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button text="Refresh" onAction="#handleRefresh"/>
+        </HBox>
+
+        <!-- ===== 1. Academic Summary + Student Blockage ===== -->
+        <HBox spacing="14">
+            <VBox spacing="10" styleClass="panel" HBox.hgrow="ALWAYS">
+                <padding><Insets top="14" right="16" bottom="14" left="16"/></padding>
+                <Label text="Academic Summary" styleClass="section-title"/>
+                <GridPane hgap="22" vgap="12">
+                    <columnConstraints>
+                        <ColumnConstraints percentWidth="33.3"/>
+                        <ColumnConstraints percentWidth="33.3"/>
+                        <ColumnConstraints percentWidth="33.3"/>
+                    </columnConstraints>
+
+                    <VBox spacing="2" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                        <Label text="Current GPA" styleClass="muted-text"/>
+                        <Label fx:id="gpaSummaryLabel" text="—" styleClass="analytics-stat-value"/>
+                    </VBox>
+                    <VBox spacing="2" GridPane.rowIndex="0" GridPane.columnIndex="1">
+                        <Label text="Academic Standing" styleClass="muted-text"/>
+                        <Label fx:id="standingLabel" text="—" styleClass="analytics-stat-value"/>
+                    </VBox>
+                    <VBox spacing="2" GridPane.rowIndex="0" GridPane.columnIndex="2">
+                        <Label text="Account Status" styleClass="muted-text"/>
+                        <Label fx:id="statusLabel" text="—" styleClass="analytics-stat-value"/>
+                    </VBox>
+
+                    <VBox spacing="2" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                        <Label text="Completed Credits" styleClass="muted-text"/>
+                        <Label fx:id="completedCreditsLabel" text="—" styleClass="analytics-stat-value"/>
+                    </VBox>
+                    <VBox spacing="2" GridPane.rowIndex="1" GridPane.columnIndex="1">
+                        <Label text="Remaining Credits" styleClass="muted-text"/>
+                        <Label fx:id="remainingCreditsLabel" text="—" styleClass="analytics-stat-value"/>
+                    </VBox>
+                    <VBox spacing="2" GridPane.rowIndex="1" GridPane.columnIndex="2">
+                        <Label text="Graduation Progress" styleClass="muted-text"/>
+                        <Label fx:id="progressPercentLabel" text="—" styleClass="analytics-stat-value"/>
+                    </VBox>
+
+                    <VBox spacing="2" GridPane.rowIndex="2" GridPane.columnIndex="0" GridPane.columnSpan="3">
+                        <Label text="Estimated Graduation Semester" styleClass="muted-text"/>
+                        <Label fx:id="estimatedGradLabel" text="—" styleClass="analytics-stat-value"/>
+                    </VBox>
+                </GridPane>
+            </VBox>
+
+            <VBox spacing="8" styleClass="panel" prefWidth="300" minWidth="260">
+                <padding><Insets top="14" right="16" bottom="14" left="16"/></padding>
+                <Label text="Student Blockage" styleClass="section-title"/>
+                <Label fx:id="blockStatusLabel" text="—" styleClass="verdict"/>
+                <Separator/>
+                <HBox spacing="8">
+                    <Label text="Type:" styleClass="muted-text"/>
+                    <Label fx:id="blockTypeLabel" text="—"/>
+                </HBox>
+                <VBox spacing="2">
+                    <Label text="Reason:" styleClass="muted-text"/>
+                    <Label fx:id="blockReasonLabel" text="—" wrapText="true"/>
+                </VBox>
+            </VBox>
+        </HBox>
+
+        <!-- ===== 2. Graphical indicators ===== -->
+        <Label text="Graphical Indicators" styleClass="section-title"/>
+        <HBox spacing="14">
+            <VBox styleClass="chart-card gauge-card" alignment="CENTER" HBox.hgrow="ALWAYS">
+                <StackPane fx:id="progressGaugeHolder" alignment="CENTER" prefHeight="230"/>
+            </VBox>
+            <VBox styleClass="chart-card gauge-card" alignment="CENTER" HBox.hgrow="ALWAYS">
+                <StackPane fx:id="gpaGaugeHolder" alignment="CENTER" prefHeight="230"/>
+            </VBox>
+        </HBox>
+
+        <!-- ===== 3. Cumulative indicator ===== -->
+        <Label text="Cumulative Indicator" styleClass="section-title"/>
+        <HBox spacing="14">
+            <StackPane styleClass="chart-card" HBox.hgrow="ALWAYS">
+                <BarChart fx:id="semesterGpaChart" title="Semester GPA" legendVisible="false" animated="false">
+                    <xAxis><CategoryAxis label="Semester"/></xAxis>
+                    <yAxis><NumberAxis label="GPA" lowerBound="0" upperBound="4" tickUnit="0.5"/></yAxis>
+                </BarChart>
+                <Label fx:id="semesterGpaEmpty" styleClass="chart-empty" visible="false" managed="false"
+                       text="No completed semesters yet."/>
+            </StackPane>
+            <StackPane styleClass="chart-card" HBox.hgrow="ALWAYS">
+                <BarChart fx:id="cumulativeGpaChart" title="Cumulative GPA" legendVisible="false" animated="false">
+                    <xAxis><CategoryAxis label="Semester"/></xAxis>
+                    <yAxis><NumberAxis label="GPA" lowerBound="0" upperBound="4" tickUnit="0.5"/></yAxis>
+                </BarChart>
+                <Label fx:id="cumulativeGpaEmpty" styleClass="chart-empty" visible="false" managed="false"
+                       text="No completed semesters yet."/>
+            </StackPane>
+        </HBox>
+
+        <!-- ===== 4. Academic progress & graduation projection ===== -->
+        <Label text="Academic Progress with Graduation Projection" styleClass="section-title"/>
+        <StackPane styleClass="chart-card">
+            <LineChart fx:id="projectionChart" legendVisible="true" animated="false" createSymbols="true"
+                       prefHeight="320">
+                <xAxis><CategoryAxis label="Semester"/></xAxis>
+                <yAxis><NumberAxis label="Credits"/></yAxis>
+            </LineChart>
+            <Label fx:id="projectionEmpty" styleClass="chart-empty" visible="false" managed="false"
+                   text="Not enough academic history yet to project your graduation pace."/>
+        </StackPane>
+
+        <!-- ===== 5. Course credit indicator ===== -->
+        <Label text="Course Credit Indicator" styleClass="section-title"/>
+        <StackPane styleClass="chart-card">
+            <BarChart fx:id="creditChart" title="Credits per Semester" legendVisible="false" animated="false"
+                      prefHeight="280">
+                <xAxis><CategoryAxis label="Semester"/></xAxis>
+                <yAxis><NumberAxis label="Credits"/></yAxis>
+            </BarChart>
+            <Label fx:id="creditEmpty" styleClass="chart-empty" visible="false" managed="false"
+                   text="No completed semesters yet."/>
+        </StackPane>
+
+        <fx:include source="student_footer.fxml"/>
+
+    </VBox>
+    </content>
+</ScrollPane>
