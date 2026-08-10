@@ -1,8 +1,6 @@
 package com.university.service;
 
-import com.university.dao.AuditLogDAO;
 import com.university.dao.UserDAO;
-import com.university.enums.AuditActionType;
 import com.university.enums.UserRole;
 import com.university.model.User;
 import com.university.util.ValidationUtil;
@@ -69,7 +67,6 @@ public class AccountService {
     private static final int MAX_EMAIL_ATTEMPTS = 100;
 
     private final UserDAO userDao = new UserDAO();
-    private final AuditLogDAO auditLogDao = new AuditLogDAO();
 
     /**
      * What was generated for a brand-new account.
@@ -263,23 +260,6 @@ public class AccountService {
         ValidationException.requireId(userId, "User");
         userDao.updatePasswordHash(userId, PasswordHasher.hashDefaultPassword(userId));
         return PasswordHasher.defaultPasswordFor(userId);
-    }
-
-    // ================================================================= audit
-
-    /**
-     * Records an account action against the user acted upon.
-     *
-     * <p>The description is written by the caller and must never contain a
-     * password. {@code recordId} is the account's {@code user_id}, which is
-     * also the Student ID or Instructor ID quoted in the description, so the
-     * log reads the same way the screens do.</p>
-     */
-    public void audit(Connection connection, AuditActionType action, String tableName,
-                      int userId, String oldValue, String newValue, String description) {
-        Integer actor = Session.isActive() ? Session.current().getUser().getUserId() : null;
-        auditLogDao.record(connection, actor, action, tableName, userId,
-                oldValue, newValue, description);
     }
 
     // =============================================================== helpers

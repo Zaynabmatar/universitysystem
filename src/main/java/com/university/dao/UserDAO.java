@@ -19,7 +19,12 @@ import java.util.Optional;
  * decides the next value. Nothing here computes one, and nothing anywhere
  * else may either — no {@code MAX(user_id) + 1}, no {@code COUNT(*)}, no
  * reading the last row. {@link #insert} hands the row to the database and
- * reads the assigned id straight back out of {@code OUTPUT INSERTED.user_id}.</p>
+ * reads the assigned id back through {@link AbstractDAO#insertAndReturnKey},
+ * the same {@code SCOPE_IDENTITY()}-based mechanism every other DAO in this
+ * package uses — {@code OUTPUT INSERTED.user_id} without an {@code INTO}
+ * clause is what this table used before {@code trg_User_Audit}
+ * (migration {@code 0014_audit_log_triggers.sql}) started auditing it: SQL
+ * Server refuses that exact form on any table that has an enabled trigger.</p>
  *
  * <p>This class moves password hashes around but never judges them; that is
  * {@link PasswordHasher}'s job.</p>
@@ -33,16 +38,8 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
             "SELECT user_id, username, password_hash, role, is_active, last_login, created_at, "
             + "email, address FROM dbo.users";
 
-    /**
-     * {@code OUTPUT INSERTED.user_id} makes SQL Server return the value its
-     * IDENTITY column just assigned, in the same round trip and the same
-     * transaction as the insert. It is exact under concurrency in a way that
-     * looking the row up afterwards never is.
-     */
     private static final String INSERT =
-            "INSERT INTO dbo.users (username, password_hash, role, is_active) "
-            + "OUTPUT INSERTED.user_id "
-            + "VALUES (?, ?, ?, ?)";
+            "INSERT INTO dbo.users (username, password_hash, role, is_active) VALUES (?, ?, ?, ?)";
 
     /**
      * Column-filler only: {@code password_hash} is NOT NULL, but the real
@@ -216,14 +213,11 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     }
 
     /**
-     * @return the {@code user_id} SQL Server generated, read back from
-     *         {@code OUTPUT INSERTED.user_id} — never computed here
+     * @return the {@code user_id} SQL Server generated — never computed here
      */
     @Override
     public int insert(Connection connection, User entity) {
-        int userId = queryOne(connection, INSERT, rs -> rs.getInt(1), insertParams(entity))
-                .orElseThrow(() -> new DataAccessException(
-                        "The database did not return a generated user_id: " + INSERT));
+        int userId = insertAndReturnKey(connection, INSERT, insertParams(entity));
         entity.setUserId(userId);
         entity.setPasswordHash(PLACEHOLDER_HASH);
         return userId;

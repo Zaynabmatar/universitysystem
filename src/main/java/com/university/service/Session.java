@@ -1,5 +1,6 @@
 package com.university.service;
 
+import com.university.database.ActorContext;
 import com.university.enums.UserRole;
 import com.university.model.Instructor;
 import com.university.model.Student;
@@ -32,11 +33,15 @@ public final class Session {
     /** Opens a session. Called by {@link AuthService} once a password checks out. */
     static void begin(User user, Student student, Instructor instructor) {
         current = new Session(user, student, instructor);
+        // So DBConnection.getConnection() can stamp SESSION_CONTEXT for the
+        // trigger-based audit log — see ActorContext.
+        ActorContext.set(user.getUserId());
     }
 
     /** Closes the session. */
     static void end() {
         current = null;
+        ActorContext.clear();
     }
 
     /** True when somebody is signed in. */

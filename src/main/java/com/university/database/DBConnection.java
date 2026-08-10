@@ -9,7 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.Properties;
 
 /**
@@ -298,7 +300,41 @@ public class DBConnection {
      * @throws SQLException if no connection can be obtained
      */
     public static Connection getConnection() throws SQLException {
-        return dataSource().getConnection();
+        Connection connection = dataSource().getConnection();
+        stampSessionContext(connection);
+        return connection;
+    }
+
+    /**
+     * Stamps the connection with the signed-in user's id, using SQL Server's
+     * {@code SESSION_CONTEXT} rather than a table or a bind variable threaded
+     * through every call.
+     *
+     * <p>The pool reuses physical connections across unrelated borrows, so this
+     * runs on every single checkout — never only on first use — and always
+     * writes an explicit value, including {@code NULL} when nobody is signed
+     * in. Otherwise a connection last used for one administrator's session
+     * could still carry that administrator's id the next time it is handed
+     * out, mis-attributing whatever the new borrower's trigger-audited change
+     * turns out to be.</p>
+     *
+     * <p>The {@code trg_*_Audit} triggers (migration
+     * {@code 0014_audit_log_triggers.sql}) read this back with
+     * {@code SESSION_CONTEXT(N'app_user_id')} for every audited table that has
+     * no {@code submitted_by} / {@code recorded_by} column of its own to carry
+     * the actor explicitly.</p>
+     */
+    private static void stampSessionContext(Connection connection) throws SQLException {
+        Integer actorUserId = ActorContext.get();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "EXEC sp_set_session_context @key = N'app_user_id', @value = ?")) {
+            if (actorUserId == null) {
+                statement.setNull(1, Types.INTEGER);
+            } else {
+                statement.setInt(1, actorUserId);
+            }
+            statement.execute();
+        }
     }
 
     /**
