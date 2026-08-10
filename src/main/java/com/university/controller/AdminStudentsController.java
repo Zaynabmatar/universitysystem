@@ -1,27 +1,32 @@
 package com.university.controller;
 
 import com.university.controller.dialog.StudentFormDialog;
+import com.university.enums.NotificationType;
 import com.university.enums.StudentStatus;
 import com.university.enums.UserRole;
+import com.university.model.Department;
 import com.university.model.Program;
 import com.university.model.Student;
 import com.university.service.AccountService;
 import com.university.service.CourseService;
+import com.university.service.NotificationService;
 import com.university.service.ServiceException;
 import com.university.service.Session;
 import com.university.service.StudentService;
 import com.university.util.AlertUtil;
+import com.university.util.ValidationUtil;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.HBox;
 import javafx.util.StringConverter;
 
 import java.util.List;
 
-/** The admin's "Manage Students" screen: search/filter table plus add, edit, deactivate and reset-password actions. */
+/** The admin's "Manage Students" screen: search/filter table plus add, edit, deactivate, reset-password and notification actions. */
 public class AdminStudentsController {
 
     @FXML private TextField searchField;
@@ -43,11 +48,27 @@ public class AdminStudentsController {
     @FXML private Button reactivateButton;
     @FXML private Button resetPwdButton;
 
+    // ------------------------------------------------------------ notification section
+    @FXML private RadioButton notifyAllRadio;
+    @FXML private RadioButton notifyDeptRadio;
+    @FXML private RadioButton notifySpecificRadio;
+    @FXML private HBox notifyDeptProgramBox;
+    @FXML private HBox notifySpecificBox;
+    @FXML private ComboBox<Department> notifyDepartmentBox;
+    @FXML private ComboBox<Program> notifyProgramBox;
+    @FXML private TextField notifySearchField;
+    @FXML private ComboBox<Student> notifyResultsBox;
+    @FXML private Label notifyRecipientCountLabel;
+    @FXML private TextField notifySubjectField;
+    @FXML private TextArea notifyMessageField;
+
     private final StudentService studentService = new StudentService();
     private final CourseService courseService = new CourseService();
+    private final NotificationService notificationService = new NotificationService();
 
     private final ObservableList<Student> rows = FXCollections.observableArrayList();
     private List<Program> programs = List.of();
+    private List<Department> departments = List.of();
 
     @FXML
     private void initialize() {
@@ -69,6 +90,7 @@ public class AdminStudentsController {
         studentTable.setPlaceholder(new Label("No students match your filters."));
 
         programs = courseService.listPrograms(false);
+        departments = courseService.listDepartments(false);
         programFilter.getItems().add(null);
         programFilter.getItems().addAll(programs);
         programFilter.setConverter(new StringConverter<>() {
@@ -100,6 +122,7 @@ public class AdminStudentsController {
                 () -> selected.get() == null || selected.get().getStatus() != StudentStatus.WITHDRAWN, selected));
 
         reload();
+        initNotificationSection();
     }
 
     // ------------------------------------------------------------------ data
@@ -243,6 +266,188 @@ public class AdminStudentsController {
                     + "\n\nTell the student to change it after signing in.");
         } catch (Exception e) {
             AlertUtil.error("Could not reset password", "The password could not be reset.", e);
+        }
+    }
+
+    // ------------------------------------------------------------------ send notification
+
+    private void initNotificationSection() {
+        ToggleGroup recipientGroup = new ToggleGroup();
+        notifyAllRadio.setToggleGroup(recipientGroup);
+        notifyDeptRadio.setToggleGroup(recipientGroup);
+        notifySpecificRadio.setToggleGroup(recipientGroup);
+        recipientGroup.selectedToggleProperty().addListener((o, a, b) -> updateNotifySectionVisibility());
+
+        notifyDepartmentBox.getItems().add(null);
+        notifyDepartmentBox.getItems().addAll(departments);
+        notifyDepartmentBox.setConverter(new StringConverter<>() {
+            @Override public String toString(Department d) { return d == null ? "Select department" : d.toString(); }
+            @Override public Department fromString(String s) { return null; }
+        });
+        notifyDepartmentBox.valueProperty().addListener((o, a, b) -> {
+            populateNotifyProgramBox();
+            updateRecipientCount();
+        });
+
+        notifyProgramBox.setConverter(new StringConverter<>() {
+            @Override public String toString(Program p) { return p == null ? "All programs" : p.toString(); }
+            @Override public Program fromString(String s) { return null; }
+        });
+        notifyProgramBox.valueProperty().addListener((o, a, b) -> updateRecipientCount());
+
+        notifyResultsBox.setConverter(new StringConverter<>() {
+            @Override public String toString(Student s) { return s == null ? "" : s.getUserId() + " - " + s.getFullName(); }
+            @Override public Student fromString(String s) { return null; }
+        });
+        notifyResultsBox.valueProperty().addListener((o, a, b) -> updateRecipientCount());
+
+        notifySearchField.textProperty().addListener((o, a, b) -> refreshNotifySearchResults());
+
+        updateNotifySectionVisibility();
+    }
+
+    private void updateNotifySectionVisibility() {
+        boolean deptMode = notifyDeptRadio.isSelected();
+        boolean specificMode = notifySpecificRadio.isSelected();
+        notifyDeptProgramBox.setVisible(deptMode);
+        notifyDeptProgramBox.setManaged(deptMode);
+        notifySpecificBox.setVisible(specificMode);
+        notifySpecificBox.setManaged(specificMode);
+        updateRecipientCount();
+    }
+
+    private void populateNotifyProgramBox() {
+        Department dept = notifyDepartmentBox.getValue();
+        notifyProgramBox.getItems().clear();
+        notifyProgramBox.setValue(null);
+        if (dept == null) {
+            notifyProgramBox.setDisable(true);
+            return;
+        }
+        notifyProgramBox.setDisable(false);
+        notifyProgramBox.getItems().add(null);
+        notifyProgramBox.getItems().addAll(programs.stream()
+                .filter(p -> p.getDepartmentId() == dept.getDepartmentId())
+                .toList());
+        notifyProgramBox.getSelectionModel().selectFirst();
+    }
+
+    private void refreshNotifySearchResults() {
+        notifyResultsBox.setValue(null);
+        String term = notifySearchField.getText();
+        if (ValidationUtil.isBlank(term)) {
+            notifyResultsBox.getItems().clear();
+            return;
+        }
+        List<Student> matches = studentService.search(term.trim()).stream()
+                .filter(s -> s.getStatus() != StudentStatus.WITHDRAWN)
+                .toList();
+        notifyResultsBox.getItems().setAll(matches);
+        if (!matches.isEmpty()) {
+            notifyResultsBox.show();
+        }
+    }
+
+    private boolean programInDepartment(int programId, int departmentId) {
+        return programs.stream()
+                .filter(p -> p.getProgramId() == programId)
+                .anyMatch(p -> p.getDepartmentId() == departmentId);
+    }
+
+    /** Every account this send would reach, active accounts only. */
+    private List<Student> resolveNotifyRecipients() {
+        if (notifySpecificRadio.isSelected()) {
+            Student selected = notifyResultsBox.getValue();
+            return selected == null ? List.of() : List.of(selected);
+        }
+
+        List<Student> activeStudents = studentService.search("").stream()
+                .filter(s -> s.getStatus() != StudentStatus.WITHDRAWN)
+                .toList();
+
+        if (notifyAllRadio.isSelected()) {
+            return activeStudents;
+        }
+
+        // By department / optional program.
+        Department dept = notifyDepartmentBox.getValue();
+        if (dept == null) {
+            return List.of();
+        }
+        Program program = notifyProgramBox.getValue();
+        return activeStudents.stream()
+                .filter(s -> program != null
+                        ? s.getProgramId() == program.getProgramId()
+                        : programInDepartment(s.getProgramId(), dept.getDepartmentId()))
+                .toList();
+    }
+
+    private void updateRecipientCount() {
+        int count = resolveNotifyRecipients().size();
+        notifyRecipientCountLabel.setText(count + " student" + (count == 1 ? "" : "s") + " will receive this notification.");
+    }
+
+    private String describeNotifyRecipients(List<Student> recipients) {
+        if (notifySpecificRadio.isSelected()) {
+            Student s = recipients.get(0);
+            return s.getFullName() + " (Student ID " + s.getUserId() + ")";
+        }
+        if (notifyAllRadio.isSelected()) {
+            return "all " + recipients.size() + " active student" + (recipients.size() == 1 ? "" : "s");
+        }
+        Program program = notifyProgramBox.getValue();
+        Department dept = notifyDepartmentBox.getValue();
+        String scope = program != null ? program.toString() : (dept != null ? dept.toString() : "the selected department");
+        return recipients.size() + " student" + (recipients.size() == 1 ? "" : "s") + " in " + scope;
+    }
+
+    @FXML
+    private void handleSendNotification() {
+        String subject = notifySubjectField.getText() == null ? "" : notifySubjectField.getText().trim();
+        String message = notifyMessageField.getText() == null ? "" : notifyMessageField.getText().trim();
+
+        if (ValidationUtil.isBlank(subject) || !ValidationUtil.maxLength(subject, 100)) {
+            AlertUtil.warn("Cannot send notification", "Subject is required (maximum 100 characters).");
+            return;
+        }
+        if (ValidationUtil.isBlank(message) || !ValidationUtil.maxLength(message, 500)) {
+            AlertUtil.warn("Cannot send notification", "Message is required (maximum 500 characters).");
+            return;
+        }
+        if (notifyDeptRadio.isSelected() && notifyDepartmentBox.getValue() == null) {
+            AlertUtil.warn("Cannot send notification", "Select a department.");
+            return;
+        }
+        if (notifySpecificRadio.isSelected() && notifyResultsBox.getValue() == null) {
+            AlertUtil.warn("Cannot send notification", "Search for and select a student.");
+            return;
+        }
+
+        List<Student> recipients = resolveNotifyRecipients();
+        if (recipients.isEmpty()) {
+            AlertUtil.warn("No recipients", "No active students match the selected recipients.");
+            return;
+        }
+
+        boolean ok = AlertUtil.confirm("Send notification",
+                "Send this notification to " + describeNotifyRecipients(recipients) + "?");
+        if (!ok) return;
+
+        try {
+            List<Integer> userIds = recipients.stream().map(Student::getUserId).toList();
+            notificationService.notifyAll(userIds, NotificationType.GENERAL, subject, message);
+            AlertUtil.success("Notification sent",
+                    "Sent to " + recipients.size() + " student" + (recipients.size() == 1 ? "" : "s") + ".");
+            notifySubjectField.clear();
+            notifyMessageField.clear();
+            notifySearchField.clear();
+            notifyResultsBox.getItems().clear();
+            notifyResultsBox.setValue(null);
+            updateRecipientCount();
+        } catch (ServiceException se) {
+            AlertUtil.warn("Could not send", se.getMessage());
+        } catch (Exception e) {
+            AlertUtil.error("Could not send", "The notification could not be sent.", e);
         }
     }
 }

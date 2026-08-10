@@ -1,19 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx"
-      xmlns:fx="http://javafx.com/fxml"
-      fx:controller="com.university.controller.AdminInstructorsController"
-      styleClass="content-page" spacing="12">
+<ScrollPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.university.controller.AdminInstructorsController"
+            fitToWidth="true" styleClass="page-scroll">
+<content>
+<VBox styleClass="content-page" spacing="12">
 
     <Label text="Manage Instructors" styleClass="page-title"/>
 
@@ -26,7 +32,7 @@
         <Label fx:id="countLabel" styleClass="muted-text"/>
     </HBox>
 
-    <TableView fx:id="instructorTable" VBox.vgrow="ALWAYS">
+    <TableView fx:id="instructorTable" prefHeight="400" VBox.vgrow="ALWAYS">
         <columns>
             <TableColumn fx:id="colInstructorId" text="Instructor ID" prefWidth="110"/>
             <TableColumn fx:id="colName"       text="Name"         prefWidth="180"/>
@@ -48,4 +54,43 @@
         <Region HBox.hgrow="ALWAYS"/>
         <Button text="Refresh" onAction="#handleRefresh"/>
     </HBox>
+
+    <!-- ================= Send Notification to Instructors ================= -->
+    <VBox styleClass="panel" spacing="10">
+        <padding><Insets top="16" right="16" bottom="16" left="16"/></padding>
+
+        <Label text="Send Notification to Instructors" styleClass="section-title"/>
+
+        <HBox spacing="20" alignment="CENTER_LEFT">
+            <RadioButton fx:id="notifyAllRadio"      text="All Instructors" selected="true"/>
+            <RadioButton fx:id="notifyDeptRadio"     text="By Department"/>
+            <RadioButton fx:id="notifySpecificRadio" text="Specific Instructor"/>
+        </HBox>
+
+        <HBox fx:id="notifyDeptBox" spacing="10" alignment="CENTER_LEFT" managed="false" visible="false">
+            <Label text="Department:"/>
+            <ComboBox fx:id="notifyDepartmentBox" prefWidth="220" promptText="Select department"/>
+        </HBox>
+
+        <HBox fx:id="notifySpecificBox" spacing="10" alignment="CENTER_LEFT" managed="false" visible="false">
+            <Label text="Search:"/>
+            <TextField fx:id="notifySearchField" promptText="Search by Instructor ID or name" prefWidth="260"/>
+            <ComboBox fx:id="notifyResultsBox" prefWidth="280" promptText="Select an instructor"/>
+        </HBox>
+
+        <Label fx:id="notifyRecipientCountLabel" styleClass="muted-text"/>
+
+        <Label text="Subject *"/>
+        <TextField fx:id="notifySubjectField" promptText="Subject" maxWidth="Infinity"/>
+
+        <Label text="Message *"/>
+        <TextArea fx:id="notifyMessageField" promptText="Message" prefRowCount="4" wrapText="true"/>
+
+        <HBox alignment="CENTER_RIGHT">
+            <Button fx:id="sendNotificationButton" text="Send Notification" onAction="#handleSendNotification"/>
+        </HBox>
+    </VBox>
+
 </VBox>
+</content>
+</ScrollPane>
