@@ -29,18 +29,18 @@ import java.util.Optional;
 public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
 
     private static final String SELECT =
-            "SELECT grade_id, enrollment_id, coursework_mark, midterm_mark, final_mark, total_mark, "
-            + "letter_grade, grade_points, result_status, is_submitted, submitted_by, "
+            "SELECT grade_id, enrollment_id, coursework_mark, midterm_mark, lab_mark, final_mark, "
+            + "total_mark, letter_grade, grade_points, result_status, is_submitted, submitted_by, "
             + "submitted_at, last_modified_by, last_modified_at FROM dbo.grades";
 
     private static final String INSERT =
-            "INSERT INTO dbo.grades (enrollment_id, coursework_mark, midterm_mark, final_mark, "
+            "INSERT INTO dbo.grades (enrollment_id, coursework_mark, midterm_mark, lab_mark, final_mark, "
             + "total_mark, letter_grade, grade_points, result_status, is_submitted, "
-            + "submitted_by, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + "submitted_by, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String UPDATE =
-            "UPDATE dbo.grades SET coursework_mark = ?, midterm_mark = ?, final_mark = ?, total_mark = ?, "
-            + "letter_grade = ?, grade_points = ?, result_status = ?, is_submitted = ?, "
+            "UPDATE dbo.grades SET coursework_mark = ?, midterm_mark = ?, lab_mark = ?, final_mark = ?, "
+            + "total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ?, is_submitted = ?, "
             + "last_modified_by = ?, last_modified_at = ? WHERE grade_id = ? AND is_submitted = 0";
 
     private static final String DELETE = "DELETE FROM dbo.grades WHERE grade_id = ?";
@@ -53,6 +53,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         grade.setEnrollmentId(rs.getInt("enrollment_id"));
         grade.setCourseworkMark(rs.getBigDecimal("coursework_mark"));
         grade.setMidtermMark(rs.getBigDecimal("midterm_mark"));
+        grade.setLabMark(rs.getBigDecimal("lab_mark"));
         grade.setFinalMark(rs.getBigDecimal("final_mark"));
         grade.setTotalMark(rs.getBigDecimal("total_mark"));
         grade.setLetterGrade(LetterGrade.fromDb(rs.getString("letter_grade")));
@@ -193,9 +194,12 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      */
     public List<GradeSheetRow> findSectionRoster(int sectionId) {
         String sql = "SELECT e.enrollment_id, e.student_id, st.user_id, st.first_name, st.last_name, "
-                + "g.grade_id, g.coursework_mark, g.midterm_mark, g.final_mark, g.is_submitted "
+                + "g.grade_id, g.coursework_mark, g.midterm_mark, g.lab_mark, g.final_mark, "
+                + "g.is_submitted, c.has_lab "
                 + "FROM dbo.enrollments e "
                 + "INNER JOIN dbo.students st ON st.student_id = e.student_id "
+                + "INNER JOIN dbo.sections sec ON sec.section_id = e.section_id "
+                + "INNER JOIN dbo.courses c ON c.course_id = sec.course_id "
                 + "LEFT JOIN dbo.grades g ON g.enrollment_id = e.enrollment_id "
                 + "WHERE e.section_id = ? AND e.status IN ('ENROLLED', 'COMPLETED') "
                 + "ORDER BY st.user_id";
@@ -208,7 +212,9 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
             row.setGradeId(DaoUtils.getInteger(rs, "grade_id"));
             row.setCourseworkMark(rs.getBigDecimal("coursework_mark"));
             row.setMidtermMark(rs.getBigDecimal("midterm_mark"));
+            row.setLabMark(rs.getBigDecimal("lab_mark"));
             row.setFinalMark(rs.getBigDecimal("final_mark"));
+            row.setHasLab(rs.getBoolean("has_lab"));
             row.setSubmitted(rs.getBoolean("is_submitted"));
             row.recompute();
             return row;
@@ -303,11 +309,11 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      * {@code trg_Grade_Audit} has something to attribute the change to.
      */
     public boolean overrideSubmitted(Connection connection, Grade entity) {
-        String sql = "UPDATE dbo.grades SET coursework_mark = ?, midterm_mark = ?, final_mark = ?, "
-                + "total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ?, "
+        String sql = "UPDATE dbo.grades SET coursework_mark = ?, midterm_mark = ?, lab_mark = ?, "
+                + "final_mark = ?, total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ?, "
                 + "last_modified_by = ?, last_modified_at = ? WHERE grade_id = ?";
         return executeUpdate(connection, sql,
-                entity.getCourseworkMark(), entity.getMidtermMark(), entity.getFinalMark(),
+                entity.getCourseworkMark(), entity.getMidtermMark(), entity.getLabMark(), entity.getFinalMark(),
                 entity.getTotalMark(), letterOrNull(entity), entity.getGradePoints(),
                 resultOrNull(entity), entity.getLastModifiedBy(), entity.getLastModifiedAt(),
                 entity.getGradeId()) > 0;
@@ -348,6 +354,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 entity.getEnrollmentId(),
                 entity.getCourseworkMark(),
                 entity.getMidtermMark(),
+                entity.getLabMark(),
                 entity.getFinalMark(),
                 entity.getTotalMark(),
                 letterOrNull(entity),
@@ -363,6 +370,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         return new Object[]{
                 entity.getCourseworkMark(),
                 entity.getMidtermMark(),
+                entity.getLabMark(),
                 entity.getFinalMark(),
                 entity.getTotalMark(),
                 letterOrNull(entity),

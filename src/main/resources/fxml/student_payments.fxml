@@ -7,9 +7,13 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Text?>
+<?import javafx.scene.text.TextFlow?>
 
 <ScrollPane xmlns="http://javafx.com/javafx"
             xmlns:fx="http://javafx.com/fxml"
@@ -68,18 +72,50 @@
                 <VBox styleClass="panel" spacing="10" HBox.hgrow="ALWAYS" minWidth="0">
                     <padding><Insets top="14" right="16" bottom="14" left="16"/></padding>
                     <Label text="Payment Method" styleClass="section-title"/>
-                    <HBox spacing="20">
-                        <RadioButton fx:id="creditCardOption" text="Credit Card"/>
-                        <RadioButton fx:id="wishOption"       text="WISH"/>
-                        <RadioButton fx:id="omtOption"        text="OMT"/>
-                        <RadioButton fx:id="cashOption"       text="Cash at Bank"/>
+                    <HBox spacing="20" alignment="CENTER_LEFT">
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <RadioButton fx:id="creditCardOption" text="Credit Card"/>
+                            <ImageView fitWidth="20" fitHeight="20" preserveRatio="true" smooth="true">
+                                <image>
+                                    <Image url="@../images/payment-icons/credit-card.png"/>
+                                </image>
+                            </ImageView>
+                        </HBox>
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <RadioButton fx:id="wishOption" text="WISH"/>
+                            <ImageView fitWidth="20" fitHeight="20" preserveRatio="true" smooth="true">
+                                <image>
+                                    <Image url="@../images/payment-icons/wish-logo.png"/>
+                                </image>
+                            </ImageView>
+                        </HBox>
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <RadioButton fx:id="omtOption" text="OMT"/>
+                            <ImageView fitWidth="20" fitHeight="20" preserveRatio="true" smooth="true">
+                                <image>
+                                    <Image url="@../images/payment-icons/omt-logo.png"/>
+                                </image>
+                            </ImageView>
+                        </HBox>
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <RadioButton fx:id="cashOption" text="Cash at Bank"/>
+                            <ImageView fitWidth="20" fitHeight="20" preserveRatio="true" smooth="true">
+                                <image>
+                                    <Image url="@../images/payment-icons/bank.png"/>
+                                </image>
+                            </ImageView>
+                        </HBox>
                     </HBox>
                 </VBox>
                 <VBox styleClass="panel" spacing="6" HBox.hgrow="ALWAYS" minWidth="0" maxWidth="360">
                     <padding><Insets top="14" right="16" bottom="14" left="16"/></padding>
-                    <Label text="Note" styleClass="section-title"/>
-                    <Label wrapText="true" styleClass="muted-text"
-                           text="Please make sure to pay each installment before the due date to avoid additional penalties. A late fee may be added for installments paid after the due date."/>
+                    <Label text="Note:" styleClass="section-title"/>
+                    <TextFlow>
+                        <Text text="Please make sure to pay each installment before the due date to avoid additional penalties.&#10;&#10;" style="-fx-fill: #6b7280;"/>
+                        <Text text="A penalty of " style="-fx-fill: #6b7280;"/>
+                        <Text text="\$10" style="-fx-fill: #d32f2f; -fx-font-weight: bold;"/>
+                        <Text text=" will be added for each installment if payment is made after the due date." style="-fx-fill: #6b7280;"/>
+                    </TextFlow>
                 </VBox>
             </HBox>
 

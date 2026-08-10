@@ -156,6 +156,14 @@ public class RecommendationService {
         /* Total */
         public int finalScore;
 
+        /**
+         * The PRIMARY sort key — the student's own Plan of Study, not the score. 2 = required and
+         * already due or overdue, 1 = required but not yet due, 0 = elective. A required,
+         * overdue course always outranks an elective, however the 0..115 score compares; the
+         * score only breaks ties inside one tier.
+         */
+        public int planPriorityTier;
+
         public final List<Reason> degreeFitReasons   = new ArrayList<>();
         public final List<Reason> peerReasons        = new ArrayList<>();
         public final List<Reason> eligibilityReasons = new ArrayList<>();
@@ -375,9 +383,10 @@ public class RecommendationService {
                     score(candidate, me, plan, stats, unlockedCodes, maxUnlocks, peerStats));
         }
 
-        /* ---------- sort, cut, rank. Deterministic tie-break on course code. ---------- */
+        /* ---------- sort, cut, rank. Plan of Study first, score second, course code last. ---------- */
         out.recommendations.sort(
-                Comparator.comparingInt((Recommendation r) -> r.finalScore).reversed()
+                Comparator.comparingInt((Recommendation r) -> r.planPriorityTier).reversed()
+                          .thenComparing(Comparator.comparingInt((Recommendation r) -> r.finalScore).reversed())
                           .thenComparing(r -> r.courseCode));
         while (out.recommendations.size() > TOP_N) {
             out.recommendations.remove(out.recommendations.size() - 1);
@@ -578,6 +587,7 @@ public class RecommendationService {
 
         PlanEntry   entry = plan.get(candidate.courseId);
         CourseStats st    = stats.get(candidate.courseId);
+        r.planPriorityTier = planPriorityTier(entry, me);
 
         /* ---- the four factors ---- */
         r.mandatoryPoints      = scoreMandatoryForDegree(entry, me, r);
@@ -616,6 +626,22 @@ public class RecommendationService {
         }
         r.degreeFitReasons.add(Reason.scored(Block.DEGREE_FIT, text, points));
         return points;
+    }
+
+    /**
+     * The Plan of Study tier (the primary sort key) — same {@code program_requirements} data as
+     * factor 1/2 below, read once here instead of a second computation. A course failed and not
+     * yet retaken has no passed attempt, so it is still {@code plan.get(courseId)}'s mandatory
+     * entry and, once the student's current semester has passed its recommended one, lands in the
+     * top tier exactly like any other overdue requirement — no separate "failed" case needed.
+     */
+    private int planPriorityTier(PlanEntry entry, StudentProfile me) {
+        if (entry == null || !entry.isMandatory) {
+            return 0;
+        }
+        boolean dueOrOverdue = entry.recommendedSemester != null
+                && me.currentSemester - entry.recommendedSemester >= 0;
+        return dueOrOverdue ? 2 : 1;
     }
 
     /**

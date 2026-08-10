@@ -151,6 +151,13 @@
     -fx-opacity: 0.7;
 }
 
+.login-content .name-hint-text {
+    -fx-text-fill: #8a94a6;
+    -fx-font-size: 12px;
+    -fx-padding: 0 2 0 0;
+    -fx-font-style: italic;
+}
+
 .login-content .error-text {
     -fx-text-fill: white;
     -fx-font-weight: bold;
@@ -444,7 +451,7 @@
 .tt-color-5 { -fx-background-color: #ede9fe; -fx-border-color: #c4b5fd; }
 .tt-color-6 { -fx-background-color: #ffe4e6; -fx-border-color: #fda4af; }
 
-/* ---------- Phase 10: waitlist & notifications ---------- */
+/* ---------- Phase 10: notifications ---------- */
 .bell-stack  { -fx-padding: 0 2 0 2; }
 .bell-badge  { -fx-background-color: #d32f2f; -fx-text-fill: white; -fx-font-size: 10px;
                -fx-font-weight: bold; -fx-background-radius: 9; -fx-padding: 1 5 1 5;
@@ -661,13 +668,16 @@
 .ai-assistant-toggle-btn:pressed { -fx-background-color: -navy-900; }
 
 .ai-assistant-collapse-btn {
-    -fx-background-color: transparent;
-    -fx-text-fill: rgba(255, 255, 255, 0.75);
+    -fx-background-color: linear-gradient(to bottom, -navy-800, -navy-900);
+    -fx-background-radius: 8;
+    -fx-text-fill: white;
     -fx-font-size: 11px;
-    -fx-padding: 2 4 2 4;
+    -fx-font-weight: bold;
+    -fx-padding: 4 10 4 10;
     -fx-cursor: hand;
 }
-.ai-assistant-collapse-btn:hover { -fx-text-fill: white; }
+.ai-assistant-collapse-btn:hover   { -fx-background-color: linear-gradient(to bottom, -navy-700, -navy-800); }
+.ai-assistant-collapse-btn:pressed { -fx-background-color: -navy-900; }
 
 .ai-chat-input {
     -fx-background-color: rgba(255, 255, 255, 0.12);

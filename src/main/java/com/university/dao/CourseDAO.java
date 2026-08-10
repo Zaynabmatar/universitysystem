@@ -15,15 +15,15 @@ public class CourseDAO extends AbstractDAO implements GenericDAO<Course> {
 
     private static final String SELECT =
             "SELECT course_id, course_code, course_title, description, credits, dept_id, "
-            + "level_year, is_active FROM dbo.courses";
+            + "level_year, is_active, has_lab FROM dbo.courses";
 
     private static final String INSERT =
             "INSERT INTO dbo.courses (course_code, course_title, description, credits, dept_id, "
-            + "level_year, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            + "level_year, is_active, has_lab) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String UPDATE =
             "UPDATE dbo.courses SET course_code = ?, course_title = ?, description = ?, "
-            + "credits = ?, dept_id = ?, level_year = ?, is_active = ? WHERE course_id = ?";
+            + "credits = ?, dept_id = ?, level_year = ?, is_active = ?, has_lab = ? WHERE course_id = ?";
 
     private static final String DELETE = "DELETE FROM dbo.courses WHERE course_id = ?";
 
@@ -39,6 +39,7 @@ public class CourseDAO extends AbstractDAO implements GenericDAO<Course> {
         course.setDepartmentId(rs.getInt("dept_id"));
         course.setLevelYear(rs.getInt("level_year"));
         course.setActive(rs.getBoolean("is_active"));
+        course.setHasLab(rs.getBoolean("has_lab"));
         return course;
     }
 
@@ -130,7 +131,8 @@ public class CourseDAO extends AbstractDAO implements GenericDAO<Course> {
                 entity.getCredits(),
                 entity.getDepartmentId(),
                 entity.getLevelYear(),
-                entity.isActive()
+                entity.isActive(),
+                entity.isHasLab()
         };
     }
 
@@ -143,6 +145,7 @@ public class CourseDAO extends AbstractDAO implements GenericDAO<Course> {
                 entity.getDepartmentId(),
                 entity.getLevelYear(),
                 entity.isActive(),
+                entity.isHasLab(),
                 entity.getCourseId()
         };
     }

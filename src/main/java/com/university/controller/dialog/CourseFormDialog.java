@@ -67,7 +67,7 @@ public final class CourseFormDialog extends Dialog<Course> {
         g.setPadding(new Insets(14));
         int r = 0;
         g.addRow(r++, new Label("Course code *"), courseCodeField, new Label("Credits *"), creditsSpinner);
-        g.addRow(r++, new Label("Title *"), courseTitleField, new Label("Study year *"), yearBox);
+        g.addRow(r++, new Label("Course Title *"), courseTitleField, new Label("Study year *"), yearBox);
         g.addRow(r++, new Label("Department *"), departmentBox);
         g.addRow(r++, new Label("Description"), descriptionField);
         GridPane.setColumnSpan(descriptionField, 3);

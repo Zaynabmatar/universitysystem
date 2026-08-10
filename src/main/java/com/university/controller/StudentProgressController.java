@@ -164,7 +164,7 @@ public class StudentProgressController {
         colCode.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().courseCode));
         colCode.setPrefWidth(100);
 
-        TableColumn<RequirementRow, String> colTitle = new TableColumn<>("Course Name");
+        TableColumn<RequirementRow, String> colTitle = new TableColumn<>("Course Title");
         colTitle.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().courseTitle));
         colTitle.setPrefWidth(240);
 

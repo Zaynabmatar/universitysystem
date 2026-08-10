@@ -53,12 +53,14 @@ public class InstructorGradesController {
     @FXML private Label windowLabel;
     @FXML private Label lockBanner;
     @FXML private Label statsLabel;
+    @FXML private Label weightingLabel;
     @FXML private ComboBox<SectionChoice> sectionCombo;
     @FXML private TableView<GradeSheetRow> gradeTable;
     @FXML private TableColumn<GradeSheetRow, String> colStudentId;
     @FXML private TableColumn<GradeSheetRow, String> colStudentName;
     @FXML private TableColumn<GradeSheetRow, BigDecimal> colCoursework;
     @FXML private TableColumn<GradeSheetRow, BigDecimal> colMidterm;
+    @FXML private TableColumn<GradeSheetRow, BigDecimal> colLab;
     @FXML private TableColumn<GradeSheetRow, BigDecimal> colFinal;
     @FXML private TableColumn<GradeSheetRow, BigDecimal> colTotal;
     @FXML private TableColumn<GradeSheetRow, String> colLetter;
@@ -96,6 +98,7 @@ public class InstructorGradesController {
         colStudentName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getStudentName()));
         colCoursework.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCourseworkMark()));
         colMidterm.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getMidtermMark()));
+        colLab.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getLabMark()));
         colFinal.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getFinalMark()));
         colTotal.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getTotalMark()));
         colPoints.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getGradePoints()));
@@ -105,10 +108,12 @@ public class InstructorGradesController {
         StringConverter<BigDecimal> markConverter = markConverter();
         colCoursework.setCellFactory(TextFieldTableCell.forTableColumn(markConverter));
         colMidterm.setCellFactory(TextFieldTableCell.forTableColumn(markConverter));
+        colLab.setCellFactory(TextFieldTableCell.forTableColumn(markConverter));
         colFinal.setCellFactory(TextFieldTableCell.forTableColumn(markConverter));
 
         colCoursework.setOnEditCommit(e -> applyEdit(e, Mark.COURSEWORK));
         colMidterm.setOnEditCommit(e -> applyEdit(e, Mark.MIDTERM));
+        colLab.setOnEditCommit(e -> applyEdit(e, Mark.LAB));
         colFinal.setOnEditCommit(e -> applyEdit(e, Mark.FINAL));
 
         colTotal.setCellFactory(col -> plainDecimalCell());
@@ -172,7 +177,7 @@ public class InstructorGradesController {
 
     // ------------------------------------------------------------------ live computation
 
-    private enum Mark { COURSEWORK, MIDTERM, FINAL }
+    private enum Mark { COURSEWORK, MIDTERM, LAB, FINAL }
 
     /** THE LIVE RECOMPUTE — Sections 5.1 and 5.2 applied on every committed edit. */
     private void applyEdit(TableColumn.CellEditEvent<GradeSheetRow, BigDecimal> event, Mark which) {
@@ -196,6 +201,7 @@ public class InstructorGradesController {
         switch (which) {
             case COURSEWORK -> row.setCourseworkMark(value);
             case MIDTERM -> row.setMidtermMark(value);
+            case LAB -> row.setLabMark(value);
             case FINAL -> row.setFinalMark(value);
         }
         row.recompute(); // <- the live letter and points
@@ -240,6 +246,8 @@ public class InstructorGradesController {
         if (sectionId <= 0) {
             rows.clear();
             setButtonsDisabled(true);
+            colLab.setVisible(false);
+            weightingLabel.setText("");
             return;
         }
         try {
@@ -251,6 +259,8 @@ public class InstructorGradesController {
             gradeTable.setEditable(!readOnly);
             setButtonsDisabled(readOnly);
             exportButton.setDisable(false);
+
+            applyLabVisibility();
 
             lockBanner.setText(locked
                     ? (adminMode
@@ -269,6 +279,26 @@ public class InstructorGradesController {
             setButtonsDisabled(true);
             AlertUtil.error("Grades", "The grade sheet could not be loaded. Please try again.", e);
         }
+    }
+
+    /**
+     * Shows the Lab column, and switches the weighting label, only for a section whose course
+     * actually has a lab component ({@code courses.has_lab}) — never for one hardcoded course.
+     */
+    private void applyLabVisibility() {
+        boolean hasLab = rows.isEmpty() ? currentSectionHasLab() : rows.get(0).isHasLab();
+        colLab.setVisible(hasLab);
+        weightingLabel.setText(hasLab
+                ? "Weighting: coursework 15%  •  midterm 15%  •  lab 20%  •  final 50%"
+                : "Weighting: coursework 30%  •  midterm 30%  •  final 40%");
+    }
+
+    private boolean currentSectionHasLab() {
+        Section section = sectionService.findById(sectionId);
+        if (section == null) {
+            return false;
+        }
+        return courseService.findCourseById(section.getCourseId()).map(Course::isHasLab).orElse(false);
     }
 
     /** Rule G2 made visible before the instructor types anything. */
@@ -387,7 +417,7 @@ public class InstructorGradesController {
 
         try {
             gradeService.adminOverride(row.getEnrollmentId(), row.getCourseworkMark(),
-                    row.getMidtermMark(), row.getFinalMark(), actingUserId(), reason);
+                    row.getMidtermMark(), row.getLabMark(), row.getFinalMark(), actingUserId(), reason);
             AlertUtil.success("Grade corrected",
                     "The grade was changed, the GPA was recalculated, the student was notified, and "
                     + "the change was written to the audit log by the database trigger.");

@@ -24,11 +24,14 @@ public class GradeSheetRow {
     private String studentName;
     private BigDecimal courseworkMark;
     private BigDecimal midtermMark;
+    private BigDecimal labMark;
     private BigDecimal finalMark;
     private BigDecimal totalMark;
     private LetterGrade letterGrade;
     private BigDecimal gradePoints;
     private boolean submitted;
+    /** True when this row's course has a lab component ({@code courses.has_lab}). */
+    private boolean hasLab;
 
     public int getEnrollmentId() {
         return enrollmentId;
@@ -88,6 +91,23 @@ public class GradeSheetRow {
         this.midtermMark = midtermMark;
     }
 
+    /** Only meaningful when {@link #isHasLab()} is true; null for a course with no lab. */
+    public BigDecimal getLabMark() {
+        return labMark;
+    }
+
+    public void setLabMark(BigDecimal labMark) {
+        this.labMark = labMark;
+    }
+
+    public boolean isHasLab() {
+        return hasLab;
+    }
+
+    public void setHasLab(boolean hasLab) {
+        this.hasLab = hasLab;
+    }
+
     public BigDecimal getFinalMark() {
         return finalMark;
     }
@@ -121,7 +141,7 @@ public class GradeSheetRow {
 
     /** Recomputes total/letter/points from the three marks — Section 5.1 and 5.2. */
     public void recompute() {
-        this.totalMark = GradeCalculator.totalMark(courseworkMark, midtermMark, finalMark);
+        this.totalMark = GradeCalculator.totalMark(courseworkMark, midtermMark, labMark, finalMark, hasLab);
         this.letterGrade = GradeCalculator.letterGrade(totalMark);
         this.gradePoints = letterGrade == null ? null : letterGrade.getGradePoints();
     }

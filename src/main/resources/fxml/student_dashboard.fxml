@@ -104,7 +104,7 @@
         <VBox fx:id="aiAssistantExpandedBox" spacing="4" visible="false" managed="false"
               VBox.vgrow="ALWAYS">
             <HBox alignment="CENTER_RIGHT">
-                <Button text="Collapse ▴" onAction="#handleToggleAiAssistant" styleClass="ai-assistant-collapse-btn"/>
+                <Button text="Close" onAction="#handleToggleAiAssistant" styleClass="ai-assistant-collapse-btn"/>
             </HBox>
             <fx:include fx:id="aiAssistant" source="ai_assistant_panel.fxml" VBox.vgrow="ALWAYS"/>
         </VBox>

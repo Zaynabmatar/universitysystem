@@ -113,17 +113,19 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
     /**
      * Moves the current flag to one semester.
      *
-     * <p>A single UPDATE, not two: {@code trg_semesters_block_backward_activation}
-     * (Phase 19) rejects the whole statement when the semester losing the flag
-     * ran chronologically after the one gaining it, and a trigger can only see
-     * that both rows changed at once when they change in the same statement —
-     * two separate UPDATEs would each show the trigger only one side of the
-     * change. The filtered unique index on {@code is_current} still guarantees
-     * at most one row ends up flagged, whichever way this resolves.</p>
+     * <p>A single UPDATE, not two: {@code trg_semesters_enforce_single_open} rejects the whole
+     * statement when the semester losing the flag is a DIFFERENT one from the one gaining it,
+     * and a trigger can only see that both rows changed at once when they change in the same
+     * statement — two separate UPDATEs would each show the trigger only one side of the change.
+     * In practice {@link com.university.service.SemesterService#setCurrent} only ever calls this
+     * when nothing else is current (or re-selects the semester already current), so the trigger
+     * should never actually fire here; it exists to refuse the swap even if that Java-level check
+     * is ever bypassed. The filtered unique index on {@code is_current} still guarantees at most
+     * one row ends up flagged, whichever way this resolves.</p>
      *
      * @return true when the flag was moved
-     * @throws DataAccessException wrapping the trigger's message when {@code semesterId}
-     *                             is chronologically before the semester currently active
+     * @throws DataAccessException wrapping the trigger's message when a different semester is
+     *                             already current
      */
     public boolean makeCurrent(int semesterId) {
         Connection connection = beginTransaction();
@@ -143,6 +145,16 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
         } finally {
             closeQuietly(connection);
         }
+    }
+
+    /**
+     * Clears the current flag with nobody taking it — the explicit "close" step a semester now
+     * needs before a different one may become current (Section 8: no direct swap any more).
+     *
+     * @return true when a semester actually was current and got closed
+     */
+    public boolean closeCurrent() {
+        return executeUpdate("UPDATE dbo.semesters SET is_current = 0 WHERE is_current = 1") > 0;
     }
 
     /**

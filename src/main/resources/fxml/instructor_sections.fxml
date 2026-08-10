@@ -23,8 +23,8 @@
 
     <TableView fx:id="sectionTable" VBox.vgrow="ALWAYS">
         <columns>
-            <TableColumn fx:id="colCourse"       text="Course"          prefWidth="90"/>
-            <TableColumn fx:id="colTitle"        text="Title"           prefWidth="200"/>
+            <TableColumn fx:id="colCourse"       text="Course Code"     prefWidth="100"/>
+            <TableColumn fx:id="colTitle"        text="Course Title"    prefWidth="200"/>
             <TableColumn fx:id="colSection"      text="Sec."            prefWidth="55"/>
             <TableColumn fx:id="colRoom"         text="Room"            prefWidth="70"/>
             <TableColumn fx:id="colSchedule"     text="Schedule"        prefWidth="230"/>

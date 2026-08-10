@@ -91,7 +91,6 @@ public class AdminDashboardController {
             kpiSections.setText(String.valueOf(k.activeSections));
             semesterLabel.setText("Current semester: " + k.currentSemester);
             secondaryLabel.setText(k.enrollmentsThisSemester + " enrollments this semester   •   "
-                    + k.studentsWaiting + " students on waitlists   •   "
                     + k.studentsOnProbation + " students on probation");
 
             ChartUtil.fillBar(deptChart, deptEmpty, reportService.enrollmentPerDepartment(), "Enrollments");

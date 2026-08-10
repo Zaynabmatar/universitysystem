@@ -36,7 +36,7 @@
 
                     <TableView fx:id="prereqTable" VBox.vgrow="ALWAYS">
                         <columns>
-                            <TableColumn fx:id="colPCourse"      text="Course"             prefWidth="100"/>
+                            <TableColumn fx:id="colPCourse"      text="Course Code"        prefWidth="100"/>
                             <TableColumn fx:id="colPCourseTitle" text="Course Title"       prefWidth="200"/>
                             <TableColumn fx:id="colPRequires"    text="Requires"           prefWidth="100"/>
                             <TableColumn fx:id="colPReqTitle"    text="Prerequisite Title" prefWidth="200"/>
@@ -69,8 +69,8 @@
 
                     <TableView fx:id="reqTable" VBox.vgrow="ALWAYS">
                         <columns>
-                            <TableColumn fx:id="colRCourse"   text="Course"               prefWidth="100"/>
-                            <TableColumn fx:id="colRTitle"    text="Title"                prefWidth="240"/>
+                            <TableColumn fx:id="colRCourse"   text="Course Code"          prefWidth="100"/>
+                            <TableColumn fx:id="colRTitle"    text="Course Title"         prefWidth="240"/>
                             <TableColumn fx:id="colRCredits"  text="Credits"              prefWidth="70"/>
                             <TableColumn fx:id="colRKind"     text="Type"                 prefWidth="100"/>
                             <TableColumn fx:id="colRSemester" text="Recommended Semester" prefWidth="150"/>

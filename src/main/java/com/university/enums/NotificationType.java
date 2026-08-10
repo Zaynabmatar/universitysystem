@@ -12,11 +12,8 @@ public enum NotificationType {
     SUCCESS("Success"),
     WARNING("Warning"),
     GRADE("Grade"),
-    WAITLIST("Waiting List"),
-    ASSIGNMENT("Assignment"),
     PAYMENT("Payment"),
     REGISTRATION("Registration"),
-    CHAT_REPLY("Chat Reply"),
     NEWS("News"),
     GENERAL("General");
 

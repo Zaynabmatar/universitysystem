@@ -34,15 +34,16 @@
                visible="false" managed="false"/>
     </HBox>
 
-    <Label text="Weighting: coursework 30%  •  midterm 30%  •  final 40%" styleClass="muted-label"/>
+    <Label fx:id="weightingLabel" styleClass="muted-label"/>
 
     <TableView fx:id="gradeTable" editable="true" VBox.vgrow="ALWAYS">
         <columns>
             <TableColumn fx:id="colStudentId"     text="Student ID"       prefWidth="110" editable="false"/>
             <TableColumn fx:id="colStudentName"   text="Student"          prefWidth="200" editable="false"/>
-            <TableColumn fx:id="colCoursework"    text="Coursework (30%)" prefWidth="130"/>
-            <TableColumn fx:id="colMidterm"       text="Midterm (30%)"    prefWidth="120"/>
-            <TableColumn fx:id="colFinal"         text="Final (40%)"      prefWidth="110"/>
+            <TableColumn fx:id="colCoursework"    text="Coursework"       prefWidth="110"/>
+            <TableColumn fx:id="colMidterm"       text="Midterm"          prefWidth="110"/>
+            <TableColumn fx:id="colLab"           text="Lab"              prefWidth="90"/>
+            <TableColumn fx:id="colFinal"         text="Final"            prefWidth="100"/>
             <TableColumn fx:id="colTotal"         text="Total"            prefWidth="80"  editable="false"/>
             <TableColumn fx:id="colLetter"        text="Letter"           prefWidth="70"  editable="false"/>
             <TableColumn fx:id="colPoints"        text="Points"           prefWidth="70"  editable="false"/>

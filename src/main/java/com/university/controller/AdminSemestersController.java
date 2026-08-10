@@ -41,6 +41,7 @@ public class AdminSemestersController {
     @FXML private TableColumn<Semester, String> colSections;
     @FXML private Button editButton;
     @FXML private Button setCurrentButton;
+    @FXML private Button closeCurrentButton;
 
     private final SemesterService semesterService = new SemesterService();
 
@@ -82,9 +83,9 @@ public class AdminSemestersController {
 
         var selected = semesterTable.getSelectionModel().selectedItemProperty();
         editButton.disableProperty().bind(selected.isNull());
-        // A semester that already ran before the current one can never legally become current
-        // again (Phase 19: chronology only moves forward) — greyed out here, and refused by
-        // SemesterService/the database even if this were somehow bypassed.
+        // A different semester can never become current while one is already open — it must be
+        // closed first (Section 8) — greyed out here, and refused by SemesterService/the database
+        // even if this were somehow bypassed.
         selected.addListener((obs, oldSel, newSel) -> setCurrentButton.setDisable(!canBecomeCurrent(newSel)));
         setCurrentButton.setDisable(!canBecomeCurrent(selected.get()));
 
@@ -128,6 +129,11 @@ public class AdminSemestersController {
             currentLabel.setText(current == null
                     ? "⚠ No current semester is set. Students cannot register until one is chosen."
                     : "Current semester: " + current.getSemesterName() + "  ·  Registration " + registrationStateOf(current));
+            closeCurrentButton.setDisable(current == null);
+            // Add Semester stays clickable even while a semester is open (Section 8 still refuses
+            // the create in SemesterService/the database either way) - handleAdd() explains why
+            // instead of silently graying the button out.
+            setCurrentButton.setDisable(!canBecomeCurrent(semesterTable.getSelectionModel().getSelectedItem()));
         } catch (Exception e) {
             AlertUtil.error("Could not load semesters", "The semester list could not be loaded.", e);
         }
@@ -136,20 +142,28 @@ public class AdminSemestersController {
     @FXML private void handleRefresh() { reload(); }
 
     /**
-     * False when {@code candidate} already ran before the current semester (or nothing is
-     * selected) — the one case {@link SemesterService#setCurrent} always refuses.
+     * False when {@code candidate} is null, or a different semester is already open — the two
+     * cases {@link SemesterService#setCurrent} always refuses. Re-selecting the semester that is
+     * already current stays enabled (it just shows "already current").
      */
     private boolean canBecomeCurrent(Semester candidate) {
         if (candidate == null) return false;
         if (candidate.isCurrent()) return true;
         Semester current = semesterService.getCurrentSemester();
-        return current == null || !candidate.getStartDate().isBefore(current.getStartDate());
+        return current == null;
     }
 
     // ------------------------------------------------------------------ actions
 
     @FXML
     private void handleAdd() {
+        Semester current = semesterService.getCurrentSemester();
+        if (current != null) {
+            AlertUtil.warn("Cannot add a semester", "You cannot add a new semester while "
+                    + current.getSemesterName() + " is still open. Please close the current semester first.");
+            return;
+        }
+
         Optional<Semester> result = new SemesterFormDialog(null).showAndWait();
         if (result.isEmpty()) return;
 
@@ -206,6 +220,30 @@ public class AdminSemestersController {
             AlertUtil.warn("Cannot change the current semester", se.getMessage());
         } catch (Exception e) {
             AlertUtil.error("Could not change the current semester", "The current semester could not be changed.", e);
+        }
+    }
+
+    @FXML
+    private void handleCloseCurrent() {
+        Semester current = semesterService.getCurrentSemester();
+        if (current == null) {
+            AlertUtil.info("No open semester", "There is no open semester to close.");
+            return;
+        }
+        boolean ok = AlertUtil.confirm("Close the current semester",
+                "Close " + current.getSemesterName() + "?\n\n"
+                + "No semester will be open until another one is explicitly opened. "
+                + "Students will not be able to register in the meantime.");
+        if (!ok) return;
+
+        try {
+            semesterService.closeCurrent();
+            reload();
+            AlertUtil.success("Semester closed", current.getSemesterName() + " is now closed.");
+        } catch (ServiceException se) {
+            AlertUtil.warn("Cannot close the semester", se.getMessage());
+        } catch (Exception e) {
+            AlertUtil.error("Could not close the semester", "The semester could not be closed.", e);
         }
     }
 }

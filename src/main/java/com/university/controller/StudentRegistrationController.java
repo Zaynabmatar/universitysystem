@@ -261,10 +261,10 @@ public class StudentRegistrationController {
     }
 
     /**
-     * Re-derives {@link #availableRows} from {@link #allAvailableSections} using the course-code
-     * search and Hide Full Sections checkbox — a display-only filter over sections already
-     * loaded for the current term/student. It never re-queries the database and never changes
-     * which sections exist or how full they are.
+     * Re-derives {@link #availableRows} from {@link #allAvailableSections} using the search field
+     * (matched against both course code and course title) and the Hide Full Sections checkbox —
+     * a display-only filter over sections already loaded for the current term/student. It never
+     * re-queries the database and never changes which sections exist or how full they are.
      */
     private void applyAvailableFilters() {
         String query = courseCodeSearchField == null || courseCodeSearchField.getText() == null
@@ -272,7 +272,9 @@ public class StudentRegistrationController {
         boolean hideFull = hideFullCheckBox != null && hideFullCheckBox.isSelected();
 
         List<Section> filtered = allAvailableSections.stream()
-                .filter(s -> query.isEmpty() || courseCodeOf(s.getCourseId()).toLowerCase().contains(query))
+                .filter(s -> query.isEmpty()
+                        || courseCodeOf(s.getCourseId()).toLowerCase().contains(query)
+                        || courseTitleOf(s.getCourseId()).toLowerCase().contains(query))
                 .filter(s -> !hideFull || !s.isFull())
                 .toList();
 
@@ -377,9 +379,6 @@ public class StudentRegistrationController {
         try {
             RegistrationService.DropResult result = registrationService.dropSection(studentId, selected.getSectionId());
             String message = result.getResultMessage();
-            if (result.getPromotionMessage() != null) {
-                message += "\n\nThe next student on the waiting list has been enrolled automatically.";
-            }
             if (result.isWithdrawal()) {
                 AlertUtil.warn(result.getResultTitle(), message);
             } else {

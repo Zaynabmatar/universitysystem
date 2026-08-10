@@ -41,9 +41,10 @@
 
     <HBox spacing="10" alignment="CENTER_LEFT">
         <padding><Insets top="4" right="0" bottom="0" left="0"/></padding>
-        <Button text="Add Semester"          onAction="#handleAdd"/>
+        <Button text="Add Semester"       onAction="#handleAdd"/>
         <Button fx:id="editButton"       text="Edit"                            onAction="#handleEdit"/>
         <Button fx:id="setCurrentButton" text="Make This The Current Semester"  onAction="#handleSetCurrent"/>
+        <Button fx:id="closeCurrentButton" text="Close Current Semester" onAction="#handleCloseCurrent"/>
         <Region HBox.hgrow="ALWAYS"/>
         <Button text="Refresh" onAction="#handleRefresh"/>
     </HBox>

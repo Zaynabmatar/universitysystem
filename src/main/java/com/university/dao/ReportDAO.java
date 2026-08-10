@@ -42,7 +42,6 @@ public class ReportDAO extends AbstractDAO {
               + "     JOIN dbo.sections  s   ON s.section_id   = e.section_id "
               + "     JOIN dbo.semesters sem ON sem.semester_id = s.semester_id AND sem.is_current = 1 "
               + "    WHERE e.status = N'ENROLLED')                                  AS enrollments_now, "
-              + "  (SELECT COUNT(*) FROM dbo.waitlist WHERE status = N'WAITING')    AS students_waiting, "
               + "  (SELECT COUNT(*) FROM dbo.students WHERE academic_standing = N'PROBATION') AS on_probation, "
               + "  (SELECT TOP 1 semester_name FROM dbo.semesters WHERE is_current = 1)       AS current_semester";
 
@@ -53,7 +52,6 @@ public class ReportDAO extends AbstractDAO {
             k.totalCourses = resultSet.getInt("total_courses");
             k.activeSections = resultSet.getInt("active_sections");
             k.enrollmentsThisSemester = resultSet.getInt("enrollments_now");
-            k.studentsWaiting = resultSet.getInt("students_waiting");
             k.studentsOnProbation = resultSet.getInt("on_probation");
             String currentSemester = resultSet.getNString("current_semester");
             if (currentSemester != null) {
@@ -112,8 +110,12 @@ public class ReportDAO extends AbstractDAO {
     // =====================================================================
 
     /**
-     * @param limit how many courses to return, ranked by pass rate; 0 returns every course
-     *              (used by the CSV export) with no floor on times taken.
+     * @param limit how many courses to return, ranked by enrollment volume (times taken) so the
+     *              chart shows the courses most students actually experienced — not just
+     *              whichever happen to have the highest pass rate, which would cherry-pick the
+     *              15 best-performing courses out of 300+ and always look uniformly high no
+     *              matter how the rest of the catalogue is actually doing. 0 returns every
+     *              course, ordered by code instead (used by the CSV export).
      */
     public List<CourseStat> passRatePerCourse(int limit) {
         String stats =
@@ -138,7 +140,7 @@ public class ReportDAO extends AbstractDAO {
                   + "       avg_grade_points, avg_total_mark "
                   + "FROM (" + stats + ") v "
                   + "WHERE times_taken > 0 "
-                  + "ORDER BY pass_rate_percent DESC, course_code"
+                  + "ORDER BY times_taken DESC, course_code"
                 : "SELECT course_code, course_title, dept_code, credits, "
                   + "       times_taken, times_passed, times_failed, "
                   + "       CASE WHEN times_taken = 0 THEN NULL "
