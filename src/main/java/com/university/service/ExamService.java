@@ -46,4 +46,14 @@ public class ExamService {
     public List<Exam> examsForStudent(int studentId) {
         return examDao.findByStudent(studentId);
     }
+
+    /** Every exam scheduled anywhere in one semester — the Admin Academic Calendar's view. */
+    public List<Exam> examsForSemester(int semesterId) {
+        return examDao.findBySemester(semesterId);
+    }
+
+    /** One student's exams, restricted to one semester — the Student Academic Calendar's view. */
+    public List<Exam> examsForStudentInSemester(int studentId, int semesterId) {
+        return examDao.findByStudentAndSemester(studentId, semesterId);
+    }
 }

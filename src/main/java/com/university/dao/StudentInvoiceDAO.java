@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -84,6 +85,18 @@ public class StudentInvoiceDAO extends AbstractDAO implements GenericDAO<Student
     public Optional<StudentInvoice> findByStudentAndSemester(int studentId, int semesterId) {
         return queryOne(SELECT + " WHERE student_id = ? AND semester_id = ?",
                 MAPPER, studentId, semesterId);
+    }
+
+    /**
+     * Every distinct due date billed for one semester, earliest first — the Admin calendar's view
+     * of "Payment" when no single student is in context. Invoices for the same semester are
+     * usually raised on the same due date, but this does not assume that: a semester with two
+     * billing rounds shows both dates.
+     */
+    public List<LocalDate> findDueDatesBySemester(int semesterId) {
+        return queryList("SELECT DISTINCT due_date FROM dbo.student_invoices "
+                + "WHERE semester_id = ? ORDER BY due_date",
+                rs -> rs.getObject("due_date", LocalDate.class), semesterId);
     }
 
     /** Finds a bill by its printed number. */

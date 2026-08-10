@@ -45,6 +45,32 @@ public class ExamDAO extends AbstractDAO {
                 MAPPER, sectionId);
     }
 
+    /** Every exam scheduled anywhere in one semester — the Admin calendar's view of "all exams". */
+    public List<Exam> findBySemester(int semesterId) {
+        String sql = "SELECT e.exam_id, e.section_id, e.exam_date, e.start_time, "
+                + "e.duration_minutes, e.room, e.created_by, e.created_at "
+                + "FROM dbo.exams e "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "WHERE s.semester_id = ? "
+                + "ORDER BY e.exam_date, e.start_time";
+        return queryList(sql, MAPPER, semesterId);
+    }
+
+    /**
+     * Every exam belonging to a section this student is (or was) enrolled in, restricted to one
+     * semester — the Student calendar's view, so a past or future semester's exams never leak in.
+     */
+    public List<Exam> findByStudentAndSemester(int studentId, int semesterId) {
+        String sql = "SELECT e.exam_id, e.section_id, e.exam_date, e.start_time, "
+                + "e.duration_minutes, e.room, e.created_by, e.created_at "
+                + "FROM dbo.exams e "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "INNER JOIN dbo.enrollments en ON en.section_id = e.section_id "
+                + "WHERE en.student_id = ? AND en.status <> 'DROPPED' AND s.semester_id = ? "
+                + "ORDER BY e.exam_date, e.start_time";
+        return queryList(sql, MAPPER, studentId, semesterId);
+    }
+
     /**
      * Every exam belonging to a section this student is (or was) enrolled in — a dropped
      * enrollment does not carry its section's exams along with it.
