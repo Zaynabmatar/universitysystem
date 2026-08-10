@@ -34,9 +34,14 @@ import java.util.List;
  *
  * <p>This screen exists to answer one question in the presentation: "prove your triggers work."
  * Every row it shows was written by SQL Server, not by this application — {@code trg_Grade_Audit}
- * is the only trigger in this database that writes {@code audit_log} (there is no student-audit or
- * enrollment-count trigger here; {@code sections.enrolled_count} is maintained in {@code SectionDAO}
- * instead). The screen is read-only: there is no add, no edit and no delete, on purpose.</p>
+ * (migration {@code phase11_grades_scale.sql}) plus the {@code trg_*_Audit} triggers on
+ * {@code dbo.users}, {@code dbo.students}, {@code dbo.instructors}, {@code dbo.courses},
+ * {@code dbo.semesters}, {@code dbo.enrollments} and {@code dbo.payments} (migration
+ * {@code 0014_audit_log_triggers.sql}) are the only things that write {@code audit_log}. Purely
+ * cached/derived columns — {@code sections.enrolled_count}, {@code students.cumulative_gpa} and
+ * the rest of the academic-record cache maintained by {@code AcademicService} — are deliberately
+ * not audited; they are not administrative decisions, just arithmetic. The screen is read-only:
+ * there is no add, no edit and no delete, on purpose.</p>
  */
 public class AdminAuditLogController {
 

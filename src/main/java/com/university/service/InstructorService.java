@@ -4,7 +4,6 @@ import com.university.dao.AbstractDAO;
 import com.university.dao.DepartmentDAO;
 import com.university.dao.InstructorDAO;
 import com.university.dao.UserDAO;
-import com.university.enums.AuditActionType;
 import com.university.enums.UserRole;
 import com.university.model.Instructor;
 import com.university.util.ValidationUtil;
@@ -96,11 +95,6 @@ public class InstructorService {
             int instructorId = instructorDao.insert(connection, instructor);
             instructor.setInstructorId(instructorId);
 
-            accounts.audit(connection, AuditActionType.INSERT, "instructors", account.userId(),
-                    null, account.email(),
-                    "Created instructor account with Instructor ID " + account.userId()
-                    + " for " + instructor.getFullName() + ".");
-
             connection.commit();
             return account;
         } catch (SQLException e) {
@@ -140,15 +134,6 @@ public class InstructorService {
 
             instructorDao.update(connection, instructor);
 
-            if (!email.equalsIgnoreCase(stored.getEmail())) {
-                // instructorDao.update above has already written the new address;
-                // instructors.email is the only column that holds it.
-                accounts.audit(connection, AuditActionType.UPDATE, "instructors", stored.getUserId(),
-                        stored.getEmail(), email,
-                        "Admin changed the university email for Instructor ID "
-                        + stored.getUserId() + ".");
-            }
-
             connection.commit();
         } catch (SQLException e) {
             transactions.rollbackQuietly(connection);
@@ -187,10 +172,6 @@ public class InstructorService {
             instructorDao.update(connection, instructor);
             // The same account, the same Instructor ID, the same address.
             userDao.setActive(connection, instructor.getUserId(), active);
-            accounts.audit(connection, AuditActionType.UPDATE, "users", instructor.getUserId(),
-                    active ? "INACTIVE" : "ACTIVE", active ? "ACTIVE" : "INACTIVE",
-                    (active ? "Reactivated" : "Deactivated") + " Instructor ID "
-                    + instructor.getUserId() + ".");
             connection.commit();
         } catch (SQLException e) {
             transactions.rollbackQuietly(connection);
@@ -215,10 +196,7 @@ public class InstructorService {
      */
     public String resetPasswordToDefault(int instructorId) {
         Instructor instructor = requireInstructor(instructorId);
-        String password = accounts.resetPasswordToDefault(instructor.getUserId());
-        accounts.audit(null, AuditActionType.UPDATE, "users", instructor.getUserId(), null, null,
-                "Reset password for Instructor ID " + instructor.getUserId() + ".");
-        return password;
+        return accounts.resetPasswordToDefault(instructor.getUserId());
     }
 
     // ------------------------------------------------------------------ uniqueness

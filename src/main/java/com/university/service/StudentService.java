@@ -5,7 +5,6 @@ import com.university.dao.ProgramDAO;
 import com.university.dao.StudentDAO;
 import com.university.dao.UserDAO;
 import com.university.enums.AcademicStanding;
-import com.university.enums.AuditActionType;
 import com.university.enums.StudentStatus;
 import com.university.enums.UserRole;
 import com.university.model.Program;
@@ -105,11 +104,6 @@ public class StudentService {
             int studentId = studentDao.insert(connection, student);
             student.setStudentId(studentId);
 
-            accounts.audit(connection, AuditActionType.INSERT, "students", account.userId(),
-                    null, account.email(),
-                    "Created student account with Student ID " + account.userId()
-                    + " for " + student.getFullName() + ".");
-
             connection.commit();
             return account;
         } catch (SQLException e) {
@@ -152,15 +146,6 @@ public class StudentService {
 
             studentDao.update(connection, student);
 
-            boolean emailChanged = !email.equalsIgnoreCase(stored.getEmail());
-            if (emailChanged) {
-                // studentDao.update above has already written the new address;
-                // students.email is the only column that holds it.
-                accounts.audit(connection, AuditActionType.UPDATE, "students", stored.getUserId(),
-                        stored.getEmail(), email,
-                        "Admin changed the university email for Student ID " + stored.getUserId() + ".");
-            }
-
             connection.commit();
         } catch (SQLException e) {
             transactions.rollbackQuietly(connection);
@@ -199,9 +184,6 @@ public class StudentService {
             // The same account, the same Student ID, the same address: only the
             // switch that lets it sign in moves.
             userDao.setActive(connection, student.getUserId(), active);
-            accounts.audit(connection, AuditActionType.UPDATE, "users", student.getUserId(),
-                    active ? "INACTIVE" : "ACTIVE", active ? "ACTIVE" : "INACTIVE",
-                    (active ? "Reactivated" : "Deactivated") + " Student ID " + student.getUserId() + ".");
             connection.commit();
         } catch (SQLException e) {
             transactions.rollbackQuietly(connection);
@@ -225,10 +207,7 @@ public class StudentService {
      */
     public String resetPasswordToDefault(int studentId) {
         Student student = requireStudent(studentId);
-        String password = accounts.resetPasswordToDefault(student.getUserId());
-        accounts.audit(null, AuditActionType.UPDATE, "users", student.getUserId(), null, null,
-                "Reset password for Student ID " + student.getUserId() + ".");
-        return password;
+        return accounts.resetPasswordToDefault(student.getUserId());
     }
 
     // ------------------------------------------------------------------ uniqueness
