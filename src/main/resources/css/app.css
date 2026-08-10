@@ -786,3 +786,111 @@
 /* ---------- Student Academic Analytics ---------- */
 .analytics-stat-value { -fx-font-size: 19px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
 .gauge-card            { -fx-padding: 16; -fx-min-height: 230; }
+
+/* ---------- Academic Calendar (Student "My Calendar" / Admin "Academic Calendar") ----------
+   One fixed color per CalendarEventType (enums.CalendarEventType.getCssClass()) — nobody, not
+   even Admin, picks a color freely, so the legend always means the same thing everywhere it
+   shows up. Applied to both a .calendar-day-cell (the grid) and a .legend-swatch (the key
+   beside it), so the two always match exactly. */
+.cal-semester          { -fx-background-color: -navy-900; }
+.cal-registration      { -fx-background-color: #2563eb; }
+.cal-add-drop          { -fx-background-color: #0d9488; }
+.cal-withdraw          { -fx-background-color: #c2410c; }
+.cal-exam              { -fx-background-color: #b91c1c; }
+.cal-payment           { -fx-background-color: #b45309; }
+.cal-holiday           { -fx-background-color: #9d174d; }
+.cal-university-event  { -fx-background-color: -indigo-600; }
+.cal-other             { -fx-background-color: #52525b; }
+
+/* Small dot under a day's number for every additional event type that falls on the same day
+   beyond the one painted as the cell's background — so an overlap (e.g. a holiday that lands
+   inside the registration window) is never silently hidden. */
+.calendar-day-dot-row { -fx-alignment: center; -fx-padding: 1 0 0 0; }
+.calendar-day-dot     { -fx-min-width: 5; -fx-min-height: 5; -fx-max-width: 5; -fx-max-height: 5;
+                        -fx-background-radius: 5; }
+
+/* The single semester week table (CalendarWeekTable): Week | Mon..Sat | Remarks, one row per
+   Monday-Saturday week of the semester. Every cell shares .week-table-cell for its grid border,
+   so the whole GridPane reads as one bordered spreadsheet, matching the printed academic
+   calendar this screen is modeled on. Distinct from .calendar-month/.calendar-grid/
+   .calendar-day-cell, which InstructorAttendanceController's own per-section calendar still uses. */
+.week-table {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-border-color: -navy-900;
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+}
+.week-table-cell {
+    -fx-border-color: #dfe5ec;
+    -fx-border-width: 0 1 1 0;
+    -fx-padding: 6 8 6 8;
+}
+.week-table-header {
+    -fx-background-color: -navy-900;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-border-color: -navy-900;
+}
+.week-table-header-week    { -fx-background-radius: 10 0 0 0; }
+.week-table-header-remarks { -fx-background-radius: 0 10 0 0; }
+
+.week-number-cell {
+    -fx-font-weight: bold;
+    -fx-text-fill: -navy-900;
+    -fx-background-color: #eef1f8;
+    -fx-font-size: 12px;
+}
+.week-day-cell { -fx-background-color: white; }
+.week-day-number { -fx-font-size: 12.5px; -fx-text-fill: #1f2937; }
+.week-day-out-of-range { -fx-text-fill: #cbd5e1; }
+.week-day-editable { -fx-cursor: hand; }
+.week-day-editable:hover { -fx-background-color: #f3f6fb; }
+
+/* A day painted with one of the .cal-* type colors (its highest-priority event that day) — same
+   fixed-color language as the legend swatch beside it. */
+.week-day-number.cal-semester,
+.week-day-number.cal-registration,
+.week-day-number.cal-add-drop,
+.week-day-number.cal-withdraw,
+.week-day-number.cal-exam,
+.week-day-number.cal-payment,
+.week-day-number.cal-holiday,
+.week-day-number.cal-university-event,
+.week-day-number.cal-other {
+    -fx-background-radius: 5;
+    -fx-padding: 2 8 2 8;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+.week-day-number.week-day-inactive { -fx-opacity: 0.45; }
+
+.week-remarks-cell  { -fx-background-color: white; }
+.week-remarks-line  { -fx-font-size: 11.5px; -fx-text-fill: #374151; -fx-wrap-text: true; }
+
+/* The legend beside the calendar — one row per type actually used this semester, never every
+   type that exists. */
+.calendar-legend {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-border-color: #dfe5ec;
+    -fx-border-radius: 10;
+    -fx-padding: 16;
+    -fx-min-width: 190;
+}
+.legend-title  { -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: -navy-900; -fx-padding: 0 0 4 0; }
+.legend-row    { -fx-alignment: center-left; }
+.legend-swatch { -fx-min-width: 14; -fx-min-height: 14; -fx-max-width: 14; -fx-max-height: 14;
+                 -fx-background-radius: 4; }
+.legend-label  { -fx-font-size: 12px; -fx-text-fill: #374151; }
+
+/* Under-calendar academic notes card (Student layout: calendar + legend first, notes last). */
+.calendar-notes-card {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-border-color: #dfe5ec;
+    -fx-border-radius: 10;
+    -fx-padding: 18;
+}
+.calendar-note-line { -fx-font-size: 12.5px; -fx-text-fill: #374151; -fx-wrap-text: true; }

@@ -59,6 +59,7 @@ public class MainShellController {
     @FXML private Label menuNameLabel;
     @FXML private Label menuIdLabel;
     @FXML private MenuItem instructorDirectoryMenuItem;
+    @FXML private MenuItem myCalendarMenuItem;
 
     private static final double SIDEBAR_WIDTH = 260;
     private static final double SIDEBAR_ANIMATION_MILLIS = 270;
@@ -85,6 +86,7 @@ public class MainShellController {
             new MenuEntry("Courses",                "admin_courses.fxml",   "plan"),
             new MenuEntry("Prerequisites",          "admin_prerequisites.fxml", "prerequisites"),
             new MenuEntry("Semesters",              "admin_semesters.fxml", "calendar"),
+            new MenuEntry("Academic Calendar",      "admin_academic_calendar.fxml", "calendar-event"),
             new MenuEntry("Sections",               "admin_sections.fxml",  "sections"),
             new MenuEntry("Reports & Analytics",    "admin_reports.fxml",   "analytics"),
             new MenuEntry("Audit Log",              "admin_audit_log.fxml", "audit")
@@ -142,6 +144,12 @@ public class MainShellController {
         // in the account dropdown is student/admin-only.
         if (session.getRole() == UserRole.INSTRUCTOR) {
             avatarMenu.getItems().remove(instructorDirectoryMenuItem);
+        }
+        // My Calendar is the Student's own read-only Academic Calendar; Admin manages the same
+        // data instead from its own "Academic Calendar" sidebar page (ADMIN_MENU below), and an
+        // Instructor has neither.
+        if (session.getRole() != UserRole.STUDENT) {
+            avatarMenu.getItems().remove(myCalendarMenuItem);
         }
 
         List<MenuEntry> menu = menuFor(session.getRole());
@@ -291,6 +299,14 @@ public class MainShellController {
                 Rectangle body = outlinedRect(1.5, 3, 13, 11, ink);
                 shape.getChildren().addAll(body, line(1.5, 6, 14.5, 6, ink),
                         line(4.5, 1.2, 4.5, 4.2, ink), line(11.5, 1.2, 11.5, 4.2, ink));
+            }
+            case "calendar-event" -> {
+                // Same calendar body as "calendar", plus a small filled dot marking a day —
+                // distinguishes the Academic Calendar entry from Manage Semesters at a glance.
+                Rectangle body = outlinedRect(1.5, 3, 13, 11, ink);
+                Circle marker = new Circle(11, 10.5, 1.8, ink);
+                shape.getChildren().addAll(body, line(1.5, 6, 14.5, 6, ink),
+                        line(4.5, 1.2, 4.5, 4.2, ink), line(11.5, 1.2, 11.5, 4.2, ink), marker);
             }
             case "dashboard" -> {
                 Rectangle tile1 = new Rectangle(1.5, 1.5, 6, 6);
@@ -495,6 +511,11 @@ public class MainShellController {
     @FXML
     private void handleOpenInstructorDirectory() {
         openAccountPage("instructor_directory.fxml", "List of Instructors");
+    }
+
+    @FXML
+    private void handleOpenMyCalendar() {
+        openAccountPage("academic_calendar.fxml", "My Calendar");
     }
 
     /**

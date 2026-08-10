@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Bills, payments and the running balance.
@@ -291,6 +292,16 @@ public class FinanceService {
     /** Every bill one student has received. */
     public List<StudentInvoice> invoicesOf(int studentId) {
         return invoiceDao.findByStudent(studentId);
+    }
+
+    /** One student's bill for one semester, if it has been raised — the Academic Calendar's payment date. */
+    public Optional<StudentInvoice> invoiceFor(int studentId, int semesterId) {
+        return invoiceDao.findByStudentAndSemester(studentId, semesterId);
+    }
+
+    /** Every distinct due date billed for one semester — the Academic Calendar's Admin-wide view. */
+    public List<LocalDate> dueDatesForSemester(int semesterId) {
+        return invoiceDao.findDueDatesBySemester(semesterId);
     }
 
     /** The lines of one bill. */
