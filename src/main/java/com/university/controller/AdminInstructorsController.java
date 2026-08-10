@@ -2,15 +2,18 @@ package com.university.controller;
 
 import com.university.controller.dialog.InstructorFormDialog;
 import com.university.enums.AcademicRank;
+import com.university.enums.NotificationType;
 import com.university.enums.UserRole;
 import com.university.model.Department;
 import com.university.model.Instructor;
 import com.university.service.CourseService;
 import com.university.service.InstructorService;
 import com.university.service.AccountService;
+import com.university.service.NotificationService;
 import com.university.service.ServiceException;
 import com.university.service.Session;
 import com.university.util.AlertUtil;
+import com.university.util.ValidationUtil;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
@@ -18,11 +21,12 @@ import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.HBox;
 import javafx.util.StringConverter;
 
 import java.util.List;
 
-/** The admin's "Manage Instructors" screen: search/filter table plus add, edit, deactivate and reset-password actions. */
+/** The admin's "Manage Instructors" screen: search/filter table plus add, edit, deactivate, reset-password and notification actions. */
 public class AdminInstructorsController {
 
     @FXML private TextField searchField;
@@ -43,8 +47,22 @@ public class AdminInstructorsController {
     @FXML private Button reactivateButton;
     @FXML private Button resetPwdButton;
 
+    // ------------------------------------------------------------ notification section
+    @FXML private RadioButton notifyAllRadio;
+    @FXML private RadioButton notifyDeptRadio;
+    @FXML private RadioButton notifySpecificRadio;
+    @FXML private HBox notifyDeptBox;
+    @FXML private HBox notifySpecificBox;
+    @FXML private ComboBox<Department> notifyDepartmentBox;
+    @FXML private TextField notifySearchField;
+    @FXML private ComboBox<Instructor> notifyResultsBox;
+    @FXML private Label notifyRecipientCountLabel;
+    @FXML private TextField notifySubjectField;
+    @FXML private TextArea notifyMessageField;
+
     private final InstructorService instructorService = new InstructorService();
     private final CourseService courseService = new CourseService();
+    private final NotificationService notificationService = new NotificationService();
 
     private final ObservableList<Instructor> rows = FXCollections.observableArrayList();
     private List<Department> departments = List.of();
@@ -99,6 +117,7 @@ public class AdminInstructorsController {
                 () -> selected.get() == null || selected.get().isActive(), selected));
 
         reload();
+        initNotificationSection();
     }
 
     // ------------------------------------------------------------------ data
@@ -242,6 +261,153 @@ public class AdminInstructorsController {
                     + "\n\nTell the instructor to change it after signing in.");
         } catch (Exception e) {
             AlertUtil.error("Could not reset password", "The password could not be reset.", e);
+        }
+    }
+
+    // ------------------------------------------------------------------ send notification
+
+    private void initNotificationSection() {
+        ToggleGroup recipientGroup = new ToggleGroup();
+        notifyAllRadio.setToggleGroup(recipientGroup);
+        notifyDeptRadio.setToggleGroup(recipientGroup);
+        notifySpecificRadio.setToggleGroup(recipientGroup);
+        recipientGroup.selectedToggleProperty().addListener((o, a, b) -> updateNotifySectionVisibility());
+
+        notifyDepartmentBox.getItems().add(null);
+        notifyDepartmentBox.getItems().addAll(departments);
+        notifyDepartmentBox.setConverter(new StringConverter<>() {
+            @Override public String toString(Department d) { return d == null ? "Select department" : d.toString(); }
+            @Override public Department fromString(String s) { return null; }
+        });
+        notifyDepartmentBox.valueProperty().addListener((o, a, b) -> updateRecipientCount());
+
+        notifyResultsBox.setConverter(new StringConverter<>() {
+            @Override public String toString(Instructor i) { return i == null ? "" : i.getUserId() + " - " + i.getFullName(); }
+            @Override public Instructor fromString(String s) { return null; }
+        });
+        notifyResultsBox.valueProperty().addListener((o, a, b) -> updateRecipientCount());
+
+        notifySearchField.textProperty().addListener((o, a, b) -> refreshNotifySearchResults());
+
+        updateNotifySectionVisibility();
+    }
+
+    private void updateNotifySectionVisibility() {
+        boolean deptMode = notifyDeptRadio.isSelected();
+        boolean specificMode = notifySpecificRadio.isSelected();
+        notifyDeptBox.setVisible(deptMode);
+        notifyDeptBox.setManaged(deptMode);
+        notifySpecificBox.setVisible(specificMode);
+        notifySpecificBox.setManaged(specificMode);
+        updateRecipientCount();
+    }
+
+    private void refreshNotifySearchResults() {
+        notifyResultsBox.setValue(null);
+        String term = notifySearchField.getText();
+        if (ValidationUtil.isBlank(term)) {
+            notifyResultsBox.getItems().clear();
+            return;
+        }
+        List<Instructor> matches = instructorService.search(term.trim()).stream()
+                .filter(Instructor::isActive)
+                .toList();
+        notifyResultsBox.getItems().setAll(matches);
+        if (!matches.isEmpty()) {
+            notifyResultsBox.show();
+        }
+    }
+
+    /** Every account this send would reach, active accounts only. */
+    private List<Instructor> resolveNotifyRecipients() {
+        if (notifySpecificRadio.isSelected()) {
+            Instructor selected = notifyResultsBox.getValue();
+            return selected == null ? List.of() : List.of(selected);
+        }
+
+        List<Instructor> activeInstructors = instructorService.search("").stream()
+                .filter(Instructor::isActive)
+                .toList();
+
+        if (notifyAllRadio.isSelected()) {
+            return activeInstructors;
+        }
+
+        // By department.
+        Department dept = notifyDepartmentBox.getValue();
+        if (dept == null) {
+            return List.of();
+        }
+        return activeInstructors.stream()
+                .filter(i -> i.getDepartmentId() == dept.getDepartmentId())
+                .toList();
+    }
+
+    private void updateRecipientCount() {
+        int count = resolveNotifyRecipients().size();
+        notifyRecipientCountLabel.setText(count + " instructor" + (count == 1 ? "" : "s") + " will receive this notification.");
+    }
+
+    private String describeNotifyRecipients(List<Instructor> recipients) {
+        if (notifySpecificRadio.isSelected()) {
+            Instructor i = recipients.get(0);
+            return i.getFullName() + " (Instructor ID " + i.getUserId() + ")";
+        }
+        if (notifyAllRadio.isSelected()) {
+            return "all " + recipients.size() + " active instructor" + (recipients.size() == 1 ? "" : "s");
+        }
+        Department dept = notifyDepartmentBox.getValue();
+        String scope = dept != null ? dept.toString() : "the selected department";
+        return recipients.size() + " instructor" + (recipients.size() == 1 ? "" : "s") + " in " + scope;
+    }
+
+    @FXML
+    private void handleSendNotification() {
+        String subject = notifySubjectField.getText() == null ? "" : notifySubjectField.getText().trim();
+        String message = notifyMessageField.getText() == null ? "" : notifyMessageField.getText().trim();
+
+        if (ValidationUtil.isBlank(subject) || !ValidationUtil.maxLength(subject, 100)) {
+            AlertUtil.warn("Cannot send notification", "Subject is required (maximum 100 characters).");
+            return;
+        }
+        if (ValidationUtil.isBlank(message) || !ValidationUtil.maxLength(message, 500)) {
+            AlertUtil.warn("Cannot send notification", "Message is required (maximum 500 characters).");
+            return;
+        }
+        if (notifyDeptRadio.isSelected() && notifyDepartmentBox.getValue() == null) {
+            AlertUtil.warn("Cannot send notification", "Select a department.");
+            return;
+        }
+        if (notifySpecificRadio.isSelected() && notifyResultsBox.getValue() == null) {
+            AlertUtil.warn("Cannot send notification", "Search for and select an instructor.");
+            return;
+        }
+
+        List<Instructor> recipients = resolveNotifyRecipients();
+        if (recipients.isEmpty()) {
+            AlertUtil.warn("No recipients", "No active instructors match the selected recipients.");
+            return;
+        }
+
+        boolean ok = AlertUtil.confirm("Send notification",
+                "Send this notification to " + describeNotifyRecipients(recipients) + "?");
+        if (!ok) return;
+
+        try {
+            List<Integer> userIds = recipients.stream().map(Instructor::getUserId).toList();
+            notificationService.notifyAll(userIds, NotificationType.GENERAL, subject, message);
+            AlertUtil.success("Notification sent",
+                    "Sent to " + recipients.size() + " instructor" + (recipients.size() == 1 ? "" : "s") + ".");
+            notifySubjectField.clear();
+            notifyMessageField.clear();
+            notifySearchField.clear();
+            notifyResultsBox.getItems().clear();
+            notifyResultsBox.setValue(null);
+            updateRecipientCount();
+        } catch (ServiceException se) {
+            AlertUtil.warn("Could not send", se.getMessage());
+        } catch (Exception e) {
+            AlertUtil.error("Could not send", "The notification could not be sent.", e);
         }
     }
 }

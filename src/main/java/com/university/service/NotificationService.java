@@ -1,10 +1,12 @@
 package com.university.service;
 
+import com.university.dao.AbstractDAO;
 import com.university.dao.NotificationDAO;
 import com.university.enums.NotificationType;
 import com.university.model.Notification;
 
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 
 /**
@@ -18,6 +20,10 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationDAO notificationDao = new NotificationDAO();
+
+    /** Gives access to the connection helpers without exposing a whole data access object. */
+    private final AbstractDAO transactions = new AbstractDAO() {
+    };
 
     /**
      * Sends a message on its own connection.
@@ -52,6 +58,31 @@ public class NotificationService {
                           String title, String message) {
         for (Integer userId : userIds) {
             notify(connection, userId, type, title, message, null, null);
+        }
+    }
+
+    /**
+     * Sends the same message to several people on its own transaction, all or nothing.
+     *
+     * <p>Used by broadcast-style sends (an admin messaging a whole cohort of students or
+     * instructors) where nothing else is already in progress to piggyback a connection on.</p>
+     */
+    public void notifyAll(List<Integer> userIds, NotificationType type, String title, String message) {
+        if (userIds.isEmpty()) {
+            return;
+        }
+        Connection connection = transactions.beginTransaction();
+        try {
+            notifyAll(connection, userIds, type, title, message);
+            connection.commit();
+        } catch (SQLException e) {
+            transactions.rollbackQuietly(connection);
+            throw new ServiceException("The notification could not be sent. No messages were saved.", e);
+        } catch (RuntimeException e) {
+            transactions.rollbackQuietly(connection);
+            throw e;
+        } finally {
+            transactions.closeQuietly(connection);
         }
     }
 
