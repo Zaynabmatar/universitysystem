@@ -1,6 +1,7 @@
 package com.university.service;
 
 import com.university.dao.TranscriptDAO;
+import com.university.enums.LetterGrade;
 import com.university.util.GradeCalculator;
 
 import java.math.BigDecimal;
@@ -82,19 +83,23 @@ public class TranscriptService {
         }
 
         /**
-         * The label shown in the Note column.
-         * Section 5.5: the superseded attempt is labelled exactly {@code Repeated}.
+         * The label shown in the Note column — the row's real status, derived from the
+         * enrollment status and the submitted letter grade (never from {@code gradePoints == 0},
+         * which W, I and F all share and so cannot tell apart).
          */
         public String displayNote() {
-            if ("ENROLLED".equals(enrollmentStatus))                return "In progress";
-            if ("W".equals(letterGrade) || "I".equals(letterGrade)) return "Does not affect GPA";
-            if (!countsInGpa)                                       return "Repeated";
-            if (isRepeat)                                           return "Repeat attempt";
-            return "";
+            if ("ENROLLED".equals(enrollmentStatus))                  return "In Progress";
+            if ("WITHDRAWN".equals(enrollmentStatus)
+                    || "W".equals(letterGrade))                       return "Withdrawn";
+            if ("I".equals(letterGrade))                              return "Incomplete";
+            if (letterGrade != null)                                  return LetterGrade.fromDb(letterGrade).isPassing()
+                    ? "Passed" : "Failed";
+            return "—";
         }
 
+        /** Section 5.5: an older, completed attempt whose GPA contribution was retired by a repeat. */
         public boolean isSupersededRepeat() {
-            return "Repeated".equals(displayNote());
+            return "COMPLETED".equals(enrollmentStatus) && !countsInGpa;
         }
 
         public boolean isInProgress() {

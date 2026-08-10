@@ -1,5 +1,5 @@
-﻿/* ============================================================================
-   SEED 06 -- Assignments, university_news
+/* ============================================================================
+   SEED 06 -- university_news
    ONLY INSERT statements below (Section 14 / user requirement).
 
    dbo.advisors_directory is no longer seeded here. It was a hand-typed list
@@ -10,6 +10,10 @@
    foundation cleanup drops the table; nothing in the application ever read
    it (grep found zero controller/service references), so there is nothing
    left here to seed it for.
+
+   The assignments feature itself (dbo.assignments) has since been retired
+   outright (migration 0012) — this file used to also seed that table; only
+   the university_news insert remains.
 ============================================================================ */
 
 USE universitymanagementDB;
@@ -20,206 +24,6 @@ GO
 
 BEGIN TRY
 BEGIN TRANSACTION;
-
-INSERT INTO dbo.assignments (section_id, title, description, assigned_date, due_date, maximum_mark, created_by, status)
-SELECT sec.section_id, v.title, v.descr, v.assigned, v.due, v.maxmark, u.user_id, v.status
-FROM (VALUES
-    (N'ENG312', N'01', N's.younes', N'Homework 2', N'Homework 2 for this section.', CAST('2025-09-22T00:00:00' AS DATETIME2), CAST('2025-10-09T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'ENG312', N'01', N's.younes', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-28T00:00:00' AS DATETIME2), CAST('2025-11-20T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'CS367', N'01', N'n.younes2', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-11T00:00:00' AS DATETIME2), CAST('2025-10-30T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'CS115', N'01', N'a.khoury', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-15T00:00:00' AS DATETIME2), CAST('2025-10-31T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'CS115', N'01', N'a.khoury', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-18T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'IT451', N'01', N'r.abourjeily', N'Final Project', N'Final Project for this section.', CAST('2025-09-29T00:00:00' AS DATETIME2), CAST('2025-10-17T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'IT451', N'01', N'r.abourjeily', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-18T00:00:00' AS DATETIME2), CAST('2025-11-01T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'ARTS225', N'01', N'k.abourjeily', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-12T00:00:00' AS DATETIME2), CAST('2025-10-25T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'ARTS225', N'01', N'k.abourjeily', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-05T00:00:00' AS DATETIME2), CAST('2025-10-24T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'MATH158', N'01', N'n.abourjeily', N'Case Study', N'Case Study for this section.', CAST('2025-09-22T00:00:00' AS DATETIME2), CAST('2025-10-06T00:00:00' AS DATETIME2), 25, N'CLOSED'),
-    (N'MATH158', N'01', N'n.abourjeily', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-04T00:00:00' AS DATETIME2), CAST('2025-10-25T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'CS267', N'01', N'f.matta', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-09-20T00:00:00' AS DATETIME2), CAST('2025-10-14T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'CS267', N'01', N'f.matta', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-10-20T00:00:00' AS DATETIME2), CAST('2025-11-13T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'IT124', N'01', N'g.naccache', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-27T00:00:00' AS DATETIME2), CAST('2025-11-18T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'ARTS123', N'01', N'b.younes', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-14T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'ARTS313', N'01', N'l.naccache', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-10T00:00:00' AS DATETIME2), CAST('2025-10-31T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'ARTS313', N'01', N'l.naccache', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-27T00:00:00' AS DATETIME2), CAST('2025-11-10T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'MATH147', N'01', N'z.naccache', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-09-29T00:00:00' AS DATETIME2), CAST('2025-10-13T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'MATH147', N'01', N'z.naccache', N'Case Study', N'Case Study for this section.', CAST('2025-10-25T00:00:00' AS DATETIME2), CAST('2025-11-07T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'IT312', N'01', N'v.ghosn', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-03T00:00:00' AS DATETIME2), CAST('2025-10-26T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'CS134', N'01', N'm.ghosn', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-01T00:00:00' AS DATETIME2), CAST('2025-10-17T00:00:00' AS DATETIME2), 10, N'CLOSED'),
-    (N'LAW326', N'01', N't.younes', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-01T00:00:00' AS DATETIME2), CAST('2025-10-17T00:00:00' AS DATETIME2), 30, N'CLOSED'),
-    (N'BUS112', N'01', N'r.naccache', N'Homework 1', N'Homework 1 for this section.', CAST('2025-09-26T00:00:00' AS DATETIME2), CAST('2025-10-17T00:00:00' AS DATETIME2), 25, N'CLOSED'),
-    (N'BUS112', N'01', N'r.naccache', N'Case Study', N'Case Study for this section.', CAST('2025-09-22T00:00:00' AS DATETIME2), CAST('2025-10-05T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'ENG128', N'01', N'i.nasr', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-13T00:00:00' AS DATETIME2), CAST('2025-11-04T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'CS436', N'01', N's.haddad', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-29T00:00:00' AS DATETIME2), CAST('2025-11-19T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'LAW136', N'01', N't.younes', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-11T00:00:00' AS DATETIME2), CAST('2025-11-03T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'IT254', N'01', N'n.younes', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-04T00:00:00' AS DATETIME2), CAST('2025-10-22T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'PHR156', N'01', N'd.matta2', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-10T00:00:00' AS DATETIME2), CAST('2025-10-31T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'CS101', N'01', N'a.nasr', N'Problem Set', N'Problem Set for this section.', CAST('2025-09-28T00:00:00' AS DATETIME2), CAST('2025-10-10T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'CS101', N'01', N'a.nasr', N'Problem Set', N'Problem Set for this section.', CAST('2025-09-26T00:00:00' AS DATETIME2), CAST('2025-10-15T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'BUS332', N'01', N'r.matta', N'Final Project', N'Final Project for this section.', CAST('2025-10-04T00:00:00' AS DATETIME2), CAST('2025-10-26T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'BUS332', N'01', N'r.matta', N'Case Study', N'Case Study for this section.', CAST('2025-09-24T00:00:00' AS DATETIME2), CAST('2025-10-06T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'LAW415', N'01', N'e.zoghbi', N'Case Study', N'Case Study for this section.', CAST('2025-10-11T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'ENG146', N'01', N'l.naccache2', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-27T00:00:00' AS DATETIME2), CAST('2025-11-10T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'PHR426', N'01', N'c.nasr', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-10-29T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'BUS456', N'01', N'b.abourjeily', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-13T00:00:00' AS DATETIME2), CAST('2025-10-26T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'CS237', N'01', N'm.ghosn', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-23T00:00:00' AS DATETIME2), CAST('2025-11-05T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'CS237', N'01', N'm.ghosn', N'Reading Report', N'Reading Report for this section.', CAST('2025-09-27T00:00:00' AS DATETIME2), CAST('2025-10-07T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'LAW354', N'01', N'c.nasr2', N'Case Study', N'Case Study for this section.', CAST('2025-10-19T00:00:00' AS DATETIME2), CAST('2025-11-02T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'LAW354', N'01', N'c.nasr2', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-25T00:00:00' AS DATETIME2), CAST('2025-11-18T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'ARTS217', N'01', N'r.zoghbi', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-07T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'PHR241', N'01', N'c.nasr', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-02T00:00:00' AS DATETIME2), CAST('2025-10-26T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'PHR241', N'01', N'c.nasr', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-10-02T00:00:00' AS DATETIME2), CAST('2025-10-12T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'MATH117', N'01', N'n.abourjeily', N'Case Study', N'Case Study for this section.', CAST('2025-10-27T00:00:00' AS DATETIME2), CAST('2025-11-15T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'MATH428', N'01', N'n.abourjeily', N'Case Study', N'Case Study for this section.', CAST('2025-09-28T00:00:00' AS DATETIME2), CAST('2025-10-12T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'ENG245', N'01', N'd.matta', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-09-24T00:00:00' AS DATETIME2), CAST('2025-10-12T00:00:00' AS DATETIME2), 15, N'CLOSED'),
-    (N'LAW331', N'01', N't.younes', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-11-01T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'MATH233', N'01', N'j.younes', N'Case Study', N'Case Study for this section.', CAST('2025-09-30T00:00:00' AS DATETIME2), CAST('2025-10-13T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'MATH233', N'01', N'j.younes', N'Final Project', N'Final Project for this section.', CAST('2025-10-09T00:00:00' AS DATETIME2), CAST('2025-10-25T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'CS201', N'02', N's.haddad', N'Final Project', N'Final Project for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-10-30T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'ARTS432', N'01', N'n.nasr', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-09-29T00:00:00' AS DATETIME2), CAST('2025-10-20T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'CS201', N'01', N'a.khoury', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-14T00:00:00' AS DATETIME2), CAST('2025-11-01T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'CS201', N'01', N'a.khoury', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-29T00:00:00' AS DATETIME2), CAST('2025-11-18T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'IT426', N'01', N'v.ghosn', N'Case Study', N'Case Study for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-11-07T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'IT426', N'01', N'v.ghosn', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-06T00:00:00' AS DATETIME2), CAST('2025-10-16T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'BUS437', N'01', N'f.ghosn2', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-15T00:00:00' AS DATETIME2), CAST('2025-11-05T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'BUS437', N'01', N'f.ghosn2', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-28T00:00:00' AS DATETIME2), CAST('2025-11-20T00:00:00' AS DATETIME2), 25, N'CLOSED'),
-    (N'ARTS427', N'01', N'l.naccache', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-23T00:00:00' AS DATETIME2), CAST('2025-11-14T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'BUS148', N'01', N'b.abourjeily', N'Final Project', N'Final Project for this section.', CAST('2025-10-23T00:00:00' AS DATETIME2), CAST('2025-11-05T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'BUS148', N'01', N'b.abourjeily', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-10-16T00:00:00' AS DATETIME2), CAST('2025-11-09T00:00:00' AS DATETIME2), 25, N'CLOSED'),
-    (N'PHR135', N'01', N'm.ghosn2', N'Final Project', N'Final Project for this section.', CAST('2025-10-04T00:00:00' AS DATETIME2), CAST('2025-10-24T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'IT328', N'01', N'g.matta', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-26T00:00:00' AS DATETIME2), CAST('2025-11-12T00:00:00' AS DATETIME2), 15, N'CLOSED'),
-    (N'IT328', N'01', N'g.matta', N'Case Study', N'Case Study for this section.', CAST('2025-10-18T00:00:00' AS DATETIME2), CAST('2025-11-04T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'PHR253', N'01', N'd.matta2', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-27T00:00:00' AS DATETIME2), CAST('2025-11-09T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'MATH327', N'01', N'n.abourjeily', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-06T00:00:00' AS DATETIME2), CAST('2025-10-19T00:00:00' AS DATETIME2), 30, N'CLOSED'),
-    (N'MATH327', N'01', N'n.abourjeily', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-09-25T00:00:00' AS DATETIME2), CAST('2025-10-13T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'IT445', N'01', N'r.abourjeily', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-03T00:00:00' AS DATETIME2), CAST('2025-10-18T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'IT445', N'01', N'r.abourjeily', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-22T00:00:00' AS DATETIME2), CAST('2025-11-07T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'BUS355', N'01', N'r.naccache', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-10T00:00:00' AS DATETIME2), CAST('2025-10-26T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'BUS355', N'01', N'r.naccache', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-26T00:00:00' AS DATETIME2), CAST('2025-11-15T00:00:00' AS DATETIME2), 30, N'CLOSED'),
-    (N'LAW425', N'01', N'c.abourjeily', N'Case Study', N'Case Study for this section.', CAST('2025-10-16T00:00:00' AS DATETIME2), CAST('2025-11-03T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'ENG138', N'01', N'd.matta', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-04T00:00:00' AS DATETIME2), CAST('2025-10-24T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'ENG138', N'01', N'd.matta', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-09T00:00:00' AS DATETIME2), CAST('2025-10-24T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'MATH316', N'01', N'n.abourjeily', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-07T00:00:00' AS DATETIME2), CAST('2025-10-24T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'MATH316', N'01', N'n.abourjeily', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-09-23T00:00:00' AS DATETIME2), CAST('2025-10-14T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'CS248', N'01', N'm.ghosn', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-10-27T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'CS248', N'01', N'm.ghosn', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-19T00:00:00' AS DATETIME2), CAST('2025-11-08T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'CS148', N'01', N's.haddad', N'Final Project', N'Final Project for this section.', CAST('2025-10-01T00:00:00' AS DATETIME2), CAST('2025-10-22T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'IT133', N'01', N'r.abourjeily', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-27T00:00:00' AS DATETIME2), CAST('2025-11-11T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'PHR142', N'01', N'c.nasr', N'Final Project', N'Final Project for this section.', CAST('2025-10-07T00:00:00' AS DATETIME2), CAST('2025-10-25T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'MATH347', N'01', N'r.zoghbi2', N'Problem Set', N'Problem Set for this section.', CAST('2025-09-26T00:00:00' AS DATETIME2), CAST('2025-10-12T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'ARTS134', N'01', N'l.naccache', N'Homework 1', N'Homework 1 for this section.', CAST('2025-09-30T00:00:00' AS DATETIME2), CAST('2025-10-20T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'ARTS134', N'01', N'l.naccache', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-15T00:00:00' AS DATETIME2), CAST('2025-11-08T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'ENG433', N'01', N'l.naccache2', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-18T00:00:00' AS DATETIME2), CAST('2025-11-08T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'PHR315', N'01', N'c.younes', N'Problem Set', N'Problem Set for this section.', CAST('2025-09-20T00:00:00' AS DATETIME2), CAST('2025-10-09T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'MATH131', N'01', N'b.nasr', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-02T00:00:00' AS DATETIME2), CAST('2025-10-12T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'CS227', N'01', N'n.younes2', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-28T00:00:00' AS DATETIME2), CAST('2025-11-13T00:00:00' AS DATETIME2), 25, N'CLOSED'),
-    (N'ARTS323', N'01', N'r.zoghbi', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-09T00:00:00' AS DATETIME2), CAST('2025-10-30T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'ARTS323', N'01', N'r.zoghbi', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-16T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'ENG426', N'01', N's.younes', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-05T00:00:00' AS DATETIME2), CAST('2025-10-26T00:00:00' AS DATETIME2), 20, N'CLOSED'),
-    (N'BUS444', N'01', N'b.abourjeily', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-28T00:00:00' AS DATETIME2), CAST('2025-11-17T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'IT413', N'01', N'r.abourjeily', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-18T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'IT413', N'01', N'r.abourjeily', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-03T00:00:00' AS DATETIME2), CAST('2025-10-13T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'LAW231', N'01', N'c.nasr2', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-07T00:00:00' AS DATETIME2), CAST('2025-10-21T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'LAW118', N'01', N'e.zoghbi', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-09-28T00:00:00' AS DATETIME2), CAST('2025-10-14T00:00:00' AS DATETIME2), 10, N'CLOSED'),
-    (N'CS345', N'01', N'n.younes2', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-08T00:00:00' AS DATETIME2), CAST('2025-10-30T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'CS345', N'01', N'n.younes2', N'Final Project', N'Final Project for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-11-02T00:00:00' AS DATETIME2), 10, N'CLOSED'),
-    (N'ENG443', N'01', N'l.naccache2', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-09T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 30, N'CLOSED'),
-    (N'ENG443', N'01', N'l.naccache2', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-02T00:00:00' AS DATETIME2), CAST('2025-10-25T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'PHR333', N'01', N's.abourjeily', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-09-24T00:00:00' AS DATETIME2), CAST('2025-10-16T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'BUS151', N'01', N'r.matta', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-05T00:00:00' AS DATETIME2), CAST('2025-10-26T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'BUS151', N'01', N'r.matta', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-24T00:00:00' AS DATETIME2), CAST('2025-11-16T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'MATH243', N'01', N'n.abourjeily', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-26T00:00:00' AS DATETIME2), CAST('2025-11-08T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'LAW452', N'01', N'e.ghosn', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-19T00:00:00' AS DATETIME2), CAST('2025-11-08T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'LAW452', N'01', N'e.ghosn', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-09-25T00:00:00' AS DATETIME2), CAST('2025-10-08T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'MATH128', N'01', N'r.zoghbi2', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-20T00:00:00' AS DATETIME2), CAST('2025-11-04T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'MATH128', N'01', N'r.zoghbi2', N'Homework 2', N'Homework 2 for this section.', CAST('2025-09-24T00:00:00' AS DATETIME2), CAST('2025-10-13T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'ARTS117', N'01', N't.matta', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-21T00:00:00' AS DATETIME2), CAST('2025-11-14T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'ARTS117', N'01', N't.matta', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-10-19T00:00:00' AS DATETIME2), CAST('2025-11-09T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'MATH334', N'01', N'r.zoghbi2', N'Case Study', N'Case Study for this section.', CAST('2025-10-19T00:00:00' AS DATETIME2), CAST('2025-10-30T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'BUS325', N'01', N'h.nasr', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-14T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 15, N'CLOSED'),
-    (N'LAW314', N'01', N't.younes', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-10-27T00:00:00' AS DATETIME2), CAST('2025-11-07T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'LAW314', N'01', N't.younes', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-09-25T00:00:00' AS DATETIME2), CAST('2025-10-11T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'CS337', N'01', N'm.ghosn', N'Final Project', N'Final Project for this section.', CAST('2025-10-25T00:00:00' AS DATETIME2), CAST('2025-11-13T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'CS337', N'01', N'm.ghosn', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-10T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'CS217', N'01', N'n.younes2', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-15T00:00:00' AS DATETIME2), CAST('2025-11-08T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'IT347', N'01', N'p.zoghbi', N'Final Project', N'Final Project for this section.', CAST('2025-10-19T00:00:00' AS DATETIME2), CAST('2025-10-29T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'ARTS251', N'01', N'n.nasr', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-07T00:00:00' AS DATETIME2), CAST('2025-10-30T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'ARTS251', N'01', N'n.nasr', N'Homework 1', N'Homework 1 for this section.', CAST('2025-09-21T00:00:00' AS DATETIME2), CAST('2025-10-12T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'CS317', N'01', N'w.abourjeily', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-14T00:00:00' AS DATETIME2), CAST('2025-10-29T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'ENG414', N'01', N'z.zoghbi', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-11-05T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'BUS341', N'01', N'f.ghosn2', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-03T00:00:00' AS DATETIME2), CAST('2025-10-15T00:00:00' AS DATETIME2), 20, N'CLOSED'),
-    (N'BUS341', N'01', N'f.ghosn2', N'Problem Set', N'Problem Set for this section.', CAST('2025-09-29T00:00:00' AS DATETIME2), CAST('2025-10-12T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'ENG453', N'01', N's.younes', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-08T00:00:00' AS DATETIME2), CAST('2025-10-31T00:00:00' AS DATETIME2), 25, N'CLOSED'),
-    (N'PHR213', N'01', N'm.ghosn2', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-29T00:00:00' AS DATETIME2), CAST('2025-11-21T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'PHR213', N'01', N'm.ghosn2', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-10-14T00:00:00' AS DATETIME2), CAST('2025-11-05T00:00:00' AS DATETIME2), 30, N'CLOSED'),
-    (N'ARTS335', N'01', N'b.younes', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-16T00:00:00' AS DATETIME2), CAST('2025-10-26T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'ARTS341', N'01', N'b.younes', N'Problem Set', N'Problem Set for this section.', CAST('2025-09-27T00:00:00' AS DATETIME2), CAST('2025-10-10T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'ARTS341', N'01', N'b.younes', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-24T00:00:00' AS DATETIME2), CAST('2025-11-17T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'IT153', N'01', N'n.younes', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-10-27T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'IT153', N'01', N'n.younes', N'Homework 2', N'Homework 2 for this section.', CAST('2025-09-28T00:00:00' AS DATETIME2), CAST('2025-10-10T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'ENG353', N'01', N'l.naccache2', N'Case Study', N'Case Study for this section.', CAST('2025-10-11T00:00:00' AS DATETIME2), CAST('2025-11-01T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'ARTS246', N'01', N'n.nasr', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-11T00:00:00' AS DATETIME2), CAST('2025-10-25T00:00:00' AS DATETIME2), 15, N'CLOSED'),
-    (N'ARTS246', N'01', N'n.nasr', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-08T00:00:00' AS DATETIME2), CAST('2025-10-25T00:00:00' AS DATETIME2), 30, N'CLOSED'),
-    (N'ENG326', N'01', N'z.zoghbi', N'Reading Report', N'Reading Report for this section.', CAST('2025-09-22T00:00:00' AS DATETIME2), CAST('2025-10-16T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'IT238', N'01', N'g.naccache', N'Final Project', N'Final Project for this section.', CAST('2025-09-30T00:00:00' AS DATETIME2), CAST('2025-10-11T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'ARTS357', N'01', N't.matta', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-12T00:00:00' AS DATETIME2), CAST('2025-10-29T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'ARTS357', N'01', N't.matta', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-11-06T00:00:00' AS DATETIME2), 30, N'CLOSED'),
-    (N'IT437', N'01', N'g.naccache', N'Final Project', N'Final Project for this section.', CAST('2025-10-09T00:00:00' AS DATETIME2), CAST('2025-10-27T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'BUS238', N'01', N'b.abourjeily', N'Case Study', N'Case Study for this section.', CAST('2025-09-26T00:00:00' AS DATETIME2), CAST('2025-10-16T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'BUS238', N'01', N'b.abourjeily', N'Case Study', N'Case Study for this section.', CAST('2025-10-21T00:00:00' AS DATETIME2), CAST('2025-11-10T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'CS445', N'01', N'a.khoury', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-23T00:00:00' AS DATETIME2), CAST('2025-11-05T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'CS445', N'01', N'a.khoury', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-09T00:00:00' AS DATETIME2), CAST('2025-10-29T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'MATH227', N'01', N'b.nasr', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-09-29T00:00:00' AS DATETIME2), CAST('2025-10-14T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'ARTS145', N'01', N'k.abourjeily', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-27T00:00:00' AS DATETIME2), CAST('2025-11-12T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'ENG238', N'01', N'd.ghosn', N'Case Study', N'Case Study for this section.', CAST('2025-10-11T00:00:00' AS DATETIME2), CAST('2025-11-02T00:00:00' AS DATETIME2), 20, N'CLOSED'),
-    (N'CS325', N'01', N's.haddad', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-01T00:00:00' AS DATETIME2), CAST('2025-10-23T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'PHR418', N'01', N'w.naccache', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-22T00:00:00' AS DATETIME2), CAST('2025-11-13T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'PHR418', N'01', N'w.naccache', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-13T00:00:00' AS DATETIME2), CAST('2025-10-24T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'ENG156', N'01', N'd.matta', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-18T00:00:00' AS DATETIME2), CAST('2025-10-31T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'BUS247', N'01', N'f.ghosn2', N'Reading Report', N'Reading Report for this section.', CAST('2025-09-23T00:00:00' AS DATETIME2), CAST('2025-10-15T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'BUS247', N'01', N'f.ghosn2', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-14T00:00:00' AS DATETIME2), CAST('2025-11-01T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'LAW245', N'01', N'e.zoghbi', N'Final Project', N'Final Project for this section.', CAST('2025-10-07T00:00:00' AS DATETIME2), CAST('2025-10-20T00:00:00' AS DATETIME2), 25, N'CLOSED'),
-    (N'LAW245', N'01', N'e.zoghbi', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-11T00:00:00' AS DATETIME2), CAST('2025-11-02T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'IT333', N'01', N'r.abourjeily', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-09-24T00:00:00' AS DATETIME2), CAST('2025-10-06T00:00:00' AS DATETIME2), 10, N'CLOSED'),
-    (N'PHR111', N'01', N'c.nasr', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-19T00:00:00' AS DATETIME2), CAST('2025-11-09T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'BUS136', N'01', N'r.naccache', N'Homework 2', N'Homework 2 for this section.', CAST('2025-09-24T00:00:00' AS DATETIME2), CAST('2025-10-09T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'BUS136', N'01', N'r.naccache', N'Homework 2', N'Homework 2 for this section.', CAST('2025-09-28T00:00:00' AS DATETIME2), CAST('2025-10-21T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'BUS411', N'01', N'h.zoghbi', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-22T00:00:00' AS DATETIME2), CAST('2025-11-05T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'BUS411', N'01', N'h.zoghbi', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-10-27T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'IT228', N'01', N'n.younes', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-17T00:00:00' AS DATETIME2), CAST('2025-11-02T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'IT211', N'01', N'g.naccache', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-23T00:00:00' AS DATETIME2), CAST('2025-11-12T00:00:00' AS DATETIME2), 20, N'CLOSED'),
-    (N'BUS314', N'01', N'r.matta', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-10T00:00:00' AS DATETIME2), CAST('2025-10-30T00:00:00' AS DATETIME2), 10, N'CLOSED'),
-    (N'BUS314', N'01', N'r.matta', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-29T00:00:00' AS DATETIME2), CAST('2025-11-17T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'PHR124', N'01', N'm.ghosn2', N'Homework 1', N'Homework 1 for this section.', CAST('2025-09-29T00:00:00' AS DATETIME2), CAST('2025-10-19T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'CS153', N'01', N'm.ghosn', N'Homework 2', N'Homework 2 for this section.', CAST('2025-09-25T00:00:00' AS DATETIME2), CAST('2025-10-11T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'PHR437', N'01', N'd.matta2', N'Reading Report', N'Reading Report for this section.', CAST('2025-10-26T00:00:00' AS DATETIME2), CAST('2025-11-05T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'MATH431', N'01', N'b.nasr', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-26T00:00:00' AS DATETIME2), CAST('2025-11-11T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'MATH431', N'01', N'b.nasr', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-09-29T00:00:00' AS DATETIME2), CAST('2025-10-19T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'ENG252', N'01', N'l.naccache2', N'Case Study', N'Case Study for this section.', CAST('2025-10-12T00:00:00' AS DATETIME2), CAST('2025-10-31T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'CS251', N'01', N'f.matta', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-26T00:00:00' AS DATETIME2), CAST('2025-11-05T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'ENG118', N'01', N'd.matta', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-10-15T00:00:00' AS DATETIME2), CAST('2025-10-30T00:00:00' AS DATETIME2), 10, N'CLOSED'),
-    (N'ENG118', N'01', N'd.matta', N'Homework 1', N'Homework 1 for this section.', CAST('2025-09-26T00:00:00' AS DATETIME2), CAST('2025-10-06T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'CS202', N'01', N'a.nasr', N'Case Study', N'Case Study for this section.', CAST('2025-10-23T00:00:00' AS DATETIME2), CAST('2025-11-13T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'CS202', N'01', N'a.nasr', N'Problem Set', N'Problem Set for this section.', CAST('2025-09-27T00:00:00' AS DATETIME2), CAST('2025-10-10T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'IT144', N'01', N'r.abourjeily', N'Term Paper Outline', N'Term Paper Outline for this section.', CAST('2025-10-24T00:00:00' AS DATETIME2), CAST('2025-11-08T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'IT144', N'01', N'r.abourjeily', N'Case Study', N'Case Study for this section.', CAST('2025-10-20T00:00:00' AS DATETIME2), CAST('2025-11-07T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'PHR223', N'01', N's.abourjeily', N'Midterm Project', N'Midterm Project for this section.', CAST('2025-09-24T00:00:00' AS DATETIME2), CAST('2025-10-09T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'PHR223', N'01', N's.abourjeily', N'Homework 2', N'Homework 2 for this section.', CAST('2025-10-18T00:00:00' AS DATETIME2), CAST('2025-10-28T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'PHR233', N'01', N'd.matta2', N'Reading Report', N'Reading Report for this section.', CAST('2025-09-23T00:00:00' AS DATETIME2), CAST('2025-10-04T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'BUS253', N'01', N'h.nasr', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-23T00:00:00' AS DATETIME2), CAST('2025-11-03T00:00:00' AS DATETIME2), 10, N'ACTIVE'),
-    (N'IT114', N'01', N'p.zoghbi', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-10-11T00:00:00' AS DATETIME2), CAST('2025-10-30T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'IT114', N'01', N'p.zoghbi', N'Reading Report', N'Reading Report for this section.', CAST('2025-09-30T00:00:00' AS DATETIME2), CAST('2025-10-18T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'ENG222', N'01', N'd.ghosn', N'Case Study', N'Case Study for this section.', CAST('2025-10-14T00:00:00' AS DATETIME2), CAST('2025-11-02T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'ENG222', N'01', N'd.ghosn', N'Homework 1', N'Homework 1 for this section.', CAST('2025-10-09T00:00:00' AS DATETIME2), CAST('2025-10-22T00:00:00' AS DATETIME2), 25, N'ACTIVE'),
-    (N'BUS222', N'01', N'h.zoghbi', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-01T00:00:00' AS DATETIME2), CAST('2025-10-15T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'BUS222', N'01', N'h.zoghbi', N'Quiz Prep Set', N'Quiz Prep Set for this section.', CAST('2025-09-25T00:00:00' AS DATETIME2), CAST('2025-10-18T00:00:00' AS DATETIME2), 15, N'ACTIVE'),
-    (N'BUS128', N'01', N'f.ghosn2', N'Case Study', N'Case Study for this section.', CAST('2025-10-16T00:00:00' AS DATETIME2), CAST('2025-10-26T00:00:00' AS DATETIME2), 20, N'ACTIVE'),
-    (N'LAW145', N'01', N's.matta', N'Problem Set', N'Problem Set for this section.', CAST('2025-10-05T00:00:00' AS DATETIME2), CAST('2025-10-23T00:00:00' AS DATETIME2), 30, N'ACTIVE'),
-    (N'LAW145', N'01', N's.matta', N'Lab Assignment', N'Lab Assignment for this section.', CAST('2025-10-13T00:00:00' AS DATETIME2), CAST('2025-10-24T00:00:00' AS DATETIME2), 25, N'ACTIVE')
-) AS v(coursecode, secnum, username, title, descr, assigned, due, maxmark, status)
-JOIN dbo.courses c ON c.course_code = v.coursecode
-JOIN dbo.semesters sem ON sem.is_current = 1
-JOIN dbo.sections sec ON sec.course_id = c.course_id AND sec.semester_id = sem.semester_id AND sec.section_number = v.secnum
-JOIN dbo.users u ON u.username = v.username;
 
 INSERT INTO dbo.university_news (title, content, category, publication_date, expiry_date, is_published, created_by)
 SELECT v.title, v.content, v.category, v.pubdate, v.expiry, v.published, u.user_id
@@ -238,11 +42,11 @@ FROM (VALUES
 JOIN dbo.users u ON u.username = v.username;
 
 COMMIT TRANSACTION;
-PRINT N'>>> SEED 06 (assignments/news) completed.';
+PRINT N'>>> SEED 06 (news) completed.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    PRINT N'!!! SEED 06 (assignments/news) FAILED, rolled back: ' + ERROR_MESSAGE();
+    PRINT N'!!! SEED 06 (news) FAILED, rolled back: ' + ERROR_MESSAGE();
     THROW;
 END CATCH
 GO

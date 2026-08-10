@@ -121,7 +121,12 @@
             <HBox styleClass="input-pill" alignment="CENTER_LEFT" spacing="10">
                 <SVGPath styleClass="field-icon"
                          content="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                <TextField fx:id="usernameField" promptText="User ID" HBox.hgrow="ALWAYS"/>
+                <StackPane HBox.hgrow="ALWAYS" alignment="CENTER_LEFT">
+                    <TextField fx:id="usernameField" promptText="User ID"/>
+                    <Label fx:id="nameHintLabel" styleClass="name-hint-text" textOverrun="ELLIPSIS"
+                           StackPane.alignment="CENTER_LEFT" mouseTransparent="true"
+                           managed="false" visible="false"/>
+                </StackPane>
             </HBox>
 
             <HBox styleClass="input-pill" alignment="CENTER_LEFT" spacing="10">

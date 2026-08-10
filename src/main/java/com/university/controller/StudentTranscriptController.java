@@ -141,7 +141,7 @@ public class StudentTranscriptController {
         table.setPlaceholder(new Label("No courses in this semester."));
 
         table.getColumns().add(column("Code",   110, r -> r.courseCode));
-        table.getColumns().add(column("Course", 300, r -> r.courseTitle));
+        table.getColumns().add(column("Course Title", 300, r -> r.courseTitle));
         table.getColumns().add(column("Cr",      50, r -> r.creditsText()));
         table.getColumns().add(column("Mark",    90, r -> r.markText()));
         table.getColumns().add(column("Grade",   80, r -> r.letterText()));

@@ -126,6 +126,7 @@ public class GradeService {
         for (GradeSheetRow row : rows) {
             checkOne(row, row.getCourseworkMark(), "Coursework");
             checkOne(row, row.getMidtermMark(), "Midterm");
+            checkOne(row, row.getLabMark(), "Lab");
             checkOne(row, row.getFinalMark(), "Final");
         }
     }
@@ -193,7 +194,10 @@ public class GradeService {
             if (row.isSubmitted()) {
                 continue;
             }
-            if (row.getCourseworkMark() == null || row.getMidtermMark() == null || row.getFinalMark() == null) {
+            boolean missingCore = row.getCourseworkMark() == null || row.getMidtermMark() == null
+                    || row.getFinalMark() == null;
+            boolean missingLab = row.isHasLab() && row.getLabMark() == null;
+            if (missingCore || missingLab) {
                 missing.add(row.getStudentUserId() + " " + row.getStudentName());
             }
         }
@@ -239,13 +243,14 @@ public class GradeService {
      *
      * @param reason free text typed by the admin; must be at least 5 characters
      */
-    public void adminOverride(int enrollmentId, BigDecimal coursework, BigDecimal midterm,
+    public void adminOverride(int enrollmentId, BigDecimal coursework, BigDecimal midterm, BigDecimal lab,
                               BigDecimal finalMark, int adminUserId, String reason) {
         if (reason == null || reason.trim().length() < 5) {
             throw new ValidationException("Please type a reason for the change (at least 5 characters).");
         }
         checkOverrideMark(coursework, "Coursework");
         checkOverrideMark(midterm, "Midterm");
+        checkOverrideMark(lab, "Lab");
         checkOverrideMark(finalMark, "Final");
         assertIsAdmin(adminUserId);
 
@@ -255,13 +260,19 @@ public class GradeService {
                 .orElseThrow(() -> new ValidationException("There is no grade row to correct for this enrollment."));
         LetterGrade oldLetter = existing.getLetterGrade();
 
-        BigDecimal total = GradeCalculator.totalMark(coursework, midterm, finalMark);
+        Section correctionSection = sectionDao.findById(enrollment.getSectionId())
+                .orElseThrow(() -> new ServiceException("That section no longer exists."));
+        boolean hasLab = courseDao.findById(correctionSection.getCourseId())
+                .map(Course::isHasLab).orElse(false);
+
+        BigDecimal total = GradeCalculator.totalMark(coursework, midterm, lab, finalMark, hasLab);
         LetterGrade newLetter = GradeCalculator.letterGrade(total);
 
         Grade correction = new Grade();
         correction.setGradeId(existing.getGradeId());
         correction.setCourseworkMark(coursework);
         correction.setMidtermMark(midterm);
+        correction.setLabMark(hasLab ? lab : null);
         correction.setFinalMark(finalMark);
         correction.setTotalMark(total);
         correction.setLetterGrade(newLetter);
@@ -323,6 +334,7 @@ public class GradeService {
         grade.setEnrollmentId(row.getEnrollmentId());
         grade.setCourseworkMark(row.getCourseworkMark());
         grade.setMidtermMark(row.getMidtermMark());
+        grade.setLabMark(row.isHasLab() ? row.getLabMark() : null);
         grade.setFinalMark(row.getFinalMark());
         grade.setTotalMark(row.getTotalMark());
         grade.setLetterGrade(row.getLetterGrade());

@@ -23,6 +23,16 @@ public final class GradeCalculator {
     public static final BigDecimal MIDTERM_WEIGHT = new BigDecimal("0.30");
     public static final BigDecimal FINAL_WEIGHT = new BigDecimal("0.40");
 
+    /**
+     * Weights for a course with a lab component ({@code courses.has_lab}). Coursework and
+     * Midterm are trimmed to make room for Lab; Final is unaffected. Applies to any course
+     * flagged as having a lab, never one hardcoded course.
+     */
+    public static final BigDecimal LAB_COURSEWORK_WEIGHT = new BigDecimal("0.15");
+    public static final BigDecimal LAB_MIDTERM_WEIGHT = new BigDecimal("0.15");
+    public static final BigDecimal LAB_WEIGHT = new BigDecimal("0.20");
+    public static final BigDecimal LAB_FINAL_WEIGHT = new BigDecimal("0.50");
+
     /** One row of the Section 5.2 conversion table, highest band first. */
     private record Band(BigDecimal minInclusive, LetterGrade letter) {
     }
@@ -55,12 +65,32 @@ public final class GradeCalculator {
     // =====================================================================
 
     /**
-     * @return the weighted total, rounded HALF_UP to 2 decimal places, or null if any component
-     *         is still missing — a missing mark means "not marked yet", never zero.
+     * @return the weighted total for a course with no lab component, rounded HALF_UP to 2
+     *         decimal places, or null if any component is still missing — a missing mark means
+     *         "not marked yet", never zero.
      */
     public static BigDecimal totalMark(BigDecimal coursework, BigDecimal midterm, BigDecimal finalMark) {
-        if (coursework == null || midterm == null || finalMark == null) {
+        return totalMark(coursework, midterm, null, finalMark, false);
+    }
+
+    /**
+     * @param lab    the lab mark; ignored when {@code hasLab} is false, required when it is true
+     * @param hasLab whether this course has a lab component ({@code courses.has_lab}) — decides
+     *               which weighting is applied, never which single course it is
+     * @return the weighted total, rounded HALF_UP to 2 decimal places, or null if any required
+     *         component is still missing — a missing mark means "not marked yet", never zero.
+     */
+    public static BigDecimal totalMark(BigDecimal coursework, BigDecimal midterm, BigDecimal lab,
+                                        BigDecimal finalMark, boolean hasLab) {
+        if (coursework == null || midterm == null || finalMark == null || (hasLab && lab == null)) {
             return null;
+        }
+        if (hasLab) {
+            return coursework.multiply(LAB_COURSEWORK_WEIGHT)
+                    .add(midterm.multiply(LAB_MIDTERM_WEIGHT))
+                    .add(lab.multiply(LAB_WEIGHT))
+                    .add(finalMark.multiply(LAB_FINAL_WEIGHT))
+                    .setScale(2, RoundingMode.HALF_UP);
         }
         return coursework.multiply(COURSEWORK_WEIGHT)
                 .add(midterm.multiply(MIDTERM_WEIGHT))

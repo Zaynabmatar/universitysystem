@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -150,6 +151,11 @@ public class CourseService {
 
     public List<Course> listCourses(boolean activeOnly) {
         return activeOnly ? courseDao.findAllActive() : courseDao.findAll();
+    }
+
+    /** One course by id, for screens that only need to check something about a single course. */
+    public Optional<Course> findCourseById(int courseId) {
+        return courseDao.findById(courseId);
     }
 
     /** Matched against course code and title; blank/null returns every course. */

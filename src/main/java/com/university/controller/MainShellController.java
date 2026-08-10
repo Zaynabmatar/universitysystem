@@ -78,31 +78,30 @@ public class MainShellController {
     }
 
     private static final List<MenuEntry> ADMIN_MENU = List.of(
-            new MenuEntry("Dashboard",              "admin_dashboard.fxml"),
-            new MenuEntry("Students",               "admin_students.fxml"),
-            new MenuEntry("Instructors",            "admin_instructors.fxml"),
-            new MenuEntry("Departments & Programs", "admin_programs.fxml"),
-            new MenuEntry("Courses",                "admin_courses.fxml"),
-            new MenuEntry("Prerequisites",          "admin_prerequisites.fxml"),
-            new MenuEntry("Semesters",              "admin_semesters.fxml"),
-            new MenuEntry("Sections",               "admin_sections.fxml"),
-            new MenuEntry("Reports & Analytics",    "admin_reports.fxml"),
-            new MenuEntry("Audit Log",              "admin_audit_log.fxml")
+            new MenuEntry("Dashboard",              "admin_dashboard.fxml",  "dashboard"),
+            new MenuEntry("Students",               "admin_students.fxml",  "students"),
+            new MenuEntry("Instructors",            "admin_instructors.fxml", "instructor"),
+            new MenuEntry("Departments & Programs", "admin_programs.fxml",  "departments"),
+            new MenuEntry("Courses",                "admin_courses.fxml",   "plan"),
+            new MenuEntry("Prerequisites",          "admin_prerequisites.fxml", "prerequisites"),
+            new MenuEntry("Semesters",              "admin_semesters.fxml", "calendar"),
+            new MenuEntry("Sections",               "admin_sections.fxml",  "sections"),
+            new MenuEntry("Reports & Analytics",    "admin_reports.fxml",   "analytics"),
+            new MenuEntry("Audit Log",              "admin_audit_log.fxml", "audit")
     );
 
     private static final List<MenuEntry> INSTRUCTOR_MENU = List.of(
-            new MenuEntry("Dashboard",       "instructor_dashboard.fxml"),
-            new MenuEntry("My Sections",     "instructor_sections.fxml"),
-            new MenuEntry("Enter Grades",    "instructor_grades.fxml"),
-            new MenuEntry("Attendance",      "instructor_attendance.fxml"),
-            new MenuEntry("My Timetable",    "instructor_timetable.fxml")
+            new MenuEntry("Dashboard",       "instructor_dashboard.fxml",   "dashboard"),
+            new MenuEntry("My Sections",     "instructor_sections.fxml",    "sections"),
+            new MenuEntry("Enter Grades",    "instructor_grades.fxml",      "grades"),
+            new MenuEntry("Attendance",      "instructor_attendance.fxml",  "calendar"),
+            new MenuEntry("My Timetable",    "instructor_timetable.fxml",   "clock")
     );
 
     /**
      * The Student menu (reference: reference image supplied 2026-08-07). "Classes" is the
-     * repurposed former Dashboard screen; My Grades, Course Recommendation and My Timetable
-     * intentionally have no entry here any more (their pages still exist, just unreachable from
-     * the sidebar or Classes page).
+     * repurposed former Dashboard screen. My Timetable intentionally has no entry here any more
+     * (the page still exists, just unreachable from the sidebar); My Grades is back on the menu.
      */
     private static final List<MenuEntry> STUDENT_MENU = List.of(
             new MenuEntry("Classes",             "student_dashboard.fxml",      "classes"),
@@ -110,8 +109,9 @@ public class MainShellController {
             new MenuEntry("Payments",       "student_payments.fxml",       "payments"),
             new MenuEntry("Registration",   "student_registration.fxml",   "registration"),
             new MenuEntry("Transcript",     "student_transcript.fxml",     "transcript"),
+            new MenuEntry("My Grades",      "student_grades.fxml",         "grades"),
             new MenuEntry("Plan of Study",  "student_progress.fxml",       "plan"),
-            new MenuEntry("Moodle",         "student_moodle.fxml",         "moodle")
+            new MenuEntry("Course Recommendation", "student_recommendation.fxml", "recommend")
     );
 
     @FXML
@@ -145,7 +145,7 @@ public class MainShellController {
         }
 
         List<MenuEntry> menu = menuFor(session.getRole());
-        buildSidebar(menu, session.getRole());
+        buildSidebar(menu);
 
         // Role-based routing: land on the dashboard for this role.
         MenuEntry home = menu.get(0);
@@ -198,15 +198,9 @@ public class MainShellController {
         };
     }
 
-    /** The student sidebar drops the "MENU" heading; admin and instructor keep it unchanged. */
-    private void buildSidebar(List<MenuEntry> menu, UserRole role) {
+    /** No role's sidebar shows a "MENU" heading, and none of them lists Log out any more. */
+    private void buildSidebar(List<MenuEntry> menu) {
         sidebar.getChildren().clear();
-
-        if (role != UserRole.STUDENT) {
-            Label header = new Label("MENU");
-            header.getStyleClass().add("sidebar-header");
-            sidebar.getChildren().add(header);
-        }
 
         for (MenuEntry entry : menu) {
             Button b = new Button(entry.label());
@@ -225,12 +219,6 @@ public class MainShellController {
                 setActive(b);   // first item starts highlighted
             }
         }
-
-        Button logoutButton = new Button("Log out");
-        logoutButton.getStyleClass().add("nav-button");
-        logoutButton.setMaxWidth(Double.MAX_VALUE);
-        logoutButton.setOnAction(e -> handleLogout());
-        sidebar.getChildren().add(logoutButton);
     }
 
     /**
@@ -292,16 +280,105 @@ public class MainShellController {
                 Rectangle cover = outlinedRect(2, 3, 12, 10, ink);
                 shape.getChildren().addAll(cover, line(8, 3, 8, 13, ink));
             }
-            case "moodle" -> {
-                Rectangle screen = outlinedRect(1.5, 2.5, 13, 9, ink);
-                Polygon play = new Polygon(6.3, 4.7, 6.3, 9.3, 10.3, 7);
-                play.setFill(ink);
-                shape.getChildren().addAll(screen, line(8, 11.5, 8, 13.5, ink), line(5, 13.5, 11, 13.5, ink), play);
+            case "recommend" -> {
+                Polygon star = new Polygon(
+                        8, 1.5,  9.6, 5.8,  14.2, 6.0,  10.6, 8.8,  11.8, 13.3,
+                        8, 10.7,  4.2, 13.3,  5.4, 8.8,  1.8, 6.0,  6.4, 5.8);
+                star.setFill(ink);
+                shape.getChildren().add(star);
             }
             case "calendar" -> {
                 Rectangle body = outlinedRect(1.5, 3, 13, 11, ink);
                 shape.getChildren().addAll(body, line(1.5, 6, 14.5, 6, ink),
                         line(4.5, 1.2, 4.5, 4.2, ink), line(11.5, 1.2, 11.5, 4.2, ink));
+            }
+            case "dashboard" -> {
+                Rectangle tile1 = new Rectangle(1.5, 1.5, 6, 6);
+                Rectangle tile2 = new Rectangle(8.5, 1.5, 6, 6);
+                Rectangle tile3 = new Rectangle(1.5, 8.5, 6, 6);
+                Rectangle tile4 = new Rectangle(8.5, 8.5, 6, 6);
+                for (Rectangle tile : new Rectangle[]{tile1, tile2, tile3, tile4}) {
+                    tile.setArcWidth(1.5);
+                    tile.setArcHeight(1.5);
+                    tile.setFill(ink);
+                }
+                shape.getChildren().addAll(tile1, tile2, tile3, tile4);
+            }
+            case "sections" -> {
+                Rectangle back = outlinedRect(3.5, 1, 10, 8, ink);
+                Rectangle front = new Rectangle(1.5, 6, 10, 8);
+                front.setArcWidth(2);
+                front.setArcHeight(2);
+                front.setFill(ink);
+                shape.getChildren().addAll(back, front);
+            }
+            case "grades" -> {
+                Rectangle board = outlinedRect(2.5, 1.5, 11, 13, ink);
+                Rectangle clip = new Rectangle(5.5, 0.5, 5, 2);
+                clip.setArcWidth(1.5);
+                clip.setArcHeight(1.5);
+                clip.setFill(ink);
+                Polyline check = new Polyline(5, 8.3, 7, 10.3, 11, 5.7);
+                check.setStroke(ink);
+                check.setStrokeWidth(1.4);
+                shape.getChildren().addAll(board, clip, check);
+            }
+            case "clock" -> {
+                Circle face = new Circle(8, 8, 6.5);
+                face.setFill(Color.TRANSPARENT);
+                face.setStroke(ink);
+                face.setStrokeWidth(1.3);
+                shape.getChildren().addAll(face, line(8, 8, 8, 4, ink), line(8, 8, 11, 9.5, ink));
+            }
+            case "students" -> {
+                Circle head1 = new Circle(5.5, 4.5, 2.3, ink);
+                Rectangle body1 = new Rectangle(1.5, 8, 8, 6.5);
+                body1.setArcWidth(6);
+                body1.setArcHeight(6);
+                body1.setFill(ink);
+                Circle head2 = new Circle(11, 5.5, 2, Color.rgb(255, 255, 255, 0.6));
+                Rectangle body2 = new Rectangle(7.5, 9, 7, 5.5);
+                body2.setArcWidth(6);
+                body2.setArcHeight(6);
+                body2.setFill(Color.rgb(255, 255, 255, 0.6));
+                shape.getChildren().addAll(body2, head2, body1, head1);
+            }
+            case "instructor" -> {
+                Circle head = new Circle(8, 4.5, 2.6, ink);
+                Rectangle body = new Rectangle(2.5, 9, 11, 6);
+                body.setArcWidth(6);
+                body.setArcHeight(6);
+                body.setFill(ink);
+                Rectangle badge = new Rectangle(6.5, 10.3, 3, 2.4);
+                badge.setArcWidth(1);
+                badge.setArcHeight(1);
+                badge.setFill(Color.rgb(8, 39, 102));
+                shape.getChildren().addAll(body, head, badge);
+            }
+            case "departments" -> {
+                Polygon roof = new Polygon(8, 1.5, 14.5, 6, 1.5, 6);
+                roof.setFill(ink);
+                Rectangle base = new Rectangle(2.5, 6, 11, 8.5);
+                base.setFill(Color.TRANSPARENT);
+                base.setStroke(ink);
+                base.setStrokeWidth(1.3);
+                shape.getChildren().addAll(base,
+                        line(4.7, 6, 4.7, 14.5, ink), line(8, 6, 8, 14.5, ink), line(11.3, 6, 11.3, 14.5, ink),
+                        roof);
+            }
+            case "prerequisites" -> {
+                Rectangle linkA = outlinedRect(1.5, 4, 8, 6, ink);
+                Rectangle linkB = outlinedRect(6.5, 6, 8, 6, ink);
+                shape.getChildren().addAll(linkA, linkB);
+            }
+            case "audit" -> {
+                Rectangle board = outlinedRect(2.5, 1.5, 11, 13, ink);
+                Rectangle clip = new Rectangle(5.5, 0.5, 5, 2);
+                clip.setArcWidth(1.5);
+                clip.setArcHeight(1.5);
+                clip.setFill(ink);
+                shape.getChildren().addAll(board, clip,
+                        line(4.7, 6, 11.3, 6, ink), line(4.7, 8.6, 11.3, 8.6, ink), line(4.7, 11.2, 9, 11.2, ink));
             }
             default -> { }
         }

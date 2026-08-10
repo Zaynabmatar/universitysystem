@@ -20,6 +20,7 @@ public class Grade {
     private int enrollmentId;
     private BigDecimal courseworkMark;
     private BigDecimal midtermMark;
+    private BigDecimal labMark;
     private BigDecimal finalMark;
     private BigDecimal totalMark;
     private LetterGrade letterGrade;
@@ -87,6 +88,15 @@ public class Grade {
 
     public void setMidtermMark(BigDecimal midtermMark) {
         this.midtermMark = midtermMark;
+    }
+
+    /** Only set for courses with a lab component ({@code courses.has_lab}); null otherwise. */
+    public BigDecimal getLabMark() {
+        return labMark;
+    }
+
+    public void setLabMark(BigDecimal labMark) {
+        this.labMark = labMark;
     }
 
     /** Weight 40% (Section 5.1). */

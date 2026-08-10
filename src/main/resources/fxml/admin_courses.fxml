@@ -30,8 +30,8 @@
 
     <TableView fx:id="courseTable" VBox.vgrow="ALWAYS">
         <columns>
-            <TableColumn fx:id="colCode"     text="Code"       prefWidth="90"/>
-            <TableColumn fx:id="colTitle"    text="Title"      prefWidth="240"/>
+            <TableColumn fx:id="colCode"     text="Course Code"  prefWidth="100"/>
+            <TableColumn fx:id="colTitle"    text="Course Title" prefWidth="240"/>
             <TableColumn fx:id="colCredits"  text="Credits"    prefWidth="70"/>
             <TableColumn fx:id="colDept"     text="Department" prefWidth="100"/>
             <TableColumn fx:id="colYear"     text="Year"       prefWidth="60"/>

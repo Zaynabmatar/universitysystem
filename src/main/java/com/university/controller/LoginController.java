@@ -1,5 +1,8 @@
 package com.university.controller;
 
+import com.university.dao.InstructorDAO;
+import com.university.dao.StudentDAO;
+import com.university.dao.UserDAO;
 import com.university.enums.UserRole;
 import com.university.service.AuthService;
 import com.university.service.ServiceException;
@@ -10,6 +13,7 @@ import com.university.util.ValidationUtil;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
+import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -21,6 +25,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.SVGPath;
+import javafx.scene.text.Text;
 import javafx.util.Duration;
 
 /**
@@ -47,6 +52,7 @@ public class LoginController {
     @FXML private TextField passwordTextField;
     @FXML private SVGPath eyeIcon;
     @FXML private Label errorLabel;
+    @FXML private Label nameHintLabel;
     @FXML private Button loginButton;
     @FXML private Pane dotsTopRight;
     @FXML private Pane dotsBottomLeft;
@@ -58,6 +64,13 @@ public class LoginController {
 
     /** Runs the back arrow's hover/press easing; kept so a new state can cut the old one short. */
     private Timeline backAnimation;
+
+    /** Debounces the name lookup so it fires once typing pauses, not on every keystroke. */
+    private PauseTransition nameLookupDelay;
+
+    private final StudentDAO studentDAO = new StudentDAO();
+    private final InstructorDAO instructorDAO = new InstructorDAO();
+    private final UserDAO userDAO = new UserDAO();
 
     private static final String EYE_OPEN =
             "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z";
@@ -76,6 +89,16 @@ public class LoginController {
         });
         usernameField.textProperty().addListener((o, a, b) -> hideError());
         passwordField.textProperty().addListener((o, a, b) -> hideError());
+
+        nameLookupDelay = new PauseTransition(Duration.millis(250));
+        nameLookupDelay.setOnFinished(e -> updateNameHint());
+        usernameField.textProperty().addListener((o, a, b) -> {
+            hideNameHint();
+            nameLookupDelay.stop();
+            if (!ValidationUtil.isBlank(b)) {
+                nameLookupDelay.playFromStart();
+            }
+        });
         // Enter in the password field submits.
         passwordField.setOnAction(e -> handleLogin());
         passwordTextField.setOnAction(e -> handleLogin());
@@ -293,5 +316,81 @@ public class LoginController {
     private void hideError() {
         errorLabel.setVisible(false);
         errorLabel.setManaged(false);
+    }
+
+    /**
+     * Looks up the display name behind the ID currently typed, scoped to the
+     * role picked on the previous screen — the same scoping {@link #attemptLogin()}
+     * uses, so this hint can never confirm an ID under a role it does not
+     * belong to. Only a name is shown; never the password hash, email or role.
+     */
+    private void updateNameHint() {
+        String idText = usernameField.getText();
+        if (ValidationUtil.isBlank(idText)) {
+            hideNameHint();
+            return;
+        }
+        int userId;
+        try {
+            userId = Integer.parseInt(idText);
+        } catch (NumberFormatException e) {
+            hideNameHint();
+            return;
+        }
+
+        String name = lookupDisplayName(userId);
+        showNameHint(name == null ? "User not found" : name);
+    }
+
+    /** @return the person's display name for the selected role, or null if no such account exists */
+    private String lookupDisplayName(int userId) {
+        if (selectedRole == null) {
+            return null;
+        }
+        try {
+            switch (selectedRole) {
+                case STUDENT:
+                    return studentDAO.findByUserId(userId).map(s -> s.getFullName()).orElse(null);
+                case INSTRUCTOR:
+                    return instructorDAO.findByUserId(userId).map(i -> i.getFullName()).orElse(null);
+                case ADMIN:
+                    return userDAO.findById(userId)
+                            .filter(u -> u.getRole() == UserRole.ADMIN)
+                            .map(u -> u.getUsername())
+                            .orElse(null);
+                default:
+                    return null;
+            }
+        } catch (Exception e) {
+            // The lookup is a convenience hint, not part of authentication — a
+            // database hiccup here should not block or confuse the sign-in flow.
+            return null;
+        }
+    }
+
+    /** Horizontal gap, in pixels, between the typed ID and the separator that precedes the name hint. */
+    private static final double NAME_HINT_GAP = 8;
+
+    private void showNameHint(String text) {
+        nameHintLabel.setText("—  " + text);
+        nameHintLabel.setTranslateX(typedIdWidth() + NAME_HINT_GAP);
+        nameHintLabel.setVisible(true);
+        nameHintLabel.setManaged(true);
+    }
+
+    /**
+     * Pixel width of the ID currently typed, rendered in the field's own font,
+     * so the name hint can be nudged to sit right after it instead of being
+     * pinned to the far edge of the field.
+     */
+    private double typedIdWidth() {
+        Text measurer = new Text(usernameField.getText());
+        measurer.setFont(usernameField.getFont());
+        return measurer.getLayoutBounds().getWidth();
+    }
+
+    private void hideNameHint() {
+        nameHintLabel.setVisible(false);
+        nameHintLabel.setManaged(false);
     }
 }

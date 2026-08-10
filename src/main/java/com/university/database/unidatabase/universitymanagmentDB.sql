@@ -81,12 +81,8 @@ BEGIN TRY
     DROP TABLE IF EXISTS dbo.invoice_items;
     DROP TABLE IF EXISTS dbo.student_invoices;
     DROP TABLE IF EXISTS dbo.fee_types;
-    DROP TABLE IF EXISTS dbo.chat_messages;
-    DROP TABLE IF EXISTS dbo.chat_conversations;
     DROP TABLE IF EXISTS dbo.advisors_directory;
     DROP TABLE IF EXISTS dbo.university_news;
-    DROP TABLE IF EXISTS dbo.assignments;
-    DROP TABLE IF EXISTS dbo.waitlist;
     DROP TABLE IF EXISTS dbo.grades;
     DROP TABLE IF EXISTS dbo.enrollments;
     DROP TABLE IF EXISTS dbo.section_schedules;
@@ -534,67 +530,6 @@ BEGIN TRY
         CONSTRAINT CK_grades_result     CHECK (result_status IN (N'PASSED', N'FAILED'))
     );
 
-    /* ---- E3. waitlist : the queue for a FULL section ---------------------- */
-    CREATE TABLE dbo.waitlist
-    (
-        waitlist_id INT          IDENTITY(1,1) NOT NULL,
-        section_id  INT          NOT NULL,
-        student_id  INT          NOT NULL,
-        position    INT          NOT NULL,
-        status      NVARCHAR(20) NOT NULL
-                    CONSTRAINT DF_waitlist_status DEFAULT (N'WAITING'),
-        created_at  DATETIME2    NOT NULL
-                    CONSTRAINT DF_waitlist_created_at DEFAULT (GETDATE()),
-
-        CONSTRAINT PK_waitlist                 PRIMARY KEY (waitlist_id),
-        CONSTRAINT UQ_waitlist_section_student UNIQUE      (section_id, student_id),
-
-        CONSTRAINT FK_waitlist_section FOREIGN KEY (section_id)
-            REFERENCES dbo.sections (section_id) ON DELETE NO ACTION,
-        CONSTRAINT FK_waitlist_student FOREIGN KEY (student_id)
-            REFERENCES dbo.students (student_id) ON DELETE NO ACTION,
-
-        CONSTRAINT CK_waitlist_position CHECK (position > 0),
-        CONSTRAINT CK_waitlist_status   CHECK (status IN (N'WAITING', N'PROMOTED', N'CANCELLED'))
-    );
-
-
-    /* ========================================================================
-       MODULE F - ASSIGNMENTS
-       ======================================================================== */
-    PRINT N'--- MODULE F: assignments ---';
-
-    /* An assignment belongs to a SECTION (one offering), not to a course,
-       so different sections of CS201 can have different assignments.       */
-    CREATE TABLE dbo.assignments
-    (
-        assignment_id INT            IDENTITY(1,1) NOT NULL,
-        section_id    INT            NOT NULL,
-        title         NVARCHAR(150)  NOT NULL,
-        description   NVARCHAR(1000) NULL,
-        assigned_date DATETIME2      NOT NULL
-                      CONSTRAINT DF_assignments_assigned DEFAULT (GETDATE()),
-        due_date      DATETIME2      NOT NULL,
-        maximum_mark  DECIMAL(5,2)   NULL,
-        created_by    INT            NOT NULL,
-        status        NVARCHAR(20)   NOT NULL
-                      CONSTRAINT DF_assignments_status DEFAULT (N'ACTIVE'),
-        created_at    DATETIME2      NOT NULL
-                      CONSTRAINT DF_assignments_created_at DEFAULT (GETDATE()),
-
-        CONSTRAINT PK_assignments PRIMARY KEY (assignment_id),
-
-        CONSTRAINT FK_assignments_section FOREIGN KEY (section_id)
-            REFERENCES dbo.sections (section_id) ON DELETE NO ACTION,
-        CONSTRAINT FK_assignments_creator FOREIGN KEY (created_by)
-            REFERENCES dbo.users (user_id)       ON DELETE NO ACTION,
-
-        CONSTRAINT CK_assignments_status  CHECK (status IN (N'ACTIVE', N'CLOSED', N'CANCELLED')),
-        CONSTRAINT CK_assignments_dates   CHECK (due_date >= assigned_date),
-        CONSTRAINT CK_assignments_max_mrk CHECK (maximum_mark IS NULL OR maximum_mark > 0)
-    );
-
-
     /* ========================================================================
        MODULE G - UNIVERSITY NEWS
        ======================================================================== */
@@ -651,60 +586,6 @@ BEGIN TRY
 
         CONSTRAINT PK_advisors_directory       PRIMARY KEY (advisor_id),
         CONSTRAINT UQ_advisors_directory_email UNIQUE      (university_email)
-    );
-
-
-    /* ========================================================================
-       MODULE I - CHATBOX (student <-> administration)
-       ======================================================================== */
-    PRINT N'--- MODULE I: chatbox ---';
-
-    /* ---- I1. chat_conversations : the ticket header ----------------------- */
-    CREATE TABLE dbo.chat_conversations
-    (
-        conversation_id        INT           IDENTITY(1,1) NOT NULL,
-        student_id             INT           NOT NULL,
-        assigned_admin_user_id INT           NULL,   -- NULL = not yet picked up
-        subject                NVARCHAR(150) NOT NULL,
-        category               NVARCHAR(30)  NOT NULL,
-        status                 NVARCHAR(20)  NOT NULL
-                               CONSTRAINT DF_chat_conversations_status DEFAULT (N'OPEN'),
-        created_at             DATETIME2     NOT NULL
-                               CONSTRAINT DF_chat_conversations_created_at DEFAULT (GETDATE()),
-        updated_at             DATETIME2     NULL,
-
-        CONSTRAINT PK_chat_conversations PRIMARY KEY (conversation_id),
-
-        CONSTRAINT FK_chat_conversations_student FOREIGN KEY (student_id)
-            REFERENCES dbo.students (student_id) ON DELETE NO ACTION,
-        CONSTRAINT FK_chat_conversations_admin   FOREIGN KEY (assigned_admin_user_id)
-            REFERENCES dbo.users (user_id)       ON DELETE NO ACTION,
-
-        CONSTRAINT CK_chat_conversations_category CHECK (category IN (N'ACADEMIC', N'REGISTRATION', N'FINANCE', N'TECHNICAL', N'OTHER')),
-        CONSTRAINT CK_chat_conversations_status   CHECK (status   IN (N'OPEN', N'IN_PROGRESS', N'RESOLVED', N'CLOSED'))
-    );
-
-    /* ---- I2. chat_messages -----------------------------------------------
-       CASCADE IS SAFE: a message cannot exist without its conversation, and
-       there is exactly one path from chat_conversations down to here.
-    ------------------------------------------------------------------------ */
-    CREATE TABLE dbo.chat_messages
-    (
-        message_id      INT           IDENTITY(1,1) NOT NULL,
-        conversation_id INT           NOT NULL,
-        sender_user_id  INT           NOT NULL,
-        message_text    NVARCHAR(MAX) NOT NULL,
-        sent_at         DATETIME2     NOT NULL
-                        CONSTRAINT DF_chat_messages_sent_at DEFAULT (GETDATE()),
-        is_read         BIT           NOT NULL
-                        CONSTRAINT DF_chat_messages_is_read DEFAULT (0),
-
-        CONSTRAINT PK_chat_messages PRIMARY KEY (message_id),
-
-        CONSTRAINT FK_chat_messages_conversation FOREIGN KEY (conversation_id)
-            REFERENCES dbo.chat_conversations (conversation_id) ON DELETE CASCADE,
-        CONSTRAINT FK_chat_messages_sender       FOREIGN KEY (sender_user_id)
-            REFERENCES dbo.users (user_id)                     ON DELETE NO ACTION
     );
 
 
@@ -898,8 +779,8 @@ BEGIN TRY
             REFERENCES dbo.users (user_id) ON DELETE NO ACTION,
 
         CONSTRAINT CK_notifications_type CHECK (type IN
-            (N'INFO', N'SUCCESS', N'WARNING', N'GRADE', N'WAITLIST', N'ASSIGNMENT',
-             N'PAYMENT', N'REGISTRATION', N'CHAT_REPLY', N'NEWS', N'GENERAL'))
+            (N'INFO', N'SUCCESS', N'WARNING', N'GRADE',
+             N'PAYMENT', N'REGISTRATION', N'NEWS', N'GENERAL'))
     );
 
     /* ---- K2. audit_log : written by TRIGGERS, never by Java ---------------
@@ -972,23 +853,10 @@ BEGIN TRY
     CREATE INDEX IX_grades_submitted_by            ON dbo.grades (submitted_by);
     CREATE INDEX IX_grades_modified_by             ON dbo.grades (last_modified_by);
 
-    CREATE INDEX IX_waitlist_section               ON dbo.waitlist (section_id, position);
-    CREATE INDEX IX_waitlist_student               ON dbo.waitlist (student_id);
-
-    CREATE INDEX IX_assignments_section            ON dbo.assignments (section_id, status);
-    CREATE INDEX IX_assignments_creator            ON dbo.assignments (created_by);
-    CREATE INDEX IX_assignments_due                ON dbo.assignments (due_date);
-
     CREATE INDEX IX_university_news_creator        ON dbo.university_news (created_by);
     CREATE INDEX IX_university_news_published      ON dbo.university_news (is_published, publication_date);
 
     CREATE INDEX IX_advisors_directory_active      ON dbo.advisors_directory (is_active);
-
-    CREATE INDEX IX_chat_conversations_student     ON dbo.chat_conversations (student_id, status);
-    CREATE INDEX IX_chat_conversations_admin       ON dbo.chat_conversations (assigned_admin_user_id);
-
-    CREATE INDEX IX_chat_messages_conversation     ON dbo.chat_messages (conversation_id, sent_at);
-    CREATE INDEX IX_chat_messages_sender           ON dbo.chat_messages (sender_user_id);
 
     CREATE INDEX IX_student_invoices_student       ON dbo.student_invoices (student_id, status);
     CREATE INDEX IX_student_invoices_semester      ON dbo.student_invoices (semester_id);
@@ -1041,15 +909,14 @@ GO
    the database from scratch.
 
    THE DATA TELLS ONE COHERENT STORY, so it also satisfies the APPLICATION
-   rules (prerequisites, waitlist, GPA cache), not just the table constraints:
+   rules (prerequisites, GPA cache), not just the table constraints:
 
      Spring 2025 (past)     : both students took CS101.
                               Zaynab passed with A. Omar failed with F.
      Fall 2025 (CURRENT)    : Zaynab takes CS102 (allowed - she passed CS101)
                               and MATH101 (no prerequisite).
-                              MATH101 has capacity 1 and is FULL, so Omar is
-                              on its waiting list - which is the only situation
-                              where a waitlist row is legitimate.
+                              MATH101 has capacity 1 and is FULL, so registering
+                              for it a second time is refused outright.
      Spring 2026 (future)   : exists so registration-window logic has a target.
 
    *** PASSWORD NOTE - READ THIS ***
@@ -1179,7 +1046,7 @@ BEGIN TRY
 
     /* ---- sections (1..4) --------------------------------------------------
        Section 4 has capacity 1 ON PURPOSE: it is the only way to demonstrate
-       a genuinely FULL section, which is what a waitlist row requires.
+       a genuinely FULL section, which registration must refuse outright.
     ---------------------------------------------------------------------- */
     INSERT INTO dbo.sections (course_id, semester_id, instructor_id, campus_id, section_number, capacity, enrolled_count, room, status) VALUES
         (1, 1, 1,    1, N'01', 30, 2, N'B204', N'OPEN'),   -- s1: CS101,   Spring 2025, Khaldeh
@@ -1224,29 +1091,11 @@ BEGIN TRY
         (1, 85.00, 90.00, 88.00, 87.70, N'B+', 3.30, N'PASSED', 1, 2, '2025-06-05T14:00:00'),
         (2, 40.00, 45.00, 30.00, 37.50, N'F', 0.00, N'FAILED', 1, 2, '2025-06-05T14:05:00');
 
-    /* ---- waitlist ---------------------------------------------------------
-       Omar queues for MATH101 (section 4), which is genuinely full
-       (capacity 1, enrolled 1). MATH101 has no prerequisite, so Omar is
-       eligible even though he failed CS101.
-    ---------------------------------------------------------------------- */
-    INSERT INTO dbo.waitlist (section_id, student_id, position, status) VALUES
-        (4, 2, 1, N'WAITING');
-
     /* ---- advisors_directory ---------------------------------------------- */
     INSERT INTO dbo.advisors_directory (full_name, department, university_email, office, phone) VALUES
         (N'Dr. Rami Nasr',    N'Computer Science',       N'r.nasr@university.edu.lb',    N'Block B, Office 214', N'+9611000111'),
         (N'Dr. Lina Aoun',    N'Information Technology', N'l.aoun@university.edu.lb',    N'Block A, Office 118', N'+9611000222'),
         (N'Mr. Hadi Chidiac', N'Student Affairs',        N'h.chidiac@university.edu.lb', N'Block C, Office 005', N'+9611000333');
-
-    /* ---- assignments ------------------------------------------------------
-       Each one is attached to a section that actually has students in it.
-       Assignment 2 is created by the ADMIN because section 4 has no
-       instructor assigned yet (TBA).
-    ---------------------------------------------------------------------- */
-    INSERT INTO dbo.assignments (section_id, title, description, assigned_date, due_date, maximum_mark, created_by, status) VALUES
-        (2, N'Lab 3 - Inheritance',      N'Implement a class hierarchy for a small library system.', '2025-10-01T09:00:00', '2025-10-10T23:59:00', 20.00, 3, N'ACTIVE'),
-        (4, N'Problem Set 1 - Limits',   N'Solve the limit exercises from chapter 2.',                '2025-10-03T09:00:00', '2025-10-12T23:59:00', 10.00, 1, N'ACTIVE'),
-        (1, N'Final Project - CS101',    N'Console application using loops, arrays and methods.',     '2025-03-10T09:00:00', '2025-05-20T23:59:00', 30.00, 2, N'CLOSED');
 
     /* ---- university_news --------------------------------------------------- */
     INSERT INTO dbo.university_news (title, content, category, publication_date, expiry_date, is_published, created_by) VALUES
@@ -1305,32 +1154,14 @@ BEGIN TRY
         (2, 2, NULL, N'CHARGE',      3000.00, '2025-09-20T10:00:00', N'Fall 2025 charges',           1),
         (2, 2, 2,    N'PAYMENT',    -3000.00, '2025-09-26T09:10:00', N'Bank transfer, receipt 0002', 1);
 
-    /* ---- chat_conversations (1, 2) ------------------------------------------
-       Each conversation matches that student's actual situation:
-         Zaynab has an unpaid balance  -> FINANCE question, admin replied
-         Omar is on a waiting list     -> REGISTRATION question, still OPEN
-    ---------------------------------------------------------------------- */
-    INSERT INTO dbo.chat_conversations (student_id, assigned_admin_user_id, subject, category, status, created_at, updated_at) VALUES
-        (1, 1,    N'Remaining balance on my invoice', N'FINANCE',      N'IN_PROGRESS', '2025-09-28T12:40:00', '2025-09-28T13:05:00'),
-        (2, NULL, N'Waiting list for MATH101',        N'REGISTRATION', N'OPEN',        '2025-09-29T08:15:00', NULL);
-
-    /* ---- chat_messages ------------------------------------------------------ */
-    INSERT INTO dbo.chat_messages (conversation_id, sender_user_id, message_text, sent_at, is_read) VALUES
-        (1, 4, N'Hello, my invoice still shows a remaining balance. Could you confirm the amount and the deadline?', '2025-09-28T12:40:00', 1),
-        (1, 1, N'Hello Zaynab, the remaining balance is 1300.00 and it is due on 20 October 2025. You can pay in instalments at the finance office.', '2025-09-28T13:05:00', 0),
-        (2, 5, N'Good morning, I am on the waiting list for MATH101. When will I know if a seat becomes available?', '2025-09-29T08:15:00', 0);
-
     /* ---- notifications ------------------------------------------------------
        related_entity_type / related_entity_id let the bell icon open the exact
        record the notification is about. Every id below really exists.
     ---------------------------------------------------------------------- */
     INSERT INTO dbo.notifications (user_id, title, message, type, is_read, related_entity_type, related_entity_id) VALUES
         (4, N'Grade published',           N'Your grade for CS101 has been published.',                            N'GRADE',      0, N'GRADE',        1),
-        (4, N'New assignment',            N'Lab 3 - Inheritance is due on 10 October.',                           N'ASSIGNMENT', 0, N'ASSIGNMENT',   1),
         (4, N'Payment received',          N'A payment of 1000.00 was recorded on invoice INV-2025-0001.',         N'PAYMENT',    1, N'INVOICE',      1),
-        (4, N'Reply from administration', N'The administration replied to your question about your balance.',     N'CHAT_REPLY', 0, N'CONVERSATION', 1),
         (5, N'Grade published',           N'Your grade for CS101 has been published.',                            N'GRADE',      0, N'GRADE',        2),
-        (5, N'Waitlist update',           N'You are position 1 on the waiting list for MATH101.',                 N'WAITLIST',   0, N'SECTION',      4),
         (5, N'University news',           N'A new robotics laboratory has opened in Block B.',                    N'NEWS',       0, N'NEWS',         2),
         (1, N'System ready',              N'The university management database has been initialised.',            N'INFO',       1, NULL,            NULL);
 
@@ -1443,11 +1274,6 @@ FROM dbo.financial_transactions t
 GROUP BY t.student_id
 HAVING SUM(t.amount) <> (SELECT SUM(i.remaining_amount) FROM dbo.student_invoices i
                          WHERE i.student_id = t.student_id);
-
-SELECT N'waitlist on a section that is not full' AS problem, w.waitlist_id
-FROM dbo.waitlist w
-JOIN dbo.sections s ON s.section_id = w.section_id
-WHERE w.status = N'WAITING' AND s.enrolled_count < s.capacity;
 
 /* Row counts per table */
 SELECT t.name AS table_name, SUM(p.rows) AS row_count

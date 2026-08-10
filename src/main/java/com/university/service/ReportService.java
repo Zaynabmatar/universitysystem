@@ -39,7 +39,6 @@ public class ReportService {
         public int activeSections;
         public String currentSemester = "No current semester";
         public int enrollmentsThisSemester;
-        public int studentsWaiting;
         public int studentsOnProbation;
     }
 

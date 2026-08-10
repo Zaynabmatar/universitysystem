@@ -9,18 +9,15 @@ import com.university.dao.SectionDAO;
 import com.university.dao.SectionScheduleDAO;
 import com.university.dao.SemesterDAO;
 import com.university.dao.StudentDAO;
-import com.university.dao.WaitlistDAO;
 import com.university.enums.EnrollmentStatus;
 import com.university.enums.LetterGrade;
 import com.university.enums.NotificationType;
 import com.university.enums.SectionStatus;
-import com.university.enums.WaitlistStatus;
 import com.university.model.Course;
 import com.university.model.Enrollment;
 import com.university.model.Section;
 import com.university.model.Semester;
 import com.university.model.Student;
-import com.university.model.Waitlist;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -59,9 +56,7 @@ public class RegistrationService {
     private final GradeDAO gradeDao = new GradeDAO();
     private final CoursePrerequisiteDAO prerequisiteDao = new CoursePrerequisiteDAO();
     private final SectionScheduleDAO scheduleDao = new SectionScheduleDAO();
-    private final WaitlistDAO waitlistDao = new WaitlistDAO();
     private final NotificationService notifications = new NotificationService();
-    private final WaitlistService waitlistService = new WaitlistService();
     private final AcademicService academicService = new AcademicService();
     private final TuitionService tuitionService = new TuitionService();
 
@@ -162,9 +157,7 @@ public class RegistrationService {
 
         // R5 — a free seat (a fresh read; the real guard is the atomic UPDATE at write time)
         if (section.getEnrolledCount() >= section.getCapacity()) {
-            int position = waitlistDao.countWaiting(sectionId) + 1;
-            throw new RegistrationException("R5", sectionId, position,
-                    "This section is full. Would you like to join the waitlist? (You are #" + position + ")");
+            throw new RegistrationException("R5", sectionId, "This section is full. You cannot register.");
         }
 
         // R6 — no timetable conflict
@@ -199,9 +192,7 @@ public class RegistrationService {
             // The atomic guard: raises enrolled_count only while it stays within capacity. If this
             // returns false, the seat was taken by someone else between the read above and now.
             if (!sectionDao.changeEnrolledCount(connection, sectionId, 1)) {
-                int position = waitlistDao.countWaiting(sectionId) + 1;
-                throw new RegistrationException("R5", sectionId, position,
-                        "This section is full. Would you like to join the waitlist? (You are #" + position + ")");
+                throw new RegistrationException("R5", sectionId, "This section is full. You cannot register.");
             }
 
             int enrollmentId;
@@ -251,8 +242,8 @@ public class RegistrationService {
     }
 
     /**
-     * RULE R6, exposed so a future waitlist promotion can re-run the same check inside its own
-     * transaction. {@code conn} is accepted for that reason; a null connection reads normally.
+     * RULE R6, exposed so a caller running inside its own transaction can re-run the same check.
+     * {@code conn} is accepted for that reason; a null connection reads normally.
      *
      * @return {@code null} when there is no conflict, otherwise the R6 message
      */
@@ -309,7 +300,6 @@ public class RegistrationService {
         private final boolean withdrawal;
         private final String resultTitle;
         private final String resultMessage;
-        private String promotionMessage;
 
         DropResult(boolean withdrawal, String resultTitle, String resultMessage) {
             this.withdrawal = withdrawal;
@@ -328,15 +318,6 @@ public class RegistrationService {
 
         public String getResultMessage() {
             return resultMessage;
-        }
-
-        /** Unused until a waitlist-promotion feature reads it. */
-        public String getPromotionMessage() {
-            return promotionMessage;
-        }
-
-        public void setPromotionMessage(String promotionMessage) {
-            this.promotionMessage = promotionMessage;
         }
     }
 
@@ -407,14 +388,6 @@ public class RegistrationService {
             transactions.closeQuietly(connection);
         }
 
-        // project_details.md Section 6.4 — both a DROPPED and a WITHDRAWN seat trigger waitlist
-        // auto-promotion (Section 6.5). This runs only after the drop's own transaction has
-        // committed; run any earlier and the seat does not look free yet.
-        WaitlistService.PromotionResult promotion = waitlistService.promoteNext(sectionId);
-        if (promotion.isPromoted()) {
-            result.setPromotionMessage(promotion.getPromotedStudentName()
-                    + " was promoted from the waitlist for " + promotion.getSectionLabel() + ".");
-        }
         return result;
     }
 
@@ -425,62 +398,6 @@ public class RegistrationService {
     public boolean isWithinFreeDropWindow(Semester semester) {
         LocalDate today = LocalDate.now();
         return semester.getDropDeadline() == null || !today.isAfter(semester.getDropDeadline());
-    }
-
-    // =============================================================== WAITLIST
-
-    /**
-     * Joins the queue for a section that is full. Only reached after the student has been shown
-     * their queue position (rule R5) and agreed to join.
-     *
-     * @return the new queue entry's key
-     */
-    public int joinWaitlist(int studentId, int sectionId) {
-        Student student = requireStudent(studentId);
-        Section section = requireSection(sectionId);
-        requireSemester(section.getSemesterId());
-        Course course = requireCourse(section.getCourseId());
-
-        if (!section.isFull()) {
-            throw new ServiceException("This section still has seats. Register for it directly.");
-        }
-        if (enrollmentDao.findByStudentAndSection(studentId, sectionId)
-                .map(e -> e.getStatus() == EnrollmentStatus.ENROLLED).orElse(false)) {
-            throw new ServiceException("You already hold a place in this section.");
-        }
-        Optional<Waitlist> existing = waitlistDao.findByStudentAndSection(studentId, sectionId);
-        if (existing.isPresent() && existing.get().getStatus() == WaitlistStatus.WAITING) {
-            throw new ServiceException("You are already on the waiting list at position "
-                    + existing.get().getPosition() + ".");
-        }
-
-        Connection connection = transactions.beginTransaction();
-        try {
-            Waitlist entry = new Waitlist();
-            entry.setSectionId(sectionId);
-            entry.setStudentId(studentId);
-            entry.setPosition(waitlistDao.nextPosition(connection, sectionId));
-            entry.setStatus(WaitlistStatus.WAITING);
-            int waitlistId = waitlistDao.insert(connection, entry);
-
-            String label = course.getCourseCode() + "-" + section.getSectionNumber();
-            notifications.notify(connection, student.getUserId(), NotificationType.WAITLIST,
-                    "Added to the waitlist",
-                    "You have joined the waitlist for " + label + ". You are #" + entry.getPosition()
-                            + " in line.",
-                    "waitlist", waitlistId);
-
-            connection.commit();
-            return waitlistId;
-        } catch (SQLException e) {
-            transactions.rollbackQuietly(connection);
-            throw new ServiceException("You could not be added to the waiting list.", e);
-        } catch (RuntimeException e) {
-            transactions.rollbackQuietly(connection);
-            throw e;
-        } finally {
-            transactions.closeQuietly(connection);
-        }
     }
 
     // ================================================================== READS

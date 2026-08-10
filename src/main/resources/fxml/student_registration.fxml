@@ -30,7 +30,7 @@
         <HBox spacing="10" alignment="CENTER_LEFT">
             <Label text="Available sections" styleClass="section-title"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <TextField fx:id="courseCodeSearchField" promptText="Search by Course Code..." prefWidth="200"
+            <TextField fx:id="courseCodeSearchField" promptText="Search by Course Code or Title..." prefWidth="220"
                        onAction="#handleSearchAvailable"/>
             <Button text="Search" onAction="#handleSearchAvailable"/>
             <CheckBox fx:id="hideFullCheckBox" text="Hide Full Sections" onAction="#handleFiltersChanged"/>

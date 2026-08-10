@@ -16,6 +16,7 @@ public class Course {
     private int departmentId;
     private int levelYear;
     private boolean active = true;
+    private boolean hasLab;
 
     public Course() {
     }
@@ -94,6 +95,15 @@ public class Course {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    /** True when this course has a lab component (any course, not one hardcoded course). */
+    public boolean isHasLab() {
+        return hasLab;
+    }
+
+    public void setHasLab(boolean hasLab) {
+        this.hasLab = hasLab;
     }
 
     @Override
