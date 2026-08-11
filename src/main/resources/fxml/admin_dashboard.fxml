@@ -79,8 +79,9 @@
                        text="No enrollments in the current semester yet."/>
             </StackPane>
 
-            <StackPane fx:id="gradeHolder" HBox.hgrow="ALWAYS" minHeight="120" style="-fx-padding: 6;" styleClass="chart-card">
-                <PieChart fx:id="gradeChart" title="Grade distribution" legendSide="RIGHT" animated="false"/>
+            <StackPane fx:id="gradeHolder" HBox.hgrow="ALWAYS" minHeight="200" minWidth="260" style="-fx-padding: 6;" styleClass="chart-card">
+                <PieChart fx:id="gradeChart" title="Grade distribution" legendSide="RIGHT" animated="false"
+                          styleClass="grade-pie-chart"/>
                 <Label fx:id="gradeEmpty" styleClass="chart-empty" visible="false" managed="false"
                        text="No grades have been submitted yet, so there is nothing to chart."/>
             </StackPane>

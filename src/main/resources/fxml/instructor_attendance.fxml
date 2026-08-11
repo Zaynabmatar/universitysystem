@@ -29,9 +29,14 @@
         <Label fx:id="sectionLabel" styleClass="muted-text"/>
     </HBox>
 
-    <HBox spacing="10" alignment="CENTER_LEFT">
+    <HBox spacing="12" alignment="CENTER_LEFT">
         <Label text="Class Calendar:" styleClass="section-title"/>
-        <Label fx:id="dateHintLabel" styleClass="muted-label"/>
+        <Label fx:id="dateHintLabel"
+               wrapText="true"
+               style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="View Total Absences"
+                onAction="#handleViewTotalAbsences"/>
     </HBox>
 
     <ScrollPane fx:id="calendarScroll" fitToWidth="true" prefHeight="260"
@@ -51,7 +56,8 @@
             <TableColumn fx:id="colStudentId"   text="Student ID"          prefWidth="110"/>
             <TableColumn fx:id="colStudentName" text="Student Name"        prefWidth="220"/>
             <TableColumn fx:id="colSection"     text="Section"             prefWidth="150"/>
-            <TableColumn fx:id="colStatus"      text="Attendance Status"   prefWidth="160"/>
+            <TableColumn fx:id="colTotalAbsences" text="Total Absences"     prefWidth="140"/>
+            <TableColumn fx:id="colStatus"        text="Attendance Status"  prefWidth="160"/>
         </columns>
     </TableView>
 

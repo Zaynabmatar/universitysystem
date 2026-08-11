@@ -45,7 +45,9 @@ public class InstructorTimetableController {
     private static final int END_HOUR = 20;
     private static final int SLOT_MINUTES = 30;
     private static final String[] PALETTE =
-            {"tt-color-1", "tt-color-2", "tt-color-3", "tt-color-4", "tt-color-5", "tt-color-6"};
+            {"tt-color-1", "tt-color-2", "tt-color-3", "tt-color-4",
+             "tt-color-5", "tt-color-6", "tt-color-7", "tt-color-8",
+             "tt-color-9", "tt-color-10", "tt-color-11", "tt-color-12"};
 
     @FXML private Label semesterLabel;
     @FXML private Label summaryLabel;
@@ -58,6 +60,7 @@ public class InstructorTimetableController {
     private final CourseService courseService = new CourseService();
 
     private int instructorId;
+    private final Map<Integer, String> courseColours = new LinkedHashMap<>();
 
     @FXML
     private void initialize() {
@@ -75,6 +78,7 @@ public class InstructorTimetableController {
         try {
             timetableGrid.getChildren().clear();
             legendBox.getChildren().clear();
+            courseColours.clear();
 
             Semester current = semesterService.getCurrentSemester();
             if (current == null) {
@@ -100,13 +104,16 @@ public class InstructorTimetableController {
 
             List<SectionSchedule> meetings = new ArrayList<>();
             int totalStudents = 0;
+
             for (Section section : mine) {
                 meetings.addAll(sectionService.listMeetings(section.getSectionId()));
                 totalStudents += section.getEnrolledCount();
             }
 
-            summaryLabel.setText(meetings.size() + " weekly meeting(s) · " + mine.size()
-                    + " section(s) · " + totalStudents + " student(s)");
+            summaryLabel.setText(meetings.size() + " weekly meeting(s) · "
+                    + mine.size() + " section(s) · "
+                    + totalStudents + " student(s)");
+
             hideEmpty();
             buildGrid(meetings, sectionsById, coursesById);
             buildLegend(mine, coursesById);
@@ -188,6 +195,8 @@ public class InstructorTimetableController {
             block.getChildren().addAll(code, detail);
             timetableGrid.add(block, dayIndex + 1, 1 + startSlot, 1, rowSpan);
         }
+
+
     }
 
     /** One chip per course, in the colour its blocks carry. */
@@ -206,8 +215,18 @@ public class InstructorTimetableController {
         });
     }
 
+    /**
+     * Adds a class/exam block to the timetable.
+     * If another block already occupies the exact same day/time range,
+     * both are displayed side by side instead of being drawn on top of each other.
+     */
+    /**
+     * Adds a class/exam block to the weekly timetable.
+     * Any real time overlap on the same day is displayed side by side.
+     */
     private String colourFor(int courseId) {
-        return PALETTE[Math.floorMod(courseId, PALETTE.length)];
+        return courseColours.computeIfAbsent(courseId, id ->
+                PALETTE[courseColours.size() % PALETTE.length]);
     }
 
     private int slotIndex(LocalTime time) {

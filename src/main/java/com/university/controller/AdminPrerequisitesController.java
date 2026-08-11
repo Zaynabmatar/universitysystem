@@ -103,11 +103,45 @@ public class AdminPrerequisitesController {
 
         prereqCourseFilter.getItems().add(null);
         prereqCourseFilter.getItems().addAll(courses);
+        prereqCourseFilter.setEditable(true);
         prereqCourseFilter.setConverter(new StringConverter<>() {
-            @Override public String toString(Course c) { return c == null ? "All courses" : c.toString(); }
-            @Override public Course fromString(String s) { return null; }
+            @Override public String toString(Course c) {
+                return c == null ? "All courses" : c.toString();
+            }
+
+            @Override public Course fromString(String text) {
+                if (text == null || text.isBlank() || "All courses".equalsIgnoreCase(text.trim())) {
+                    return null;
+                }
+                String query = text.trim();
+                return courses.stream()
+                        .filter(c -> c.getCourseCode().equalsIgnoreCase(query)
+                                || c.getCourseTitle().equalsIgnoreCase(query)
+                                || c.toString().equalsIgnoreCase(query))
+                        .findFirst()
+                        .orElse(null);
+            }
         });
         prereqCourseFilter.getSelectionModel().selectFirst();
+
+        prereqCourseFilter.getEditor().textProperty().addListener((obs, oldText, newText) -> {
+            Course selected = prereqCourseFilter.getValue();
+            if (selected != null && selected.toString().equals(newText)) return;
+
+            String query = newText == null ? "" : newText.trim().toLowerCase();
+            ObservableList<Course> matches = FXCollections.observableArrayList();
+            matches.add(null);
+
+            courses.stream()
+                    .filter(c -> query.isEmpty()
+                            || c.getCourseCode().toLowerCase().contains(query)
+                            || c.getCourseTitle().toLowerCase().contains(query))
+                    .forEach(matches::add);
+
+            prereqCourseFilter.setItems(matches);
+            if (!query.isEmpty()) prereqCourseFilter.show();
+        });
+
         prereqCourseFilter.valueProperty().addListener((o, a, b) -> reloadPrereqs());
 
         var selected = prereqTable.getSelectionModel().selectedItemProperty();

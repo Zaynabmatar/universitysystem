@@ -31,6 +31,7 @@ import javafx.scene.shape.Polyline;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
 import java.util.List;
@@ -59,7 +60,6 @@ public class MainShellController {
     @FXML private Label menuNameLabel;
     @FXML private Label menuIdLabel;
     @FXML private MenuItem instructorDirectoryMenuItem;
-    @FXML private MenuItem myCalendarMenuItem;
 
     private static final double SIDEBAR_WIDTH = 260;
     private static final double SIDEBAR_ANIMATION_MILLIS = 270;
@@ -97,7 +97,8 @@ public class MainShellController {
             new MenuEntry("My Sections",     "instructor_sections.fxml",    "sections"),
             new MenuEntry("Enter Grades",    "instructor_grades.fxml",      "grades"),
             new MenuEntry("Attendance",      "instructor_attendance.fxml",  "calendar"),
-            new MenuEntry("My Timetable",    "instructor_timetable.fxml",   "clock")
+            new MenuEntry("My Timetable",    "instructor_timetable.fxml",   "clock"),
+            new MenuEntry("Academic Calendar", "instructor_academic_calendar.fxml", "calendar-event")
     );
 
     /**
@@ -113,7 +114,8 @@ public class MainShellController {
             new MenuEntry("Transcript",     "student_transcript.fxml",     "transcript"),
             new MenuEntry("My Grades",      "student_grades.fxml",         "grades"),
             new MenuEntry("Plan of Study",  "student_progress.fxml",       "plan"),
-            new MenuEntry("Course Recommendation", "student_recommendation.fxml", "recommend")
+            new MenuEntry("Course Recommendation", "student_recommendation.fxml", "recommend"),
+            new MenuEntry("Academic Calendar", "academic_calendar.fxml", "calendar-event")
     );
 
     @FXML
@@ -128,10 +130,18 @@ public class MainShellController {
         SceneManager.getInstance().registerContentArea(contentArea);
         clipSidebarShell();
 
-        welcomeNameLabel.setText(session.getDisplayName());
+        if (session.getRole() == UserRole.ADMIN || session.getRole() == UserRole.INSTRUCTOR) {
+            welcomeNameLabel.setText("Dr. " + session.getDisplayName());
+        } else {
+            welcomeNameLabel.setText(session.getDisplayName());
+        }
 
         if (session.getStudent() != null) {
             studentIdLabel.setText("ID: " + session.getUser().getUserId());
+            studentIdLabel.setVisible(true);
+            studentIdLabel.setManaged(true);
+        } else if (session.getInstructor() != null && session.getInstructor().getAcademicRank() != null) {
+            studentIdLabel.setText("Academic Rank: " + session.getInstructor().getAcademicRank().getLabel());
             studentIdLabel.setVisible(true);
             studentIdLabel.setManaged(true);
         }
@@ -144,12 +154,6 @@ public class MainShellController {
         // in the account dropdown is student/admin-only.
         if (session.getRole() == UserRole.INSTRUCTOR) {
             avatarMenu.getItems().remove(instructorDirectoryMenuItem);
-        }
-        // My Calendar is the Student's own read-only Academic Calendar; Admin manages the same
-        // data instead from its own "Academic Calendar" sidebar page (ADMIN_MENU below), and an
-        // Instructor has neither.
-        if (session.getRole() != UserRole.STUDENT) {
-            avatarMenu.getItems().remove(myCalendarMenuItem);
         }
 
         List<MenuEntry> menu = menuFor(session.getRole());
@@ -481,6 +485,7 @@ public class MainShellController {
             Stage popup = new Stage();
             popup.initOwner(notificationsButton.getScene().getWindow());
             popup.initModality(Modality.WINDOW_MODAL);
+            popup.initStyle(StageStyle.UNDECORATED);
             popup.setTitle("Notifications");
             Scene scene = new Scene(root);
             SceneManager.getInstance().applyStylesheet(scene);
@@ -511,11 +516,6 @@ public class MainShellController {
     @FXML
     private void handleOpenInstructorDirectory() {
         openAccountPage("instructor_directory.fxml", "List of Instructors");
-    }
-
-    @FXML
-    private void handleOpenMyCalendar() {
-        openAccountPage("academic_calendar.fxml", "My Calendar");
     }
 
     /**

@@ -20,6 +20,7 @@
         <Region HBox.hgrow="ALWAYS"/>
         <Label fx:id="unreadLabel" text="0 unread" styleClass="badge-label"/>
         <Button fx:id="markAllButton" text="Mark all read" onAction="#handleMarkAllRead"/>
+<Button text="□" onAction="#handleMaximize"/>
     </HBox>
 
     <Separator/>

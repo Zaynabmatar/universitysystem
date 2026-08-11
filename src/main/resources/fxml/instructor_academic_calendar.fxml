@@ -5,26 +5,25 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
-<?import javafx.scene.control.TableColumn?>
-<?import javafx.scene.control.TableView?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.SVGPath?>
 
 <ScrollPane xmlns="http://javafx.com/javafx"
             xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.university.controller.AdminAcademicCalendarController"
+            fx:controller="com.university.controller.InstructorAcademicCalendarController"
             fitToWidth="true" styleClass="page-scroll">
     <content>
     <VBox styleClass="content-page" spacing="18">
 
-        <HBox spacing="10" alignment="CENTER_LEFT">
-            <Label text="Academic Calendar" styleClass="page-title"/>
+        <HBox spacing="10" alignment="CENTER_LEFT"><Label text="Academic Calendar" styleClass="page-title"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Label text="Semester:"/>
             <ComboBox fx:id="semesterCombo" prefWidth="200"/>
         </HBox>
-        <Label text="Semester dates, registration, drop/withdraw deadlines, exams and payment due dates come from their own screens automatically. Click an empty date to add a custom event, or click an existing one to edit it."
+
+        <Label text="A view-only academic calendar built from your real semester dates, registration window, exams, payment due date and any events the Admin has added."
                styleClass="muted-text" wrapText="true"/>
 
         <HBox spacing="18" alignment="TOP_LEFT">
@@ -38,7 +37,6 @@
                 <padding><Insets top="2" right="0" bottom="0" left="0"/></padding>
             </VBox>
         </VBox>
-
 
     </VBox>
     </content>

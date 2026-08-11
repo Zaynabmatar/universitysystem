@@ -103,7 +103,7 @@
 
                     <VBox spacing="1" alignment="CENTER_LEFT">
                         <HBox spacing="6" alignment="CENTER_LEFT">
-                            <Label text="Welcome," styleClass="welcome-label"/>
+                            <Label text="Welcome" styleClass="welcome-label"/>
                             <Label fx:id="welcomeNameLabel" text="" styleClass="welcome-label"/>
                             <Label fx:id="semesterLabel" text="" styleClass="welcome-label"/>
                         </HBox>
@@ -172,14 +172,7 @@
                                          scaleX="0.72" scaleY="0.72"/>
                             </graphic>
                         </MenuItem>
-                        <MenuItem fx:id="myCalendarMenuItem" text="My Calendar" onAction="#handleOpenMyCalendar">
-                            <graphic>
-                                <SVGPath styleClass="field-icon"
-                                         content="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"
-                                         scaleX="0.72" scaleY="0.72"/>
-                            </graphic>
-                        </MenuItem>
-                        <SeparatorMenuItem/>
+<SeparatorMenuItem/>
                         <MenuItem fx:id="logoutMenuItem" text="Log out" onAction="#handleLogout" styleClass="logout-menu-item">
                             <graphic>
                                 <SVGPath styleClass="logout-icon"

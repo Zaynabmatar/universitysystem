@@ -61,6 +61,11 @@ public class NotificationsController {
 
                 VBox box = new VBox(3, title, body, meta);
                 box.getStyleClass().add(n.isRead() ? "notif-cell-read" : "notif-cell-unread");
+
+                if ("High Absence Warning".equals(n.getTitle())) {
+                    box.getStyleClass().add("notif-high-absence");
+                    title.getStyleClass().add("notif-high-absence-title");
+                }
                 setGraphic(box);
                 setText(null);
             }
@@ -104,6 +109,11 @@ public class NotificationsController {
         } catch (RuntimeException e) {
             AlertUtil.error("Notifications", "Your notifications could not be marked as read.");
         }
+    }
+@FXML
+    private void handleMaximize() {
+        Stage stage = (Stage) closeButton.getScene().getWindow();
+        stage.setMaximized(!stage.isMaximized());
     }
 
     @FXML

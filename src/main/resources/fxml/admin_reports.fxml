@@ -63,9 +63,9 @@
         <Tab text="Grade Distribution">
             <BorderPane>
                 <center>
-                    <StackPane fx:id="gradeHolder" styleClass="chart-card">
+                    <StackPane fx:id="gradeHolder" styleClass="chart-card" minHeight="260" minWidth="320">
                         <PieChart fx:id="gradeChart" title="Grade distribution (submitted grades)"
-                                  legendSide="RIGHT" animated="false"/>
+                                  legendSide="RIGHT" animated="false" styleClass="grade-pie-chart"/>
                         <Label fx:id="gradeEmpty" styleClass="chart-empty" visible="false" managed="false"
                                text="No grades have been submitted yet, so there is nothing to chart."/>
                     </StackPane>

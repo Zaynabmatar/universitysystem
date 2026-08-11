@@ -12,22 +12,15 @@ import com.university.service.SemesterService;
 import com.university.service.ServiceException;
 import com.university.service.Session;
 import com.university.util.AlertUtil;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -42,30 +35,16 @@ import java.util.Set;
  */
 public class AdminAcademicCalendarController {
 
-    private static final DateTimeFormatter D_FMT = DateTimeFormatter.ofPattern("d MMM yyyy");
-
     private static final List<CalendarEventType> PRIORITY = AcademicCalendarService.DAY_PRIORITY;
 
     @FXML private ComboBox<Semester> semesterCombo;
     @FXML private VBox calendarBox;
     @FXML private VBox legendBox;
     @FXML private VBox notesBox;
-    @FXML private Label countLabel;
-    @FXML private TableView<CalendarEvent> eventTable;
-    @FXML private TableColumn<CalendarEvent, String> colTitle;
-    @FXML private TableColumn<CalendarEvent, String> colType;
-    @FXML private TableColumn<CalendarEvent, String> colDates;
-    @FXML private TableColumn<CalendarEvent, String> colStatus;
-    @FXML private Button editButton;
-    @FXML private Button deactivateButton;
-    @FXML private Button reactivateButton;
-    @FXML private Button deleteButton;
 
     private final SemesterService semesterService = new SemesterService();
     private final AcademicCalendarService academicCalendarService = new AcademicCalendarService();
     private final CalendarEventService calendarEventService = new CalendarEventService();
-
-    private final ObservableList<CalendarEvent> rows = FXCollections.observableArrayList();
 
     private Semester currentSemester;
     private List<Entry> visibleEntries = List.of();
@@ -74,32 +53,6 @@ public class AdminAcademicCalendarController {
     @FXML
     private void initialize() {
         Session.current().requireRole(UserRole.ADMIN);
-
-        colTitle.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getTitle()));
-        colType.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getType().getLabel()));
-        colDates.setCellValueFactory(c -> new SimpleStringProperty(datesOf(c.getValue())));
-        colStatus.setCellValueFactory(c ->
-                new SimpleStringProperty(c.getValue().isActive() ? "Active" : "Inactive"));
-        colStatus.setCellFactory(col -> new TableCell<>() {
-            @Override protected void updateItem(String value, boolean empty) {
-                super.updateItem(value, empty);
-                getStyleClass().removeAll("badge", "badge-ok", "badge-neutral");
-                if (empty || value == null) {
-                    setText(null);
-                    return;
-                }
-                setText(value);
-                getStyleClass().add("badge");
-                getStyleClass().add("Active".equals(value) ? "badge-ok" : "badge-neutral");
-            }
-        });
-
-        eventTable.setItems(rows);
-        eventTable.setPlaceholder(new Label("No custom events for this semester yet."));
-
-        var selected = eventTable.getSelectionModel().selectedItemProperty();
-        selected.addListener((obs, old, sel) -> updateActionButtons(sel));
-        updateActionButtons(null);
 
         semesterCombo.setCellFactory(list -> semesterCell());
         semesterCombo.setButtonCell(semesterCell());
@@ -122,19 +75,6 @@ public class AdminAcademicCalendarController {
         };
     }
 
-    private void updateActionButtons(CalendarEvent selected) {
-        boolean has = selected != null;
-        editButton.setDisable(!has);
-        deleteButton.setDisable(!has);
-        deactivateButton.setDisable(!has || !selected.isActive());
-        reactivateButton.setDisable(!has || selected.isActive());
-    }
-
-    private String datesOf(CalendarEvent event) {
-        return event.getStartDate().equals(event.getEndDate())
-                ? D_FMT.format(event.getStartDate())
-                : D_FMT.format(event.getStartDate()) + " → " + D_FMT.format(event.getEndDate());
-    }
 
     // ------------------------------------------------------------------ loading
 
@@ -166,9 +106,6 @@ public class AdminAcademicCalendarController {
             buildCalendar(semester);
             buildLegend();
             buildNotes(academicCalendarService.notesForSemester(semesterId, null));
-
-            rows.setAll(customEvents);
-            countLabel.setText(customEvents.size() + " custom event" + (customEvents.size() == 1 ? "" : "s"));
         } catch (RuntimeException e) {
             visibleEntries = List.of();
             customEvents = List.of();
@@ -176,12 +113,6 @@ public class AdminAcademicCalendarController {
         }
     }
 
-    @FXML
-    private void handleRefresh() {
-        if (currentSemester != null) {
-            reload(currentSemester);
-        }
-    }
 
     // ------------------------------------------------------------------ calendar table
 
@@ -285,70 +216,6 @@ public class AdminAcademicCalendarController {
             AlertUtil.warn("Cannot save the event", se.getMessage());
         } catch (Exception e) {
             AlertUtil.error("Could not save", "The event could not be updated.", e);
-        }
-    }
-
-    @FXML
-    private void handleAdd() {
-        if (currentSemester == null) return;
-        LocalDate today = LocalDate.now();
-        LocalDate defaultDate = (today.isBefore(currentSemester.getStartDate())
-                || today.isAfter(currentSemester.getEndDate())) ? currentSemester.getStartDate() : today;
-        openAddDialog(defaultDate);
-    }
-
-    @FXML
-    private void handleEdit() {
-        CalendarEvent selected = eventTable.getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            openEditDialog(selected);
-        }
-    }
-
-    @FXML
-    private void handleDeactivate() {
-        CalendarEvent selected = eventTable.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
-        if (!AlertUtil.confirm("Deactivate event", "Deactivate \"" + selected.getTitle()
-                + "\"? It will no longer appear on the Student calendar.")) {
-            return;
-        }
-        try {
-            calendarEventService.deactivate(selected.getEventId());
-            AlertUtil.success("Deactivated", "\"" + selected.getTitle() + "\" is now hidden from students.");
-            reload(currentSemester);
-        } catch (Exception e) {
-            AlertUtil.error("Could not deactivate", "The event could not be deactivated.", e);
-        }
-    }
-
-    @FXML
-    private void handleReactivate() {
-        CalendarEvent selected = eventTable.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
-        try {
-            calendarEventService.reactivate(selected.getEventId());
-            AlertUtil.success("Reactivated", "\"" + selected.getTitle() + "\" is visible to students again.");
-            reload(currentSemester);
-        } catch (Exception e) {
-            AlertUtil.error("Could not reactivate", "The event could not be reactivated.", e);
-        }
-    }
-
-    @FXML
-    private void handleDelete() {
-        CalendarEvent selected = eventTable.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
-        if (!AlertUtil.confirm("Delete event", "Permanently delete \"" + selected.getTitle()
-                + "\"? This cannot be undone.")) {
-            return;
-        }
-        try {
-            calendarEventService.delete(selected.getEventId());
-            AlertUtil.success("Deleted", "\"" + selected.getTitle() + "\" was deleted.");
-            reload(currentSemester);
-        } catch (Exception e) {
-            AlertUtil.error("Could not delete", "The event could not be deleted.", e);
         }
     }
 }

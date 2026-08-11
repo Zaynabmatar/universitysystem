@@ -65,6 +65,7 @@ public class InstructorAttendanceController {
     @FXML private TableColumn<AttendanceRow, String> colStudentId;
     @FXML private TableColumn<AttendanceRow, String> colStudentName;
     @FXML private TableColumn<AttendanceRow, String> colSection;
+    @FXML private TableColumn<AttendanceRow, String> colTotalAbsences;
     @FXML private TableColumn<AttendanceRow, AttendanceStatus> colStatus;
     @FXML private Label statsLabel;
     @FXML private Button saveButton;
@@ -101,8 +102,11 @@ public class InstructorAttendanceController {
                 new SimpleStringProperty(String.valueOf(c.getValue().getStudentUserId())));
         colStudentName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getStudentName()));
         colSection.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getSectionLabel()));
+        colTotalAbsences.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getTotalAbsences())));
         colStatus.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getStatus()));
         colStatus.setCellFactory(statusCellFactory());
+        colTotalAbsences.setVisible(true);
+        colStatus.setVisible(false);
 
         attendanceTable.setItems(filteredRows);
         attendanceTable.setPlaceholder(new Label("Choose one of your sections, then a scheduled class date."));
@@ -170,26 +174,58 @@ public class InstructorAttendanceController {
         sectionId = chosen.sectionId();
         sectionLabel.setText(chosen.label());
         selectedDate = null;
-        rows.clear();
-        updateStats();
         saveButton.setDisable(true);
+
+        colTotalAbsences.setVisible(true);
+        colStatus.setVisible(false);
 
         try {
             scheduledDates = new HashSet<>(attendanceService.listScheduledDates(sectionId));
+            rows.setAll(attendanceService.getSectionAttendanceSummary(sectionId));
+            attendanceTable.refresh();
+            updateStats();
         } catch (RuntimeException e) {
             scheduledDates = Set.of();
-            AlertUtil.error("Attendance", "This section's schedule could not be loaded.", e);
+            rows.clear();
+            updateStats();
+            AlertUtil.error("Attendance", "This section could not be loaded.", e);
         }
 
         buildCalendar();
 
         dateHintLabel.setText(scheduledDates.isEmpty()
                 ? "This section has no weekly schedule set, so no class dates are available."
-                : "Pick one of the highlighted class dates.");
+                : "Choose a scheduled class date to add attendance status.");
     }
 
+    @FXML
+    private void handleViewTotalAbsences() {
+        if (sectionId <= 0) {
+            return;
+        }
+
+        selectedDate = null;
+        colTotalAbsences.setVisible(true);
+        colStatus.setVisible(false);
+        saveButton.setDisable(true);
+
+        try {
+            rows.setAll(attendanceService.getSectionAttendanceSummary(sectionId));
+            attendanceTable.refresh();
+            updateStats();
+            buildCalendar();
+
+            dateHintLabel.setText(
+                    "Choose a highlighted scheduled class date below to add attendance status."
+            );
+        } catch (RuntimeException e) {
+            AlertUtil.error("Attendance", "The attendance summary could not be loaded.", e);
+        }
+    }
     private void onDateChosen(LocalDate date) {
         selectedDate = date;
+        colTotalAbsences.setVisible(false);
+        colStatus.setVisible(true);
         buildCalendar();
         loadRoster(date);
     }

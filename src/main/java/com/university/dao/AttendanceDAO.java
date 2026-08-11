@@ -64,6 +64,12 @@ public class AttendanceDAO extends AbstractDAO implements GenericDAO<AttendanceR
                 MAPPER, enrollmentId, classDate);
     }
 
+    /** Same lookup, using the caller's transaction. */
+    public Optional<AttendanceRecord> findByEnrollmentAndDate(Connection connection, int enrollmentId, LocalDate classDate) {
+        return queryOne(connection, SELECT + " WHERE enrollment_id = ? AND class_date = ?",
+                MAPPER, enrollmentId, classDate);
+    }
+
     /**
      * The instructor's attendance sheet for one section on one date: every ENROLLED or COMPLETED
      * student in the section, joined with whatever attendance row already exists for them on that
@@ -94,6 +100,55 @@ public class AttendanceDAO extends AbstractDAO implements GenericDAO<AttendanceR
             return row;
         }, classDate, sectionId);
     }
+
+    /** Total saved absences for one enrollment across all recorded class dates. */
+    /** Students in one section with their total saved absences, no class date required. */
+    public List<AttendanceRow> findSectionAttendanceSummary(int sectionId) {
+        String sql = "SELECT e.enrollment_id, e.student_id, st.user_id, st.first_name, st.last_name, "
+                + "c.course_code, s.section_number "
+                + "FROM dbo.enrollments e "
+                + "INNER JOIN dbo.students st ON st.student_id = e.student_id "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "INNER JOIN dbo.courses c ON c.course_id = s.course_id "
+                + "WHERE e.section_id = ? AND e.status IN ('ENROLLED', 'COMPLETED') "
+                + "ORDER BY st.user_id";
+
+        List<AttendanceRow> rows = queryList(sql, rs -> {
+            AttendanceRow row = new AttendanceRow();
+            row.setEnrollmentId(rs.getInt("enrollment_id"));
+            row.setStudentId(rs.getInt("student_id"));
+            row.setStudentUserId(rs.getInt("user_id"));
+            row.setStudentName(rs.getString("first_name") + " " + rs.getString("last_name"));
+            row.setSectionLabel(rs.getString("course_code") + "-" + rs.getString("section_number"));
+            return row;
+        }, sectionId);
+
+        for (AttendanceRow row : rows) {
+            row.setTotalAbsences(countAbsencesForEnrollment(row.getEnrollmentId()));
+        }
+        return rows;
+    }
+
+    public int countAbsencesForEnrollment(int enrollmentId) {
+        return queryOne(
+                "SELECT COUNT(*) AS absence_count FROM dbo.attendance_records "
+                        + "WHERE enrollment_id = ? AND status = 'ABSENT'",
+                rs -> rs.getInt("absence_count"),
+                enrollmentId
+        ).orElse(0);
+    }
+
+    /** Same absence count, using the caller's transaction. */
+    public int countAbsencesForEnrollment(Connection connection, int enrollmentId) {
+        return queryOne(
+                connection,
+                "SELECT COUNT(*) AS absence_count FROM dbo.attendance_records "
+                        + "WHERE enrollment_id = ? AND status = 'ABSENT'",
+                rs -> rs.getInt("absence_count"),
+                enrollmentId
+        ).orElse(0);
+    }
+
 
     /**
      * Writes one student's mark for one date: updates the existing row for this

@@ -99,6 +99,8 @@ public final class InstructorFormDialog extends Dialog<Instructor> {
             fillFromModel(existing, departments);
         } else {
             instructorIdField.setPromptText("Generated automatically on save");
+            phoneField.setText("+961 ");
+            phoneField.positionCaret(phoneField.getText().length());
             emailField.setEditable(false);
             emailField.setFocusTraversable(false);
             emailField.setPromptText("Generated automatically from the name");
