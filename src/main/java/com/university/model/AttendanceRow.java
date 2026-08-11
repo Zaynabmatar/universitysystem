@@ -22,6 +22,7 @@ public class AttendanceRow {
     private String sectionLabel;
     private Integer attendanceId;
     private AttendanceStatus status = AttendanceStatus.PRESENT;
+    private int totalAbsences;
 
     public int getEnrollmentId() {
         return enrollmentId;
@@ -70,6 +71,14 @@ public class AttendanceRow {
 
     public void setAttendanceId(Integer attendanceId) {
         this.attendanceId = attendanceId;
+    }
+
+    public int getTotalAbsences() {
+        return totalAbsences;
+    }
+
+    public void setTotalAbsences(int totalAbsences) {
+        this.totalAbsences = totalAbsences;
     }
 
     public AttendanceStatus getStatus() {

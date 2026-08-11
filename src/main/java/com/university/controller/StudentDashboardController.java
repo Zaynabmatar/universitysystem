@@ -13,6 +13,7 @@ import com.university.model.SectionSchedule;
 import com.university.model.Semester;
 import com.university.model.StudentGradeRow;
 import com.university.service.AcademicService;
+import com.university.service.AttendanceService;
 import com.university.service.CourseService;
 import com.university.service.ExamService;
 import com.university.service.InstructorService;
@@ -31,11 +32,15 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
@@ -77,6 +82,7 @@ public class StudentDashboardController {
     @FXML private TableColumn<ClassRow, String> colSchedule;
     @FXML private TableColumn<ClassRow, String> colRoom;
     @FXML private TableColumn<ClassRow, String> colGrade;
+    @FXML private TableColumn<ClassRow, String> colAbsences;
     @FXML private TableColumn<ClassRow, String> colStatus;
 
     @FXML private Label totalCoursesLabel;
@@ -107,6 +113,7 @@ public class StudentDashboardController {
     private final InstructorService instructorService = new InstructorService();
     private final AcademicService academicService = new AcademicService();
     private final ExamService examService = new ExamService();
+    private final AttendanceService attendanceService = new AttendanceService();
 
     private final ObservableList<ClassRow> rows = FXCollections.observableArrayList();
     private final ObservableList<ExamRow> examRows = FXCollections.observableArrayList();
@@ -132,6 +139,7 @@ public class StudentDashboardController {
         colSchedule.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().schedule));
         colRoom.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().room));
         colGrade.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().grade));
+        colAbsences.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().totalAbsences)));
         colStatus.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().status.getLabel()));
         colStatus.setCellFactory(col -> new TableCell<>() {
             @Override protected void updateItem(String value, boolean empty) {
@@ -257,6 +265,7 @@ public class StudentDashboardController {
                         scheduleTextOf(section.getSectionId()),
                         section.getRoom() == null || section.getRoom().isBlank() ? "—" : section.getRoom(),
                         grade,
+                        attendanceService.countAbsencesForEnrollment(enrollment.getEnrollmentId()),
                         enrollment.getStatus(),
                         course == null ? 0 : course.getCredits()));
             }
@@ -409,15 +418,37 @@ public class StudentDashboardController {
         GridPane.setVgrow(table, Priority.ALWAYS);
 
         Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle("All Exams");
-        dialog.setHeaderText("Every exam scheduled for a course you are enrolled or were enrolled in.");
         dialog.setResizable(true);
-        dialog.getDialogPane().setContent(table);
+        dialog.initStyle(StageStyle.UNDECORATED);
+
+        Label titleLabel = new Label("All Exams");
+        titleLabel.getStyleClass().add("popup-title");
+Button maximizeButton = new Button("□");
+
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+
+        HBox windowHeader = new HBox(8, titleLabel, headerSpacer, maximizeButton);
+        windowHeader.setStyle("-fx-padding: 10 12 10 12; -fx-alignment: CENTER_LEFT;");
+
+        VBox dialogContent = new VBox(8, windowHeader,
+                new Label("Every exam scheduled for a course you are enrolled or were enrolled in."),
+                table);
+        VBox.setVgrow(table, Priority.ALWAYS);
+
+        dialog.getDialogPane().setContent(dialogContent);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
         var css = getClass().getResource("/css/app.css");
         if (css != null) {
             dialog.getDialogPane().getStylesheets().add(css.toExternalForm());
         }
+
+        dialog.setOnShown(e -> {
+            Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+maximizeButton.setOnAction(a -> stage.setMaximized(!stage.isMaximized()));
+        });
+
         dialog.showAndWait();
     }
 
@@ -439,11 +470,13 @@ public class StudentDashboardController {
         final String schedule;
         final String room;
         final String grade;
+        final int totalAbsences;
         final EnrollmentStatus status;
         final int credits;
 
         ClassRow(String courseCode, String courseName, String section, String campus, String instructor,
-                  String crn, String schedule, String room, String grade, EnrollmentStatus status, int credits) {
+                 String crn, String schedule, String room, String grade, int totalAbsences,
+                 EnrollmentStatus status, int credits) {
             this.courseCode = courseCode;
             this.courseName = courseName;
             this.section = section;
@@ -453,6 +486,7 @@ public class StudentDashboardController {
             this.schedule = schedule;
             this.room = room;
             this.grade = grade;
+            this.totalAbsences = totalAbsences;
             this.status = status;
             this.credits = credits;
         }

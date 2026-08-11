@@ -26,7 +26,7 @@ import java.util.Set;
  * (My Account &gt; My Calendar). Every date shown comes straight from the database through
  * {@link AcademicCalendarService}: this screen only lays the week table out and paints it.
  */
-public class StudentAcademicCalendarController {
+public class InstructorAcademicCalendarController {
 
     private static final List<CalendarEventType> PRIORITY = AcademicCalendarService.DAY_PRIORITY;
 
@@ -42,7 +42,7 @@ public class StudentAcademicCalendarController {
 
     @FXML
     private void initialize() {
-        Session.current().requireRole(UserRole.STUDENT);
+        Session.current().requireRole(UserRole.INSTRUCTOR);
 
         semesterCombo.setCellFactory(list -> semesterCell());
         semesterCombo.setButtonCell(semesterCell());
@@ -84,11 +84,10 @@ public class StudentAcademicCalendarController {
 
     private void reload(Semester semester) {
         try {
-            int studentId = Session.current().requireStudentId();
-            currentEntries = calendarService.entriesForSemester(semester.getSemesterId(), studentId, false);
+            currentEntries = calendarService.entriesForSemester(semester.getSemesterId(), null, false);
             buildCalendar(semester);
             buildLegend();
-            buildNotes(calendarService.notesForSemester(semester.getSemesterId(), studentId));
+            buildNotes(calendarService.notesForSemester(semester.getSemesterId(), null));
         } catch (RuntimeException e) {
             currentEntries = List.of();
             AlertUtil.error("My Calendar", "Your calendar could not be loaded.", e);

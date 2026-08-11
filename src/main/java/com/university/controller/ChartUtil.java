@@ -44,6 +44,18 @@ final class ChartUtil {
             }
         }
         showOrExplain(chart, empty, hasData);
+        if (hasData) {
+            javafx.application.Platform.runLater(() -> {
+                javafx.scene.Node legend = chart.lookup(".chart-legend");
+                System.err.println("DEBUG chart size=" + chart.getWidth() + "x" + chart.getHeight()
+                        + " legend=" + (legend == null ? "null" : legend.getBoundsInParent().getWidth() + "x" + legend.getBoundsInParent().getHeight()));
+                if (legend != null) {
+                    for (javafx.scene.Node n : ((javafx.scene.layout.Pane) legend).getChildrenUnmodifiable()) {
+                        System.err.println("DEBUG item bounds=" + n.getBoundsInParent() + " text=" + (n instanceof Label ? ((Label) n).getText() : n));
+                    }
+                }
+            });
+        }
     }
 
     static void fillLine(LineChart<String, Number> chart, Label empty, List<Slice> data, String seriesName) {

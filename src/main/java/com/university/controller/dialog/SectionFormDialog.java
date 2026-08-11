@@ -90,6 +90,39 @@ public final class SectionFormDialog extends Dialog<Boolean> {
 
         courseBox.getItems().setAll(courses);
         courseBox.setMaxWidth(Double.MAX_VALUE);
+        courseBox.setEditable(true);
+        courseBox.setConverter(new StringConverter<>() {
+            @Override public String toString(Course course) {
+                return course == null ? "" : course.toString();
+            }
+
+            @Override public Course fromString(String text) {
+                if (text == null || text.isBlank()) return null;
+                String query = text.trim();
+                return courses.stream()
+                        .filter(course -> course.getCourseCode().equalsIgnoreCase(query)
+                                || course.getCourseTitle().equalsIgnoreCase(query)
+                                || course.toString().equalsIgnoreCase(query))
+                        .findFirst()
+                        .orElse(null);
+            }
+        });
+
+        courseBox.getEditor().textProperty().addListener((obs, oldText, newText) -> {
+            Course selected = courseBox.getValue();
+            if (selected != null && selected.toString().equals(newText)) return;
+
+            String query = newText == null ? "" : newText.trim().toLowerCase();
+            ObservableList<Course> matches = FXCollections.observableArrayList();
+            courses.stream()
+                    .filter(course -> query.isEmpty()
+                            || course.getCourseCode().toLowerCase().contains(query)
+                            || course.getCourseTitle().toLowerCase().contains(query))
+                    .forEach(matches::add);
+
+            courseBox.setItems(matches);
+            if (courseBox.isFocused() && !query.isEmpty()) courseBox.show();
+        });
         semesterBox.getItems().setAll(semesters);
         semesterBox.setMaxWidth(Double.MAX_VALUE);
         campusBox.getItems().setAll(campuses);
@@ -97,11 +130,38 @@ public final class SectionFormDialog extends Dialog<Boolean> {
 
         instructorBox.getItems().add(null);
         instructorBox.getItems().addAll(instructors);
+        instructorBox.setEditable(true);
         instructorBox.setConverter(new StringConverter<>() {
-            @Override public String toString(Instructor i) { return i == null ? "TBA (not assigned yet)" : i.getFullName(); }
-            @Override public Instructor fromString(String s) { return null; }
+            @Override public String toString(Instructor i) {
+                return i == null ? "TBA (not assigned yet)" : i.getFullName();
+            }
+
+            @Override public Instructor fromString(String text) {
+                if (text == null || text.isBlank() || text.equalsIgnoreCase("TBA (not assigned yet)")) return null;
+                String query = text.trim();
+                return instructors.stream()
+                        .filter(i -> i.getFullName().equalsIgnoreCase(query))
+                        .findFirst()
+                        .orElse(null);
+            }
         });
         instructorBox.setMaxWidth(Double.MAX_VALUE);
+
+        instructorBox.getEditor().textProperty().addListener((obs, oldText, newText) -> {
+            Instructor selected = instructorBox.getValue();
+            if (selected != null && selected.getFullName().equals(newText)) return;
+
+            String query = newText == null ? "" : newText.trim().toLowerCase();
+            ObservableList<Instructor> matches = FXCollections.observableArrayList();
+            matches.add(null);
+            instructors.stream()
+                    .filter(i -> query.isEmpty()
+                            || i.getFullName().toLowerCase().contains(query))
+                    .forEach(matches::add);
+
+            instructorBox.setItems(matches);
+            if (instructorBox.isFocused() && !query.isEmpty()) instructorBox.show();
+        });
 
         statusBox.getItems().setAll(SectionStatus.values());
         statusBox.setMaxWidth(Double.MAX_VALUE);

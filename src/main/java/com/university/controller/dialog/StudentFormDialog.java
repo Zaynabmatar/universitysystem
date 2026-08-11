@@ -120,6 +120,8 @@ public final class StudentFormDialog extends Dialog<Student> {
         else {
             statusBox.setValue(StudentStatus.ACTIVE);
             admissionPicker.setValue(LocalDate.now());
+            phoneField.setText("+961 ");
+            phoneField.positionCaret(phoneField.getText().length());
             // Nothing to show yet, and nothing for the admin to decide.
             studentIdField.setPromptText("Generated automatically on save");
             emailField.setEditable(false);

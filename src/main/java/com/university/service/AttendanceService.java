@@ -7,6 +7,8 @@ import com.university.dao.SectionDAO;
 import com.university.dao.SectionScheduleDAO;
 import com.university.dao.SemesterDAO;
 import com.university.enums.DayOfWeekCode;
+import com.university.enums.NotificationType;
+import com.university.enums.AttendanceStatus;
 import com.university.model.AttendanceRecord;
 import com.university.model.AttendanceRow;
 import com.university.model.Section;
@@ -35,6 +37,7 @@ import java.util.Set;
 public class AttendanceService {
 
     private final AttendanceDAO attendanceDao = new AttendanceDAO();
+    private final NotificationService notificationService = new NotificationService();
     private final SectionDAO sectionDao = new SectionDAO();
     private final SectionScheduleDAO scheduleDao = new SectionScheduleDAO();
     private final SemesterDAO semesterDao = new SemesterDAO();
@@ -103,6 +106,17 @@ public class AttendanceService {
         return attendanceDao.findRosterForDate(sectionId, classDate);
     }
 
+    /** Total absences saved for one enrollment. */
+    public int countAbsencesForEnrollment(int enrollmentId) {
+        return attendanceDao.countAbsencesForEnrollment(enrollmentId);
+    }
+
+    /** Students in one section with their total absences, before a date is selected. */
+    public List<AttendanceRow> getSectionAttendanceSummary(int sectionId) {
+        return attendanceDao.findSectionAttendanceSummary(sectionId);
+    }
+
+
     // ----------------------------------------------------------------- write
 
     /**
@@ -122,13 +136,62 @@ public class AttendanceService {
         Connection connection = transactions.beginTransaction();
         try {
             for (AttendanceRow row : rows) {
+                AttendanceRecord previous = attendanceDao
+                        .findByEnrollmentAndDate(connection, row.getEnrollmentId(), classDate)
+                        .orElse(null);
+
+                boolean newAbsence =
+                        row.getStatus() == AttendanceStatus.ABSENT
+                        && (previous == null || previous.getStatus() != AttendanceStatus.ABSENT);
+
                 AttendanceRecord record = new AttendanceRecord();
                 record.setEnrollmentId(row.getEnrollmentId());
                 record.setSectionId(sectionId);
                 record.setClassDate(classDate);
                 record.setStatus(row.getStatus());
                 record.setRecordedBy(recordedByUserId);
+
                 attendanceDao.upsert(connection, record);
+
+                if (newAbsence) {
+                    notificationService.notify(
+                            connection,
+                            row.getStudentUserId(),
+                            NotificationType.WARNING,
+                            "Attendance Notice",
+                            "You were marked absent in " + row.getSectionLabel()
+                                    + " on " + classDate + ".",
+                            "attendance_records",
+                            null
+                    );
+
+                    int totalAbsences = attendanceDao
+                            .countAbsencesForEnrollment(connection, row.getEnrollmentId());
+
+                    if (totalAbsences == 4) {
+                        notificationService.notify(
+                                connection,
+                                row.getStudentUserId(),
+                                NotificationType.WARNING,
+                                "Attendance Warning",
+                                "You have reached 4 absences in " + row.getSectionLabel()
+                                        + ". Your absences are becoming high. Please attend your upcoming classes regularly.",
+                                "attendance_records",
+                                null
+                        );
+                    } else if (totalAbsences == 5) {
+                        notificationService.notify(
+                                connection,
+                                row.getStudentUserId(),
+                                NotificationType.WARNING,
+                                "High Absence Warning",
+                                "You have reached 5 absences in " + row.getSectionLabel()
+                                        + ". Frequent absences may affect your attendance grade. Please review your attendance.",
+                                "attendance_records",
+                                null
+                        );
+                    }
+                }
             }
             connection.commit();
         } catch (SQLException e) {
