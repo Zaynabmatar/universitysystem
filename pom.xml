@@ -30,6 +30,12 @@
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-media</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+
 
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>
@@ -82,7 +88,7 @@
         </dependency>
 
         <!-- Proves the Section 5 arithmetic, above all the worked example that must
-             produce exactly 3.24. GradeCalculator is pure — no database, no JavaFX —
+             produce exactly 3.24. GradeCalculator is pure â€” no database, no JavaFX â€”
              which is precisely what makes it testable. -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
