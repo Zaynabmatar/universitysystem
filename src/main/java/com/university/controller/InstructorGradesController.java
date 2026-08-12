@@ -286,12 +286,16 @@ public class InstructorGradesController {
      * actually has a lab component ({@code courses.has_lab}) — never for one hardcoded course.
      */
     private void applyLabVisibility() {
-        boolean hasLab = rows.isEmpty() ? currentSectionHasLab() : rows.get(0).isHasLab();
-        colLab.setVisible(hasLab);
-        weightingLabel.setText(hasLab
-                ? "Weighting: coursework 15%  •  midterm 15%  •  lab 20%  •  final 50%"
-                : "Weighting: coursework 30%  •  midterm 30%  •  final 40%");
-    }
+    boolean hasLab = rows.isEmpty() ? currentSectionHasLab() : rows.get(0).isHasLab();
+
+    colCoursework.setVisible(!hasLab);
+
+    colLab.setVisible(hasLab);
+
+    weightingLabel.setText(hasLab
+            ? "Weighting: midterm 30%  •  lab 20%  •  final 50%"
+            : "Weighting: coursework 20%  •  midterm 30%  •  final 50%");
+}
 
     private boolean currentSectionHasLab() {
         Section section = sectionService.findById(sectionId);
@@ -497,3 +501,5 @@ public class InstructorGradesController {
     }
 
 }
+
+

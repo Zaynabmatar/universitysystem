@@ -38,7 +38,7 @@ public class StudentTimetableController {
     private static final int END_HOUR = 20;
     private static final int SLOT_MINUTES = 30;
     private static final String[] PALETTE =
-            {"tt-color-1", "tt-color-2", "tt-color-3", "tt-color-4", "tt-color-5", "tt-color-6"};
+            {"tt-color-1", "tt-color-2", "tt-color-3", "tt-color-4", "tt-color-5", "tt-color-6", "tt-color-7", "tt-color-8", "tt-color-9", "tt-color-10", "tt-color-11", "tt-color-12"};
 
     @FXML private Label semesterLabel;
     @FXML private Label summaryLabel;
@@ -51,6 +51,8 @@ public class StudentTimetableController {
     private final CourseService courseService = new CourseService();
 
     private int studentId;
+    private int courseColourIndex = 0;
+    private final Map<Integer, String> courseColours = new java.util.LinkedHashMap<>();
 
     @FXML
     private void initialize() {
@@ -66,6 +68,7 @@ public class StudentTimetableController {
 
     private void reload() {
         try {
+            courseColourIndex = 0;
             Semester currentSemester = semesterService.getCurrentSemester();
             timetableGrid.getChildren().clear();
 
@@ -179,7 +182,12 @@ public class StudentTimetableController {
             Course course = coursesById.get(section.getCourseId());
 
             VBox block = new VBox(2);
-            block.getStyleClass().addAll("timetable-block", PALETTE[Math.floorMod(section.getCourseId(), PALETTE.length)]);
+            int courseId = section.getCourseId();
+            String courseColour = courseColours.computeIfAbsent(
+                    courseId,
+                    id -> PALETTE[courseColourIndex++ % PALETTE.length]
+            );
+            block.getStyleClass().addAll("timetable-block", courseColour);
 
             Label codeLabel = new Label(course != null
                     ? course.getCourseCode() + "-" + section.getSectionNumber() : "Section " + section.getSectionNumber());
@@ -198,3 +206,5 @@ public class StudentTimetableController {
         return Math.max(0, minutesFromStart / SLOT_MINUTES);
     }
 }
+
+

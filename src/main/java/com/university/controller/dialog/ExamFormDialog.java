@@ -44,7 +44,19 @@ public final class ExamFormDialog extends Dialog<Boolean> {
         this.createdByUserId = createdByUserId;
 
         setTitle("Add Exam");
+        setResizable(true);
+        initStyle(javafx.stage.StageStyle.UNDECORATED);
         setHeaderText("Every student enrolled in " + sectionLabel + " will see this exam.");
+
+        getDialogPane().lookup(".header-panel").setStyle(
+                "-fx-background-color: transparent;"
+        );
+        var addExamHeaderLabel = getDialogPane().lookup(".header-panel .label");
+        if (addExamHeaderLabel != null) {
+            addExamHeaderLabel.setStyle(
+                    "-fx-text-fill: #243B80; -fx-font-weight: bold; -fx-font-size: 16px;"
+            );
+        }
         getDialogPane().setMinWidth(420);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         var css = getClass().getResource("/css/app.css");
@@ -126,3 +138,7 @@ public final class ExamFormDialog extends Dialog<Boolean> {
         errorLabel.setManaged(true);
     }
 }
+
+
+
+

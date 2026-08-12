@@ -4,6 +4,7 @@ import com.university.controller.dialog.ExamFormDialog;
 import com.university.enums.NotificationType;
 import com.university.enums.UserRole;
 import com.university.model.Course;
+import com.university.model.Exam;
 import com.university.model.GradeSheetRow;
 import com.university.model.Section;
 import com.university.model.SectionSchedule;
@@ -70,6 +71,7 @@ public class InstructorSectionsController {
     @FXML private javafx.scene.control.Button enterGradesButton;
     @FXML private javafx.scene.control.Button viewRosterButton;
     @FXML private javafx.scene.control.Button addExamButton;
+    @FXML private javafx.scene.control.Button viewExamsButton;
 
     // ------------------------------------------------------------ notification section
     @FXML private RadioButton notifyAllRadio;
@@ -154,6 +156,7 @@ public class InstructorSectionsController {
         enterGradesButton.disableProperty().bind(selected.isNull());
         viewRosterButton.disableProperty().bind(selected.isNull());
         addExamButton.disableProperty().bind(selected.isNull());
+        viewExamsButton.disableProperty().bind(selected.isNull());
 
         reload();
         initNotificationSection();
@@ -242,8 +245,21 @@ public class InstructorSectionsController {
         listView.setPlaceholder(new Label("No students are enrolled in this section."));
 
         Dialog<Void> dialog = new Dialog<>();
+        dialog.setResizable(true);
+        dialog.initStyle(javafx.stage.StageStyle.UNDECORATED);
+        dialog.setResizable(true);
+        dialog.initStyle(javafx.stage.StageStyle.UNDECORATED);
         dialog.setTitle("Students");
         dialog.setHeaderText(courseCodeOf(selected.getCourseId()) + "-" + selected.getSectionNumber());
+        dialog.getDialogPane().lookup(".header-panel").setStyle(
+                "-fx-background-color: transparent;"
+        );
+        var studentHeaderLabel = dialog.getDialogPane().lookup(".header-panel .label");
+        if (studentHeaderLabel != null) {
+            studentHeaderLabel.setStyle(
+                    "-fx-text-fill: #243B80; -fx-font-weight: bold; -fx-font-size: 16px;"
+            );
+        }
         dialog.getDialogPane().setContent(listView);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         var css = getClass().getResource("/css/app.css");
@@ -269,6 +285,125 @@ public class InstructorSectionsController {
         }
     }
 
+    @FXML
+    private void handleViewExams() {
+        Section selected = sectionTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            return;
+        }
+
+        String label =
+                courseCodeOf(selected.getCourseId())
+                        + " — "
+                        + courseTitleOf(selected.getCourseId())
+                        + " — Section "
+                        + selected.getSectionNumber();
+
+        try {
+            List<Exam> exams = examService.examsForSection(selected.getSectionId());
+
+            javafx.scene.control.TableView<Exam> table =
+                    new javafx.scene.control.TableView<>();
+
+            javafx.scene.control.TableColumn<Exam, String> dateCol =
+                    new javafx.scene.control.TableColumn<>("Exam Date");
+            javafx.scene.control.TableColumn<Exam, String> timeCol =
+                    new javafx.scene.control.TableColumn<>("Start Time");
+            javafx.scene.control.TableColumn<Exam, String> durationCol =
+                    new javafx.scene.control.TableColumn<>("Duration");
+            javafx.scene.control.TableColumn<Exam, String> roomCol =
+                    new javafx.scene.control.TableColumn<>("Room");
+
+            dateCol.setCellValueFactory(cell ->
+                    new javafx.beans.property.SimpleStringProperty(
+                            cell.getValue().getExamDate() == null
+                                    ? "—"
+                                    : cell.getValue().getExamDate().toString()
+                    ));
+
+            timeCol.setCellValueFactory(cell ->
+                    new javafx.beans.property.SimpleStringProperty(
+                            cell.getValue().getStartTime() == null
+                                    ? "—"
+                                    : cell.getValue().getStartTime().format(HM)
+                    ));
+
+            durationCol.setCellValueFactory(cell ->
+                    new javafx.beans.property.SimpleStringProperty(
+                            cell.getValue().getDurationMinutes() + " min"
+                    ));
+
+            roomCol.setCellValueFactory(cell -> {
+                String room = cell.getValue().getRoom();
+                return new javafx.beans.property.SimpleStringProperty(
+                        room == null || room.isBlank() ? "—" : room
+                );
+            });
+
+            table.getColumns().setAll(
+                    java.util.List.of(dateCol, timeCol, durationCol, roomCol)
+            );
+
+            table.setColumnResizePolicy(
+                    javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN
+            );
+
+            table.setItems(FXCollections.observableArrayList(
+                    exams.stream()
+                            .sorted(
+                                    Comparator.comparing(
+                                            Exam::getExamDate,
+                                            Comparator.nullsLast(Comparator.naturalOrder())
+                                    ).thenComparing(
+                                            Exam::getStartTime,
+                                            Comparator.nullsLast(Comparator.naturalOrder())
+                                    )
+                            )
+                            .collect(Collectors.toList())
+            ));
+
+            table.setPlaceholder(
+                    new Label("No exams scheduled for this section.")
+            );
+
+            table.setPrefWidth(500);
+            table.setPrefHeight(240);
+
+            Dialog<Void> dialog = new Dialog<>();
+            dialog.initStyle(javafx.stage.StageStyle.UNDECORATED);
+            dialog.setResizable(true);
+
+            Label titleLabel = new Label(label);
+            titleLabel.setStyle(
+                    "-fx-text-fill: #243B80;" +
+                    "-fx-font-size: 16px;" +
+                    "-fx-font-weight: bold;"
+            );
+
+            javafx.scene.layout.VBox content =
+                    new javafx.scene.layout.VBox(12, titleLabel, table);
+            content.setPadding(new javafx.geometry.Insets(15));
+            content.setPrefWidth(500);
+
+            dialog.setHeaderText(null);
+            dialog.getDialogPane().setContent(content);
+            dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+            var css = getClass().getResource("/css/app.css");
+            if (css != null) {
+                dialog.getDialogPane().getStylesheets().add(css.toExternalForm());
+            }
+
+            dialog.showAndWait();
+
+        } catch (Exception e) {
+            AlertUtil.error(
+                    "View Exams",
+                    "The exams for this section could not be loaded.",
+                    e
+            );
+        }
+    }
     // ------------------------------------------------------------------ send notification
 
     private void initNotificationSection() {
@@ -440,3 +575,15 @@ public class InstructorSectionsController {
                 .collect(Collectors.joining(", "));
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+

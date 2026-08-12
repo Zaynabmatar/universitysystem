@@ -45,6 +45,7 @@
         <Button fx:id="enterGradesButton" text="Enter Grades"  onAction="#handleEnterGrades" disable="true"/>
         <Button fx:id="viewRosterButton"  text="View Students" onAction="#handleViewRoster"  disable="true"/>
         <Button fx:id="addExamButton"     text="Add Exam"      onAction="#handleAddExam"     disable="true"/>
+        <Button fx:id="viewExamsButton"  text="View Exams"   onAction="#handleViewExams"  disable="true"/>
     </HBox>
 
     <!-- ================= Send Notification to Students ================= -->
@@ -86,3 +87,4 @@
 </VBox>
 </content>
 </ScrollPane>
+

@@ -19,17 +19,17 @@ public final class GradeCalculator {
     }
 
     // ---- Section 5.1: the weights ---------------------------------------
-    public static final BigDecimal COURSEWORK_WEIGHT = new BigDecimal("0.30");
+    public static final BigDecimal COURSEWORK_WEIGHT = new BigDecimal("0.20");
     public static final BigDecimal MIDTERM_WEIGHT = new BigDecimal("0.30");
-    public static final BigDecimal FINAL_WEIGHT = new BigDecimal("0.40");
+    public static final BigDecimal FINAL_WEIGHT = new BigDecimal("0.50");
 
     /**
      * Weights for a course with a lab component ({@code courses.has_lab}). Coursework and
      * Midterm are trimmed to make room for Lab; Final is unaffected. Applies to any course
      * flagged as having a lab, never one hardcoded course.
      */
-    public static final BigDecimal LAB_COURSEWORK_WEIGHT = new BigDecimal("0.15");
-    public static final BigDecimal LAB_MIDTERM_WEIGHT = new BigDecimal("0.15");
+    
+    public static final BigDecimal LAB_MIDTERM_WEIGHT = new BigDecimal("0.30");
     public static final BigDecimal LAB_WEIGHT = new BigDecimal("0.20");
     public static final BigDecimal LAB_FINAL_WEIGHT = new BigDecimal("0.50");
 
@@ -81,22 +81,31 @@ public final class GradeCalculator {
      *         component is still missing — a missing mark means "not marked yet", never zero.
      */
     public static BigDecimal totalMark(BigDecimal coursework, BigDecimal midterm, BigDecimal lab,
-                                        BigDecimal finalMark, boolean hasLab) {
-        if (coursework == null || midterm == null || finalMark == null || (hasLab && lab == null)) {
+                                    BigDecimal finalMark, boolean hasLab) {
+    if (midterm == null || finalMark == null) {
+        return null;
+    }
+
+    if (hasLab) {
+        if (lab == null) {
             return null;
         }
-        if (hasLab) {
-            return coursework.multiply(LAB_COURSEWORK_WEIGHT)
-                    .add(midterm.multiply(LAB_MIDTERM_WEIGHT))
-                    .add(lab.multiply(LAB_WEIGHT))
-                    .add(finalMark.multiply(LAB_FINAL_WEIGHT))
-                    .setScale(2, RoundingMode.HALF_UP);
-        }
-        return coursework.multiply(COURSEWORK_WEIGHT)
-                .add(midterm.multiply(MIDTERM_WEIGHT))
-                .add(finalMark.multiply(FINAL_WEIGHT))
+
+        return midterm.multiply(LAB_MIDTERM_WEIGHT)
+                .add(lab.multiply(LAB_WEIGHT))
+                .add(finalMark.multiply(LAB_FINAL_WEIGHT))
                 .setScale(2, RoundingMode.HALF_UP);
     }
+
+    if (coursework == null) {
+        return null;
+    }
+
+    return coursework.multiply(COURSEWORK_WEIGHT)
+            .add(midterm.multiply(MIDTERM_WEIGHT))
+            .add(finalMark.multiply(FINAL_WEIGHT))
+            .setScale(2, RoundingMode.HALF_UP);
+}
 
     // =====================================================================
     // Section 5.2 — mark -> letter
@@ -148,3 +157,4 @@ public final class GradeCalculator {
         return (gpa == null ? BigDecimal.ZERO : gpa).setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
 }
+

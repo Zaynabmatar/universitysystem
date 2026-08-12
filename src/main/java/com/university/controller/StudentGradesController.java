@@ -49,6 +49,7 @@ public class StudentGradesController {
     @FXML private TableColumn<StudentGradeRow, Number> colCredits;
     @FXML private TableColumn<StudentGradeRow, BigDecimal> colCoursework;
     @FXML private TableColumn<StudentGradeRow, BigDecimal> colMidterm;
+    @FXML private TableColumn<StudentGradeRow, BigDecimal> colLab;
     @FXML private TableColumn<StudentGradeRow, BigDecimal> colFinal;
     @FXML private TableColumn<StudentGradeRow, BigDecimal> colTotal;
     @FXML private TableColumn<StudentGradeRow, String> colLetter;
@@ -70,6 +71,7 @@ public class StudentGradesController {
         colCredits.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCredits()));
         colCoursework.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCourseworkMark()));
         colMidterm.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getMidtermMark()));
+        colLab.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getLabMark()));
         colFinal.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getFinalMark()));
         colTotal.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getTotalMark()));
         colPoints.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getGradePoints()));
@@ -81,9 +83,49 @@ public class StudentGradesController {
         // student can tell "no mark yet" apart from "a mark of nothing".
         colCoursework.setCellFactory(col -> markCell());
         colMidterm.setCellFactory(col -> markCell());
+        colLab.setCellFactory(col -> markCell());
         colFinal.setCellFactory(col -> markCell());
         colTotal.setCellFactory(col -> markCell());
         colPoints.setCellFactory(col -> markCell());
+        colCoursework.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(BigDecimal mark, boolean empty) {
+                super.updateItem(mark, empty);
+
+                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                    setText(null);
+                    return;
+                }
+
+                StudentGradeRow row = (StudentGradeRow) getTableRow().getItem();
+
+                if (row.isHasLab()) {
+                    setText("—");
+                } else {
+                    setText(mark == null ? "Not graded yet" : mark.toPlainString());
+                }
+            }
+        });
+
+        colLab.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(BigDecimal mark, boolean empty) {
+                super.updateItem(mark, empty);
+
+                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                    setText(null);
+                    return;
+                }
+
+                StudentGradeRow row = (StudentGradeRow) getTableRow().getItem();
+
+                if (!row.isHasLab()) {
+                    setText("—");
+                } else {
+                    setText(mark == null ? "Not graded yet" : mark.toPlainString());
+                }
+            }
+        });
 
         colLetter.setCellFactory(col -> new TableCell<>() {
             @Override
@@ -219,3 +261,4 @@ public class StudentGradesController {
         };
     }
 }
+

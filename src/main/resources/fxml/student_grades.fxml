@@ -51,6 +51,7 @@
             <TableColumn fx:id="colCredits"     text="Cr."        prefWidth="45"/>
             <TableColumn fx:id="colCoursework"  text="Coursework" prefWidth="105"/>
             <TableColumn fx:id="colMidterm"     text="Midterm"    prefWidth="105"/>
+            <TableColumn fx:id="colLab"         text="Lab"        prefWidth="105"/>
             <TableColumn fx:id="colFinal"       text="Final"      prefWidth="105"/>
             <TableColumn fx:id="colTotal"       text="Total"      prefWidth="90"/>
             <TableColumn fx:id="colLetter"      text="Letter"     prefWidth="65"/>
@@ -62,3 +63,5 @@
     <Label fx:id="repeatNote" styleClass="muted-label" wrapText="true" visible="false" managed="false"
            text="Rows marked Repeated are earlier attempts. Only your most recent attempt counts towards your GPA."/>
 </VBox>
+
+
