@@ -2,6 +2,9 @@ package com.university.controller;
 
 import com.university.service.AIAssistantService;
 
+import javafx.animation.FadeTransition;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -18,10 +21,10 @@ import javafx.util.Duration;
 import java.util.List;
 
 /**
- * The University AI Assistant chat panel — embedded via {@code ai_assistant_panel.fxml} on the
+ * The University AI Assistant chat panel â€” embedded via {@code ai_assistant_panel.fxml} on the
  * Student, Instructor and Admin screens. Each host screen calls {@link #configure} once, right
  * after this panel loads, with a greeting and a set of quick questions appropriate to that role.
- * Everything else — bubbles, the typing indicator, scrolling, New Chat, Enter-to-send — is
+ * Everything else â€” bubbles, the typing indicator, scrolling, New Chat, Enter-to-send â€” is
  * identical across roles and lives only here.
  *
  * <p>Every reply comes from {@link AIAssistantService#respond}, which for now always returns the
@@ -45,11 +48,12 @@ public class AIAssistantPanelController {
     /**
      * True from the moment a message is sent until its reply (or the Gemini timeout) comes back.
      * Guards against a second Send/quick-question/Enter firing a second background lookup while
-     * one is already in flight. Only ever read or written on the JavaFX Application Thread — the
+     * one is already in flight. Only ever read or written on the JavaFX Application Thread â€” the
      * background lookup thread never touches it directly, it hops back via {@link Platform#runLater}
-     * first — so a plain boolean is enough.
+     * first â€” so a plain boolean is enough.
      */
     private boolean waitingForReply = false;
+    private Timeline typingDotsTimeline;
 
     /** Called once by the host controller, right after this panel is loaded. */
     public void configure(String greeting, List<String> quickQuestions) {
@@ -125,7 +129,7 @@ public class AIAssistantPanelController {
 
     /**
      * {@link AIAssistantService#respond} may now call out to Gemini for general questions, which
-     * is a blocking network call — running it straight off the {@link PauseTransition} callback
+     * is a blocking network call â€” running it straight off the {@link PauseTransition} callback
      * would freeze the whole window for however long that request takes. So the lookup runs on a
      * background thread and only the UI update hops back onto the JavaFX Application Thread.
      */
@@ -149,7 +153,15 @@ public class AIAssistantPanelController {
     }
 
     private void appendAssistantMessage(String text) {
-        chatMessagesBox.getChildren().add(buildChatBubble(text, false));
+        HBox row = buildChatBubble(text, false);
+        row.setOpacity(0.0);
+        chatMessagesBox.getChildren().add(row);
+
+        FadeTransition fade = new FadeTransition(Duration.millis(250), row);
+        fade.setFromValue(0.0);
+        fade.setToValue(1.0);
+        fade.play();
+
         scrollChatToBottom();
     }
 
@@ -165,8 +177,30 @@ public class AIAssistantPanelController {
     }
 
     private void showAssistantTyping(boolean visible) {
-        typingIndicatorLabel.setVisible(visible);
-        typingIndicatorLabel.setManaged(visible);
+        if (visible) {
+            typingIndicatorLabel.setText("●");
+            typingIndicatorLabel.setVisible(true);
+            typingIndicatorLabel.setManaged(true);
+
+            if (typingDotsTimeline != null) {
+                typingDotsTimeline.stop();
+            }
+
+            typingDotsTimeline = new Timeline(
+                    new KeyFrame(Duration.ZERO, e -> typingIndicatorLabel.setText("●")),
+                    new KeyFrame(Duration.millis(150), e -> typingIndicatorLabel.setText("● ●")),
+                    new KeyFrame(Duration.millis(300), e -> typingIndicatorLabel.setText("● ● ●")),
+                    new KeyFrame(Duration.millis(450), e -> typingIndicatorLabel.setText("●"))
+            );
+            typingDotsTimeline.setCycleCount(Timeline.INDEFINITE);
+            typingDotsTimeline.play();
+        } else {
+            if (typingDotsTimeline != null) {
+                typingDotsTimeline.stop();
+            }
+            typingIndicatorLabel.setVisible(false);
+            typingIndicatorLabel.setManaged(false);
+        }
     }
 
     /** Runs after the new bubble has been laid out, so the scrollbar's max reflects it. */

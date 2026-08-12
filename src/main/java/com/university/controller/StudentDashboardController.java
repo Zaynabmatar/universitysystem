@@ -24,6 +24,7 @@ import com.university.service.Session;
 import com.university.util.AlertUtil;
 import com.university.util.SceneManager;
 
+import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -62,7 +63,7 @@ import java.util.stream.Collectors;
  * <p>Exams are read entirely through the student's own enrollments
  * ({@link ExamService#examsForStudent}, which joins {@code exams -> sections -> enrollments}), so
  * a student only ever sees an exam for a section they are actually enrolled in, and a new exam an
- * instructor creates appears here the next time this screen loads — no per-student copy is ever
+ * instructor creates appears here the next time this screen loads â€” no per-student copy is ever
  * written.</p>
  */
 public class StudentDashboardController {
@@ -185,11 +186,11 @@ public class StudentDashboardController {
         bindHeightToContent(examsTable, examRows);
         bindHeightToContent(todaysScheduleTable, todayRows);
 
-        reload();
+        Platform.runLater(this::reload);
 
         aiAssistantController.configure(
                 "Hi! I'm the University AI Assistant. Ask me about registration, your classes, "
-                        + "deadlines, or your GPA — or use one of the quick questions above.",
+                        + "deadlines, or your GPA â€” or use one of the quick questions above.",
                 List.of("When does registration open?", "What is my next class?",
                         "What is the Add/Drop deadline?", "Show my GPA"));
     }
@@ -256,14 +257,14 @@ public class StudentDashboardController {
                         ? gradeRow.getLetterGrade().getLabel() : "--";
 
                 built.add(new ClassRow(
-                        course == null ? "—" : course.getCourseCode(),
-                        course == null ? "—" : course.getCourseTitle(),
+                        course == null ? "â€”" : course.getCourseCode(),
+                        course == null ? "â€”" : course.getCourseTitle(),
                         section.getSectionNumber(),
                         campusNameOf(section.getCampusId()),
                         instructorNameOf(section.getInstructorId()),
                         String.valueOf(section.getSectionId()),
                         scheduleTextOf(section.getSectionId()),
-                        section.getRoom() == null || section.getRoom().isBlank() ? "—" : section.getRoom(),
+                        section.getRoom() == null || section.getRoom().isBlank() ? "â€”" : section.getRoom(),
                         grade,
                         attendanceService.countAbsencesForEnrollment(enrollment.getEnrollmentId()),
                         enrollment.getStatus(),
@@ -291,7 +292,7 @@ public class StudentDashboardController {
 
     /**
      * The student's real classes meeting today, built from the same registered sections as
-     * {@link #loadRegisteredCourses()} — never a hardcoded sample — filtered to whichever meetings
+     * {@link #loadRegisteredCourses()} â€” never a hardcoded sample â€” filtered to whichever meetings
      * fall on today's weekday and sorted by start time.
      */
     private void loadTodaysSchedule() {
@@ -311,9 +312,9 @@ public class StudentDashboardController {
                     built.add(new TodayRow(
                             meeting.getStartTime(),
                             HM.format(meeting.getStartTime()) + " - " + HM.format(meeting.getEndTime()),
-                            course == null ? "—" : course.getCourseCode() + " — " + course.getCourseTitle(),
+                            course == null ? "â€”" : course.getCourseCode() + " â€” " + course.getCourseTitle(),
                             instructorNameOf(section.getInstructorId()),
-                            section.getRoom() == null || section.getRoom().isBlank() ? "—" : section.getRoom()));
+                            section.getRoom() == null || section.getRoom().isBlank() ? "â€”" : section.getRoom()));
                 }
             }
             built.sort(Comparator.comparing(r -> r.startTime));
@@ -329,13 +330,13 @@ public class StudentDashboardController {
         String day = DayOfWeekCode.fromJavaDayOfWeek(exam.getExamDate().getDayOfWeek()).getLabel();
         int endMinutes = exam.getDurationMinutes();
         return new ExamRow(
-                course == null ? "—" : course.getCourseCode(),
-                course == null ? "—" : course.getCourseTitle(),
+                course == null ? "â€”" : course.getCourseCode(),
+                course == null ? "â€”" : course.getCourseTitle(),
                 MD.format(exam.getExamDate()),
                 day,
                 HM.format(exam.getStartTime()),
                 durationText(endMinutes),
-                exam.getRoom() == null || exam.getRoom().isBlank() ? "—" : exam.getRoom());
+                exam.getRoom() == null || exam.getRoom().isBlank() ? "â€”" : exam.getRoom());
     }
 
     private String durationText(int minutes) {
@@ -366,7 +367,7 @@ public class StudentDashboardController {
 
     private String campusNameOf(int campusId) {
         return campuses.stream().filter(c -> c.getCampusId() == campusId).findFirst()
-                .map(Campus::getCampusName).orElse("—");
+                .map(Campus::getCampusName).orElse("â€”");
     }
 
     private String scheduleTextOf(int sectionId) {
@@ -381,7 +382,7 @@ public class StudentDashboardController {
 
     // ------------------------------------------------------------------ actions
 
-    /** Every exam this student has, across every semester — not only the ones on this page. */
+    /** Every exam this student has, across every semester â€” not only the ones on this page. */
     @FXML
     private void handleViewAllExams() {
         List<Exam> all;
@@ -423,7 +424,7 @@ public class StudentDashboardController {
 
         Label titleLabel = new Label("All Exams");
         titleLabel.getStyleClass().add("popup-title");
-Button maximizeButton = new Button("□");
+Button maximizeButton = new Button("â–¡");
 
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
@@ -531,8 +532,8 @@ maximizeButton.setOnAction(a -> stage.setMaximized(!stage.isMaximized()));
 
     /**
      * The AI panel starts collapsed to a single top-right button and reserves no layout space;
-     * this toggles it open — a vertical panel overlaying the dashboard, anchored below that
-     * button — or closed. The dashboard beneath never resizes or reflows either way.
+     * this toggles it open â€” a vertical panel overlaying the dashboard, anchored below that
+     * button â€” or closed. The dashboard beneath never resizes or reflows either way.
      */
     @FXML
     private void handleToggleAiAssistant() {

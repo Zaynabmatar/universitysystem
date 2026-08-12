@@ -9,7 +9,12 @@ import com.university.service.TranscriptService.SemesterPlan;
 import com.university.util.AlertUtil;
 import com.university.util.GradeCalculator;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.util.Duration;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
@@ -21,21 +26,21 @@ import javafx.scene.layout.VBox;
 import java.util.List;
 
 /**
- * "Can I graduate?", answered condition by condition — and, underneath, the complete
+ * "Can I graduate?", answered condition by condition â€” and, underneath, the complete
  * semester-by-semester Study Plan for the logged-in student's exact program.
  *
  * <p>project_details.md Section 6.9 has three conditions, and this screen shows all three
- * separately, each with its own ✓ or ✗ and its own numbers — never just the overall verdict.
+ * separately, each with its own âœ“ or âœ— and its own numbers â€” never just the overall verdict.
  * A student who is refused must be able to read <em>which</em> condition failed.</p>
  *
  * <p>The Study Plan section below it is built entirely from
- * {@link TranscriptService.DegreeProgress#semesterPlans} — one {@link TableView} per semester,
+ * {@link TranscriptService.DegreeProgress#semesterPlans} â€” one {@link TableView} per semester,
  * created here rather than declared in FXML because the number of semesters is a property of the
  * student's own program (4 for the Master's, 8 for most Bachelor's, 9 for Law and Pharmacy), not
  * a fixed screen layout.</p>
  *
  * <p>Read-only: nothing here writes to the database, and {@code students.status} is never set
- * to {@code GRADUATED} — conferring a degree is a registrar action, not a screen.</p>
+ * to {@code GRADUATED} â€” conferring a degree is a registrar action, not a screen.</p>
  */
 public class StudentProgressController {
 
@@ -79,10 +84,24 @@ public class StudentProgressController {
     }
 
     private void renderSummary() {
-        programLabel.setText(progress.fullName + "  •  " + progress.studentUserId
-                           + "  •  " + progress.programName);
-        percentLabel.setText(progress.percentText());
-        progressBar.setProgress(progress.progressFraction());
+        programLabel.setText(progress.fullName + "  â€¢  " + progress.studentUserId
+                           + "  â€¢  " + progress.programName);
+        double targetProgress = progress.progressFraction();
+        progressBar.setProgress(0.0);
+
+        if (!percentLabel.textProperty().isBound()) {
+            percentLabel.textProperty().bind(
+                    Bindings.format("%.1f%%", progressBar.progressProperty().multiply(100))
+            );
+        }
+
+        Timeline progressAnimation = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(progressBar.progressProperty(), 0.0)),
+                new KeyFrame(Duration.seconds(3),
+                        new KeyValue(progressBar.progressProperty(), targetProgress))
+        );
+        progressAnimation.play();
         creditsSummaryLabel.setText(progress.creditsCompleted + " of "
                                   + progress.creditsRequired + " credits");
         completedLabel.setText("Completed: " + progress.creditsCompleted + " credits");
@@ -106,11 +125,11 @@ public class StudentProgressController {
         condition2Label.setText(tick(creditsOk) + (creditsOk
                 ? " Credits: " + progress.creditsCompleted + " / " + progress.creditsRequired
                 : " Credits: " + progress.creditsCompleted + " / " + progress.creditsRequired
-                  + " — " + progress.creditsRemaining + " remaining"));
+                  + " â€” " + progress.creditsRemaining + " remaining"));
 
         String gpa = GradeCalculator.formatGpa(progress.cumulativeGpa);
         condition3Label.setText(tick(gpaOk) + (gpaOk
-                ? " Cumulative GPA " + gpa + " ≥ 2.00"
+                ? " Cumulative GPA " + gpa + " â‰¥ 2.00"
                 : " Cumulative GPA " + gpa + " is below the required 2.00"));
 
         styleCondition(condition1Label, mandatoryOk);
@@ -120,14 +139,14 @@ public class StudentProgressController {
         boolean eligible = progress.canGraduate;
         verdictLabel.setText(eligible
                 ? "Eligible to graduate"
-                : "Not yet eligible — " + progress.outstandingConditions()
+                : "Not yet eligible â€” " + progress.outstandingConditions()
                   + " requirement(s) outstanding");
         verdictLabel.getStyleClass().removeAll("verdict-ok", "verdict-warn");
         verdictLabel.getStyleClass().add(eligible ? "verdict-ok" : "verdict-warn");
     }
 
     private String tick(boolean ok) {
-        return ok ? "✓" : "✗";
+        return ok ? "âœ“" : "âœ—";
     }
 
     private void styleCondition(Label label, boolean ok) {
@@ -137,7 +156,7 @@ public class StudentProgressController {
 
     /**
      * One {@link TableView} per {@link SemesterPlan}, in order, each with its own "Semester N"
-     * heading — the whole of the student's own program curriculum, nothing hard-coded.
+     * heading â€” the whole of the student's own program curriculum, nothing hard-coded.
      */
     private void renderStudyPlan() {
         studyPlanContainer.getChildren().clear();
@@ -215,7 +234,7 @@ public class StudentProgressController {
         table.getColumns().setAll(List.of(colCode, colTitle, colCredits, colType, colPrereq, colStatus));
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
-        // Sized to show every row of this one semester without its own inner scrollbar — the
+        // Sized to show every row of this one semester without its own inner scrollbar â€” the
         // page-level ScrollPane in the FXML is what scrolls the whole screen if the full
         // Study Plan runs taller than the window.
         double rowHeight = 28;

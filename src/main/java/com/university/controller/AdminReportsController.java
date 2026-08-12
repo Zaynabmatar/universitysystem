@@ -88,6 +88,8 @@ public class AdminReportsController {
     @FXML private TableColumn<TopGpaRow, Number> topCredits;
     @FXML private TableColumn<TopGpaRow, BigDecimal> topGpa;
 
+    @FXML private javafx.scene.control.TabPane tabs;
+
     private final ReportService reportService = new ReportService();
 
     private final ObservableList<SectionFill> fillRows = FXCollections.observableArrayList();
@@ -103,10 +105,20 @@ public class AdminReportsController {
     @FXML
     private void initialize() {
         Session.current().requireRole(UserRole.ADMIN);
+
         wireFillTable();
         wireProbationTable();
         wireTopTable();
+
         handleRefresh();
+
+        tabs.getSelectionModel()
+                .selectedItemProperty()
+                .addListener((obs, oldTab, newTab) -> {
+                    if (newTab != null) {
+                        animateSelectedChart(newTab.getText());
+                    }
+                });
     }
 
     @FXML
@@ -117,14 +129,24 @@ public class AdminReportsController {
             passData = reportService.passRatePerCourse(15);
             trendData = reportService.enrollmentTrend();
 
-            ChartUtil.fillBar(deptChart, deptEmpty, deptData, "Enrollments");
+
             ChartUtil.fillPie(gradeChart, gradeEmpty, gradeData);
-            fillPassRate();
-            ChartUtil.fillLine(trendChart, trendEmpty, trendData, "Enrollments");
+
+
 
             fillRows.setAll(reportService.sectionFillRates());
             probRows.setAll(reportService.studentsOnProbation());
             topRows.setAll(reportService.topStudentsByGpa(10));
+
+            javafx.application.Platform.runLater(() -> {
+                if (tabs.getSelectionModel().getSelectedItem() != null) {
+                    animateSelectedChart(
+                            tabs.getSelectionModel()
+                                    .getSelectedItem()
+                                    .getText()
+                    );
+                }
+            });
 
             ReportService.Kpis k = reportService.getKpis();
             subtitleLabel.setText("Current semester: " + k.currentSemester
@@ -257,6 +279,51 @@ public class AdminReportsController {
     }
 
     // =====================================================================
+    private void animateSelectedChart(String tabName) {
+
+        if ("Enrollment per Department".equals(tabName)) {
+
+            ChartUtil.fillBar(
+                    deptChart,
+                    deptEmpty,
+                    deptData,
+                    "Enrollments"
+            );
+
+        } else if ("Pass Rate per Course".equals(tabName)) {
+
+            java.util.List<Slice> passSlices =
+                    new java.util.ArrayList<>();
+
+            for (CourseStat s : passData) {
+                double value =
+                        s.passRatePercent == null
+                                ? 0.0
+                                : s.passRatePercent;
+
+                passSlices.add(
+                        new Slice(s.courseCode, value)
+                );
+            }
+
+            ChartUtil.fillBar(
+                    passChart,
+                    passEmpty,
+                    passSlices,
+                    "Pass rate %"
+            );
+
+        } else if ("Enrollment Trend".equals(tabName)) {
+
+            ChartUtil.fillLine(
+                    trendChart,
+                    trendEmpty,
+                    trendData,
+                    "Enrollments"
+            );
+        }
+    }
+
     // CSV exports — one per tab
     // =====================================================================
 
