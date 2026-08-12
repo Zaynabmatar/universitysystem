@@ -118,7 +118,8 @@ public class MainShellController {
             new MenuEntry("My Grades",      "student_grades.fxml",         "grades"),
             new MenuEntry("Plan of Study",  "student_progress.fxml",       "plan"),
             new MenuEntry("Course Recommendation", "student_recommendation.fxml", "recommend"),
-            new MenuEntry("Academic Calendar", "academic_calendar.fxml", "calendar-event")
+            new MenuEntry("Academic Calendar", "academic_calendar.fxml", "calendar-event"),
+            new MenuEntry("Student Services",  "student_services.fxml",  "transcript")
     );
 
     @FXML
