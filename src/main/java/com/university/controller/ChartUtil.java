@@ -65,7 +65,8 @@ final class ChartUtil {
             chart.applyCss();
             chart.layout();
 
-            List<Node> bars = new ArrayList<>();
+            List<javafx.scene.transform.Scale> scales =
+                    new ArrayList<>();
 
             for (XYChart.Data<String, Number> data : series.getData()) {
 
@@ -73,20 +74,23 @@ final class ChartUtil {
 
                 if (bar != null) {
 
-                    double h = bar.getBoundsInParent().getHeight();
+                    double bottom =
+                            bar.getBoundsInLocal().getMaxY();
 
-                    // Start visually at ZERO.
-                    bar.setScaleY(0.0);
+                    javafx.scene.transform.Scale scale =
+                            new javafx.scene.transform.Scale(
+                                    1.0,
+                                    0.0,
+                                    0.0,
+                                    bottom
+                            );
 
-                    // Move the scaled bar downward so its bottom stays
-                    // exactly on the zero/baseline.
-                    bar.setTranslateY(h / 2.0);
-
-                    bars.add(bar);
+                    bar.getTransforms().add(scale);
+                    scales.add(scale);
                 }
             }
 
-            Runnable check = () -> {
+            Runnable play = () -> {
 
                 if (played[0] || chart.getScene() == null) {
                     return;
@@ -98,7 +102,6 @@ final class ChartUtil {
                 double sceneHeight =
                         chart.getScene().getHeight();
 
-                // Do NOTHING until the WHOLE chart is visible.
                 if (bounds.getMinY() >= 0
                         && bounds.getMaxY() <= sceneHeight) {
 
@@ -106,24 +109,25 @@ final class ChartUtil {
 
                     Timeline timeline = new Timeline();
 
-                    for (Node bar : bars) {
+                    for (javafx.scene.transform.Scale scale : scales) {
 
                         timeline.getKeyFrames().add(
                                 new KeyFrame(
                                         Duration.ZERO,
-                                        new KeyValue(bar.scaleYProperty(), 0.0),
                                         new KeyValue(
-                                                bar.translateYProperty(),
-                                                bar.getBoundsInParent().getHeight() / 2.0
+                                                scale.yProperty(),
+                                                0.0
                                         )
                                 )
                         );
 
                         timeline.getKeyFrames().add(
                                 new KeyFrame(
-                                        Duration.millis(1200),
-                                        new KeyValue(bar.scaleYProperty(), 1.0),
-                                        new KeyValue(bar.translateYProperty(), 0.0)
+                                        Duration.millis(1600),
+                                        new KeyValue(
+                                                scale.yProperty(),
+                                                1.0
+                                        )
                                 )
                         );
                     }
@@ -137,19 +141,17 @@ final class ChartUtil {
             while (parent != null) {
 
                 if (parent instanceof ScrollPane scrollPane) {
-
                     scrollPane.vvalueProperty().addListener(
-                            (obs, oldValue, newValue) -> check.run()
+                            (obs, oldValue, newValue) -> play.run()
                     );
                 }
 
                 parent = parent.getParent();
             }
 
-            check.run();
+            play.run();
         });
     }
-
     static void fillPie(PieChart chart,
                         Label empty,
                         List<Slice> data) {

@@ -37,12 +37,12 @@ import javafx.util.Duration;
  * that does not belong to that role.</p>
  *
  * <p>The number typed here is always {@code users.user_id}, for every role
- * (see {@link AuthService} for why) — the role picked on the previous screen
+ * (see {@link AuthService} for why) â€” the role picked on the previous screen
  * is a door the account must match, not a table the number is looked up in.</p>
  *
- * <p>The two "please enter your…" checks happen here rather than in the service
- * so the wording is a prompt rather than a complaint. Everything else — the
- * password itself, whether the account is active — is the service's business,
+ * <p>The two "please enter yourâ€¦" checks happen here rather than in the service
+ * so the wording is a prompt rather than a complaint. Everything else â€” the
+ * password itself, whether the account is active â€” is the service's business,
  * and its message is shown exactly as it comes back.</p>
  */
 public class LoginController {
@@ -106,7 +106,7 @@ public class LoginController {
         // The visible/hidden fields share one value; only one is shown at a time.
         passwordTextField.textProperty().bindBidirectional(passwordField.textProperty());
 
-        // Decorative dotted halftone corners — dots fade out from the near screen corner.
+        // Decorative dotted halftone corners â€” dots fade out from the near screen corner.
         buildHalftone(dotsTopRight, dotsTopRight.getPrefWidth(), 0);
         buildHalftone(dotsBottomLeft, 0, dotsBottomLeft.getPrefHeight());
 
@@ -161,7 +161,7 @@ public class LoginController {
     @FXML
     private void handleBack() {
         SceneManager.getInstance().switchRoot("role_selection.fxml",
-                "University Registration System — Select Role");
+                "University Registration System â€” Select Role");
     }
 
     private void buildHalftone(Pane pane, double anchorX, double anchorY) {
@@ -227,7 +227,7 @@ public class LoginController {
 
     /**
      * Checks the ID and password against the role picked on the role-selection
-     * screen only — never the other two tables — so an Admin ID and a Student
+     * screen only â€” never the other two tables â€” so an Admin ID and a Student
      * ID can validly be the same number without either one being able to sign
      * in through the other's button.
      *
@@ -246,10 +246,13 @@ public class LoginController {
 
         // ---- step 1: authenticate -------------------------------------------------
         try {
+            long authStart = System.nanoTime();
             authService.login(selectedRole, id, password);
+            System.out.printf("LOGIN TIMING auth: %.1f ms%n",
+                    (System.nanoTime() - authStart) / 1_000_000.0);
             passwordField.clear();
         } catch (ServiceException se) {
-            // Covers ValidationException too — it extends ServiceException.
+            // Covers ValidationException too â€” it extends ServiceException.
             // A refusal, not a fault: the wording is already the user's answer.
             return se.getMessage();
         } catch (Exception ex) {
@@ -264,8 +267,11 @@ public class LoginController {
         // failure below belongs to the screen, not to the credentials.
         try {
             String username = Session.current().getUser().getUsername();
+            long dashboardStart = System.nanoTime();
             SceneManager.getInstance().switchRoot("main_shell.fxml",
-                    "University Registration System — " + username);
+                    "University Registration System â€” " + username);
+            System.out.printf("LOGIN TIMING dashboard: %.1f ms%n",
+                    (System.nanoTime() - dashboardStart) / 1_000_000.0);
             return null;
         } catch (Exception ex) {
             report("DASHBOARD LOADING", ex);
@@ -277,8 +283,8 @@ public class LoginController {
     }
 
     /**
-     * Puts the whole failure on the console — message, stack trace and every
-     * nested cause — so the real problem is readable in the run log instead of
+     * Puts the whole failure on the console â€” message, stack trace and every
+     * nested cause â€” so the real problem is readable in the run log instead of
      * only behind "Show details" in a popup that may already have been closed.
      */
     private void report(String stage, Throwable failure) {
@@ -292,7 +298,7 @@ public class LoginController {
     }
 
     /**
-     * The innermost cause in one line — that is the sentence that actually names
+     * The innermost cause in one line â€” that is the sentence that actually names
      * the problem ("Invalid column name 'email'."), where the outer wrapper only
      * says which query it happened in.
      */
@@ -320,7 +326,7 @@ public class LoginController {
 
     /**
      * Looks up the display name behind the ID currently typed, scoped to the
-     * role picked on the previous screen — the same scoping {@link #attemptLogin()}
+     * role picked on the previous screen â€” the same scoping {@link #attemptLogin()}
      * uses, so this hint can never confirm an ID under a role it does not
      * belong to. Only a name is shown; never the password hash, email or role.
      */
@@ -362,7 +368,7 @@ public class LoginController {
                     return null;
             }
         } catch (Exception e) {
-            // The lookup is a convenience hint, not part of authentication — a
+            // The lookup is a convenience hint, not part of authentication â€” a
             // database hiccup here should not block or confuse the sign-in flow.
             return null;
         }
@@ -372,7 +378,7 @@ public class LoginController {
     private static final double NAME_HINT_GAP = 8;
 
     private void showNameHint(String text) {
-        nameHintLabel.setText("—  " + text);
+        nameHintLabel.setText(text);
         nameHintLabel.setTranslateX(typedIdWidth() + NAME_HINT_GAP);
         nameHintLabel.setVisible(true);
         nameHintLabel.setManaged(true);

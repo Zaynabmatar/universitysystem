@@ -46,33 +46,33 @@
 
                     <VBox fx:id="gpaSummaryCard" spacing="2" GridPane.rowIndex="0" GridPane.columnIndex="0">
                         <Label text="Current GPA" styleClass="muted-text"/>
-                        <Label fx:id="gpaSummaryLabel" text="â€”" styleClass="analytics-stat-value"/>
+                        <Label fx:id="gpaSummaryLabel" text="-" styleClass="analytics-stat-value"/>
                     </VBox>
                     <VBox spacing="2" GridPane.rowIndex="0" GridPane.columnIndex="1">
                         <Label text="Academic Standing" styleClass="muted-text"/>
-                        <Label fx:id="standingLabel" text="â€”" styleClass="analytics-stat-value"/>
+                        <Label fx:id="standingLabel" text="-" styleClass="analytics-stat-value"/>
                     </VBox>
                     <VBox spacing="2" GridPane.rowIndex="0" GridPane.columnIndex="2">
                         <Label text="Account Status" styleClass="muted-text"/>
-                        <Label fx:id="statusLabel" text="â€”" styleClass="analytics-stat-value"/>
+                        <Label fx:id="statusLabel" text="-" styleClass="analytics-stat-value"/>
                     </VBox>
 
                     <VBox spacing="2" GridPane.rowIndex="1" GridPane.columnIndex="0">
                         <Label text="Completed Credits" styleClass="muted-text"/>
-                        <Label fx:id="completedCreditsLabel" text="â€”" styleClass="analytics-stat-value"/>
+                        <Label fx:id="completedCreditsLabel" text="-" styleClass="analytics-stat-value"/>
                     </VBox>
                     <VBox spacing="2" GridPane.rowIndex="1" GridPane.columnIndex="1">
                         <Label text="Remaining Credits" styleClass="muted-text"/>
-                        <Label fx:id="remainingCreditsLabel" text="â€”" styleClass="analytics-stat-value"/>
+                        <Label fx:id="remainingCreditsLabel" text="-" styleClass="analytics-stat-value"/>
                     </VBox>
                     <VBox spacing="2" GridPane.rowIndex="1" GridPane.columnIndex="2">
                         <Label text="Graduation Progress" styleClass="muted-text"/>
-                        <Label fx:id="progressPercentLabel" text="â€”" styleClass="analytics-stat-value"/>
+                        <Label fx:id="progressPercentLabel" text="-" styleClass="analytics-stat-value"/>
                     </VBox>
 
                     <VBox spacing="2" GridPane.rowIndex="2" GridPane.columnIndex="0" GridPane.columnSpan="3">
                         <Label text="Estimated Graduation Semester" styleClass="muted-text"/>
-                        <Label fx:id="estimatedGradLabel" text="â€”" styleClass="analytics-stat-value"/>
+                        <Label fx:id="estimatedGradLabel" text="-" styleClass="analytics-stat-value"/>
                     </VBox>
                 </GridPane>
             </VBox>
@@ -80,15 +80,15 @@
             <VBox spacing="8" styleClass="panel" prefWidth="300" minWidth="260">
                 <padding><Insets top="14" right="16" bottom="14" left="16"/></padding>
                 <Label text="Student Blockage" styleClass="section-title"/>
-                <Label fx:id="blockStatusLabel" text="â€”" styleClass="verdict"/>
+                <Label fx:id="blockStatusLabel" text="-" styleClass="verdict"/>
                 <Separator/>
                 <HBox spacing="8">
                     <Label text="Type:" styleClass="muted-text"/>
-                    <Label fx:id="blockTypeLabel" text="â€”"/>
+                    <Label fx:id="blockTypeLabel" text="-"/>
                 </HBox>
                 <VBox spacing="2">
                     <Label text="Reason:" styleClass="muted-text"/>
-                    <Label fx:id="blockReasonLabel" text="â€”" wrapText="true"/>
+                    <Label fx:id="blockReasonLabel" text="-" wrapText="true"/>
                 </VBox>
             </VBox>
         </HBox>
