@@ -27,7 +27,9 @@ public class StudentGradeRow {
     private boolean submitted;
     private BigDecimal courseworkMark;
     private BigDecimal midtermMark;
+    private BigDecimal labMark;
     private BigDecimal finalMark;
+    private boolean hasLab;
     private BigDecimal totalMark;
     private LetterGrade letterGrade;
     private BigDecimal gradePoints;
@@ -122,6 +124,21 @@ public class StudentGradeRow {
         this.midtermMark = midtermMark;
     }
 
+    public BigDecimal getLabMark() {
+        return labMark;
+    }
+
+    public void setLabMark(BigDecimal labMark) {
+        this.labMark = labMark;
+    }
+
+    public boolean isHasLab() {
+        return hasLab;
+    }
+
+    public void setHasLab(boolean hasLab) {
+        this.hasLab = hasLab;
+    }
     public BigDecimal getFinalMark() {
         return finalMark;
     }
@@ -188,3 +205,4 @@ public class StudentGradeRow {
         return courseCode + " " + courseTitle;
     }
 }
+

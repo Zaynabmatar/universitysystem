@@ -234,7 +234,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      */
     public List<StudentGradeRow> findStudentGradeRows(int studentId, Integer semesterId) {
         String sql = "SELECT e.enrollment_id, e.status, e.counts_in_gpa, "
-                + "sem.semester_id, sem.semester_name, c.course_code, c.course_title, c.credits, "
+                + "sem.semester_id, sem.semester_name, c.course_code, c.course_title, c.credits, c.has_lab, "
                 + "ISNULL(g.is_submitted, 0) AS is_submitted, "
                 + "CASE WHEN g.is_submitted = 1 THEN g.coursework_mark END AS coursework_mark, "
                 + "CASE WHEN g.is_submitted = 1 THEN g.midterm_mark    END AS midterm_mark, "
@@ -392,3 +392,4 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         return entity.getResultStatus() == null ? null : entity.getResultStatus().toDb();
     }
 }
+

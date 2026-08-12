@@ -225,8 +225,17 @@ public class InstructorTimetableController {
      * Any real time overlap on the same day is displayed side by side.
      */
     private String colourFor(int courseId) {
-        return courseColours.computeIfAbsent(courseId, id ->
-                PALETTE[courseColours.size() % PALETTE.length]);
+        if (courseColours.containsKey(courseId)) {
+            return courseColours.get(courseId);
+        }
+
+        if (courseColours.size() >= PALETTE.length) {
+            return PALETTE[PALETTE.length - 1];
+        }
+
+        String colour = PALETTE[courseColours.size()];
+        courseColours.put(courseId, colour);
+        return colour;
     }
 
     private int slotIndex(LocalTime time) {
@@ -234,3 +243,4 @@ public class InstructorTimetableController {
         return Math.max(0, minutesFromStart / SLOT_MINUTES);
     }
 }
+
