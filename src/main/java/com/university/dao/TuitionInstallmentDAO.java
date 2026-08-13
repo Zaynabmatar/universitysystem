@@ -46,12 +46,65 @@ public class TuitionInstallmentDAO extends AbstractDAO {
         return installment;
     }
 
+    /** All stored tuition installments, used by the global notification sync. */
+    public List<TuitionInstallment> findAll() {
+        return queryList(SELECT + " ORDER BY student_id, semester_id, currency, installment_no", MAPPER);
+    }
     /** One student's installment schedule for one semester, USD and LBP together, in bill order. */
     public List<TuitionInstallment> findByStudentAndSemester(int studentId, int semesterId) {
         return queryList(SELECT + " WHERE student_id = ? AND semester_id = ? "
                 + "ORDER BY currency, installment_no", MAPPER, studentId, semesterId);
     }
 
+    public int rescheduleUnpaidForSemester(int semesterId,
+                                           java.time.LocalDate firstDue,
+                                           java.time.LocalDate lastDue) {
+        return executeUpdate(
+                ";WITH schedule AS ("
+                + " SELECT installment_id, installment_no, "
+                + " MAX(installment_no) OVER "
+                + " (PARTITION BY student_id, semester_id, currency) AS installment_count "
+                + " FROM dbo.student_tuition_installments "
+                + " WHERE semester_id = ?"
+                + ") "
+                + "UPDATE sti SET "
+                + " due_date = CASE "
+                + "   WHEN s.installment_count <= 1 THEN CAST(? AS DATE) "
+                + "   ELSE DATEADD(DAY, "
+                + "     ((s.installment_no - 1) * DATEDIFF(DAY, CAST(? AS DATE), CAST(? AS DATE))) "
+                + "       / (s.installment_count - 1), "
+                + "     CAST(? AS DATE)) "
+                + " END, "
+                + " status = CASE WHEN sti.status = 'OVERDUE' THEN 'UNPAID' ELSE sti.status END, "
+                + " penalty = 0 "
+                + "FROM dbo.student_tuition_installments sti "
+                + "JOIN schedule s ON s.installment_id = sti.installment_id "
+                + "WHERE sti.semester_id = ? "
+                + " AND sti.status IN ('UNPAID', 'PARTIALLY_PAID', 'OVERDUE') "
+                + " AND sti.payment_date IS NULL",
+                semesterId,
+                firstDue,
+                firstDue,
+                lastDue,
+                firstDue,
+                semesterId);
+    }
+
+    public int refreshDelinquency(int semesterId) {
+        return executeUpdate(
+                "UPDATE dbo.student_tuition_installments "
+                + "SET status = 'OVERDUE', "
+                + "    penalty = CASE "
+                + "        WHEN currency = 'USD' AND ISNULL(penalty, 0) = 0 THEN 10 "
+                + "        WHEN currency = 'LBP' AND ISNULL(penalty, 0) = 0 THEN 900000 "
+                + "        ELSE penalty "
+                + "    END "
+                + "WHERE semester_id = ? "
+                + "  AND status IN ('UNPAID', 'PARTIALLY_PAID', 'OVERDUE') "
+                + "  AND payment_date IS NULL "
+                + "  AND due_date < CAST(GETDATE() AS DATE)",
+                semesterId);
+    }
     public int insert(Connection connection, TuitionInstallment installment) {
         return insertAndReturnKey(connection, INSERT,
                 installment.getStudentId(),
@@ -66,3 +119,9 @@ public class TuitionInstallmentDAO extends AbstractDAO {
                 installment.getStatus());
     }
 }
+
+
+
+
+
+

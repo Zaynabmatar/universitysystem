@@ -5,11 +5,13 @@ import com.university.dao.CourseDAO;
 import com.university.dao.EnrollmentDAO;
 import com.university.dao.SectionDAO;
 import com.university.dao.SemesterDAO;
+import com.university.dao.StudentDAO;
 import com.university.dao.TuitionInstallmentDAO;
 import com.university.dao.TuitionRateDAO;
 import com.university.enums.Currency;
 import com.university.enums.EnrollmentStatus;
 import com.university.enums.InvoiceStatus;
+import com.university.enums.NotificationType;
 import com.university.model.Course;
 import com.university.model.Enrollment;
 import com.university.model.Section;
@@ -52,6 +54,8 @@ public class TuitionService {
     private final SectionDAO sectionDao = new SectionDAO();
     private final CourseDAO courseDao = new CourseDAO();
     private final SemesterDAO semesterDao = new SemesterDAO();
+    private final StudentDAO studentDao = new StudentDAO();
+    private final NotificationService notificationService = new NotificationService();
 
     private final AbstractDAO transactions = new AbstractDAO() {
     };
@@ -121,6 +125,8 @@ public class TuitionService {
 
         TuitionRate rate = rateDao.findBySemester(semester.getSemesterId()).orElseGet(() -> fallbackRate(semester));
 
+        installmentDao.refreshDelinquency(semester.getSemesterId());
+
         record RawCharge(String courseCode, String courseTitle, int credits, BigDecimal usd, BigDecimal lbp) {
         }
         List<RawCharge> rawCharges = new ArrayList<>();
@@ -155,6 +161,8 @@ public class TuitionService {
         if (stored.isEmpty() && !rawCharges.isEmpty()) {
             stored = generateInstallments(studentId, semester, rate, totalUsd, totalLbp);
         }
+
+        sendPaymentNotifications(studentId, stored);
 
         List<TuitionInstallment> usdInstallments = stored.stream()
                 .filter(i -> i.getCurrency() == Currency.USD).toList();
@@ -221,6 +229,175 @@ public class TuitionService {
      * anyone (this check included) asks, so a previous balance is caught even if the student never
      * opened the Payments page for that semester.</p>
      */
+
+    private void sendPaymentNotifications(int studentId, List<TuitionInstallment> installments) {
+        var student = studentDao.findById(studentId).orElse(null);
+        if (student == null) {
+            return;
+        }
+
+        int userId = student.getUserId();
+        LocalDate today = LocalDate.now();
+
+        for (TuitionInstallment installment : installments) {
+
+            if (installment.getPaymentDate() != null
+                    || installment.getStatus() == InvoiceStatus.PAID
+                    || installment.getDueDate() == null) {
+                continue;
+            }
+
+            int installmentId = installment.getInstallmentId();
+            LocalDate dueDate = installment.getDueDate();
+
+            // Deadline already passed and penalty was added.
+            if (installment.getStatus() == InvoiceStatus.OVERDUE) {
+String title = "Payment Overdue";
+
+                if (!notificationService.alreadyNotified(
+                        userId, "TUITION_INSTALLMENT", installmentId, title)) {
+
+                    String penaltyText = installment.getCurrency() == Currency.USD
+                            ? "$10"
+                            : "900,000 LBP";
+
+                    notificationService.notify(
+                            userId,
+                            NotificationType.WARNING,
+                            title,
+                            "Your payment deadline has passed. A late penalty of "
+                                    + penaltyText
+                                    + " has been added to your installment. "
+                                    + "Please settle the outstanding balance.",
+                            "TUITION_INSTALLMENT",
+                            installmentId
+                    );
+                }
+
+                continue;
+            }
+
+            // Reminder during the final 3 days before the deadline.
+            LocalDate reminderStart = dueDate.minusDays(3);
+
+            if (!today.isBefore(reminderStart) && !today.isAfter(dueDate)) {
+                String title = "Payment Reminder";
+
+                if (!notificationService.alreadyNotified(
+                        userId, "TUITION_INSTALLMENT", installmentId, title)) {
+
+                    String penaltyText = installment.getCurrency() == Currency.USD
+                            ? "$10"
+                            : "900,000 LBP";
+
+                    notificationService.notify(
+                            userId,
+                            NotificationType.PAYMENT,
+                            title,
+                            "Your " + installment.getCurrency()
+                                    + " installment is due on " + dueDate
+                                    + ". Please pay before the deadline. "
+                                    + "If payment is late, a penalty of "
+                                    + penaltyText + " will be added.",
+                            "TUITION_INSTALLMENT",
+                            installmentId
+                    );
+                }
+            }
+        }
+    }
+    /** Refreshes payment reminders/overdue notices for all semesters studied by this student. */
+    /** Refreshes payment notifications for every stored installment in the system. */
+    public void refreshPaymentNotificationsForAllStudents() {
+        LocalDate today = LocalDate.now();
+
+        for (TuitionInstallment installment : installmentDao.findAll()) {
+
+            if (installment.getDueDate() == null) {
+                continue;
+            }
+
+            // Do not notify already-paid installments.
+            if (installment.getPaymentDate() != null
+                    || installment.getStatus() == InvoiceStatus.PAID) {
+                continue;
+            }
+
+            var student = studentDao.findById(installment.getStudentId()).orElse(null);
+            if (student == null) {
+                continue;
+            }
+
+            int userId = student.getUserId();
+            int installmentId = installment.getInstallmentId();
+            LocalDate dueDate = installment.getDueDate();
+
+            // Reminder: only during the final 3 days before the due date.
+            LocalDate reminderStart = dueDate.minusDays(3);
+
+            if (!today.isBefore(reminderStart)
+                    && !today.isAfter(dueDate)
+                    && installment.getStatus() != InvoiceStatus.OVERDUE) {
+
+                String title = "Payment Reminder";
+
+                if (!notificationService.alreadyNotified(
+                        userId, "TUITION_INSTALLMENT", installmentId, title)) {
+
+                    String penaltyText = installment.getCurrency() == Currency.USD
+                            ? "$10"
+                            : "900,000 LBP";
+
+                    notificationService.notify(
+                            userId,
+                            NotificationType.PAYMENT,
+                            title,
+                            "Your " + installment.getCurrency()
+                                    + " installment is due on " + dueDate
+                                    + ". Please pay before the deadline. "
+                                    + "If payment is late, a penalty of "
+                                    + penaltyText + " will be added.",
+                            "TUITION_INSTALLMENT",
+                            installmentId
+                    );
+                }
+            }
+
+            // Overdue: only when the installment is really overdue and has a penalty.
+            if (installment.getStatus() == InvoiceStatus.OVERDUE
+                    && installment.getPenalty() != null
+                    && installment.getPenalty().compareTo(BigDecimal.ZERO) > 0) {
+
+                String title = "Payment Overdue";
+
+                if (!notificationService.alreadyNotified(
+                        userId, "TUITION_INSTALLMENT", installmentId, title)) {
+
+                    String penaltyText = installment.getCurrency() == Currency.USD
+                            ? "$10"
+                            : "900,000 LBP";
+
+                    notificationService.notify(
+                            userId,
+                            NotificationType.WARNING,
+                            title,
+                            "Your payment deadline has passed. A late penalty of "
+                                    + penaltyText
+                                    + " has been added. Please settle the outstanding balance.",
+                            "TUITION_INSTALLMENT",
+                            installmentId
+                    );
+                }
+            }
+        }
+    }
+    public void refreshPaymentNotificationsForStudent(int studentId) {
+        ValidationException.requireId(studentId, "Student");
+
+        for (Semester semester : semesterDao.findWithEnrollments(studentId)) {
+            billFor(studentId, semester);
+        }
+    }
     public boolean hasUnpaidPreviousBalance(int studentId, Semester targetSemester) {
         ValidationException.requireId(studentId, "Student");
         if (targetSemester == null) {
@@ -335,3 +512,9 @@ public class TuitionService {
         return rate;
     }
 }
+
+
+
+
+
+
