@@ -18,3 +18,4 @@ logs/
 db.properties
 !db.properties.example
 .universitysystem/
+*.bak
