@@ -1,11 +1,15 @@
 package com.university.controller;
 
+import com.university.controller.dialog.InstructorEvaluationDialog;
+
 import com.university.enums.AcademicStanding;
 import com.university.enums.UserRole;
 import com.university.model.Semester;
 import com.university.model.Student;
 import com.university.model.StudentGradeRow;
 import com.university.service.AcademicService;
+import com.university.service.EvaluationService;
+import com.university.service.InstructorService;
 import com.university.service.Session;
 import com.university.util.AlertUtil;
 import com.university.util.GradeCalculator;
@@ -55,8 +59,11 @@ public class StudentGradesController {
     @FXML private TableColumn<StudentGradeRow, String> colLetter;
     @FXML private TableColumn<StudentGradeRow, BigDecimal> colPoints;
     @FXML private TableColumn<StudentGradeRow, String> colStatus;
+    @FXML private TableColumn<StudentGradeRow, String> colEvaluation;
 
     private final AcademicService academicService = new AcademicService();
+    private final EvaluationService evaluationService = new EvaluationService();
+    private final InstructorService instructorService = new InstructorService();
     private final ObservableList<StudentGradeRow> rows = FXCollections.observableArrayList();
 
     private int studentId;
@@ -69,16 +76,96 @@ public class StudentGradesController {
         colCourseCode.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getCourseCode()));
         colCourseTitle.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getCourseTitle()));
         colCredits.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCredits()));
-        colCoursework.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCourseworkMark()));
-        colMidterm.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getMidtermMark()));
-        colLab.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getLabMark()));
-        colFinal.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getFinalMark()));
-        colTotal.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getTotalMark()));
-        colPoints.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getGradePoints()));
+        colCoursework.setCellValueFactory(c -> new SimpleObjectProperty<>(
+                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
+                        ? c.getValue().getCourseworkMark() : null));
+
+        colMidterm.setCellValueFactory(c -> new SimpleObjectProperty<>(
+                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
+                        ? c.getValue().getMidtermMark() : null));
+
+        colLab.setCellValueFactory(c -> new SimpleObjectProperty<>(
+                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
+                        ? c.getValue().getLabMark() : null));
+
+        colFinal.setCellValueFactory(c -> new SimpleObjectProperty<>(
+                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
+                        ? c.getValue().getFinalMark() : null));
+
+        colTotal.setCellValueFactory(c -> new SimpleObjectProperty<>(
+                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
+                        ? c.getValue().getTotalMark() : null));
+
+        colPoints.setCellValueFactory(c -> new SimpleObjectProperty<>(
+                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
+                        ? c.getValue().getGradePoints() : null));
+
         colLetter.setCellValueFactory(c -> new SimpleStringProperty(
-                c.getValue().getLetterGrade() == null ? null : c.getValue().getLetterGrade().getLabel()));
+                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
+                        && c.getValue().getLetterGrade() != null
+                        ? c.getValue().getLetterGrade().getLabel()
+                        : null));
         colStatus.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().statusLabel()));
 
+        colEvaluation.setCellValueFactory(c -> {
+            int enrollmentId = c.getValue().getEnrollmentId();
+
+            if (evaluationService.hasSubmitted(enrollmentId)) {
+                return new SimpleStringProperty("★");
+            }
+
+            if (evaluationService.isAvailable(enrollmentId)) {
+                return new SimpleStringProperty("☆");
+            }
+
+            return new SimpleStringProperty("");
+        });
+        colEvaluation.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String value, boolean empty) {
+                super.updateItem(value, empty);
+
+                setText(null);
+                setGraphic(null);
+                setStyle("");
+
+                if (empty || value == null || value.isBlank()) {
+                    return;
+                }
+
+                Label star = new Label(value);
+                star.setStyle(
+                        "-fx-font-size: 20px;"
+                        + "-fx-font-weight: bold;"
+                        + "-fx-alignment: CENTER;"
+                );
+
+                if ("★".equals(value)) {
+                    star.setStyle(
+                            "-fx-font-size: 20px;"
+                            + "-fx-font-weight: bold;"
+                            + "-fx-text-fill: #4F46E5;"
+                    );
+                } else if ("☆".equals(value)) {
+                    star.setStyle(
+                            "-fx-font-size: 20px;"
+                            + "-fx-font-weight: bold;"
+                            + "-fx-cursor: hand;"
+                    );
+
+                    star.setOnMouseClicked(event -> {
+                        StudentGradeRow row =
+                                getTableRow() == null ? null : getTableRow().getItem();
+
+                        if (row != null) {
+                            openEvaluation(row);
+                        }
+                    });
+                }
+
+                setGraphic(star);
+            }
+        });
         // An ungraded row reads "Not graded yet" rather than showing an empty cell, so the
         // student can tell "no mark yet" apart from "a mark of nothing".
         colCoursework.setCellFactory(col -> markCell());
@@ -240,6 +327,55 @@ public class StudentGradesController {
         termGpaCaption.setText(semesterId == null ? "GPA (all semesters)" : "Term GPA");
     }
 
+    private void openEvaluation(StudentGradeRow row) {
+        if (row == null) {
+            return;
+        }
+
+        try {
+            if (!evaluationService.isAvailable(row.getEnrollmentId())) {
+                reloadRows();
+                return;
+            }
+
+            Integer instructorId = row.getInstructorId();
+            if (instructorId == null) {
+                AlertUtil.error(
+                        "Instructor Evaluation",
+                        "This course does not have an instructor assigned.",
+                        null
+                );
+                return;
+            }
+
+            var instructor = instructorService.findById(instructorId);
+            var questions = evaluationService.getQuestions();
+
+            com.university.controller.dialog.InstructorEvaluationDialog dialog =
+                    new com.university.controller.dialog.InstructorEvaluationDialog(
+                            row.getCourseCode(),
+                            instructor.getFullName(),
+                            questions
+                    );
+
+            var result = dialog.showAndWait();
+
+            if (result.isEmpty()) {
+                return;
+            }
+
+            evaluationService.submit(row.getEnrollmentId(), result.get());
+
+            reloadRows();
+
+        } catch (RuntimeException e) {
+            AlertUtil.error(
+                    "Instructor Evaluation",
+                    "The instructor evaluation could not be completed.",
+                    e
+            );
+        }
+    }
     /** Blank marks read "Not graded yet" — the draft a student must never see. */
     private TableCell<StudentGradeRow, BigDecimal> markCell() {
         return new TableCell<>() {

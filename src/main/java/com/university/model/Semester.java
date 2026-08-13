@@ -25,6 +25,8 @@ public class Semester {
     private LocalDate withdrawDeadline;
     private LocalDate gradeEntryStart;
     private LocalDate gradeEntryEnd;
+    private LocalDateTime evaluationStart;
+    private LocalDateTime evaluationEnd;
     private boolean current;
 
     public Semester() {
@@ -146,6 +148,30 @@ public class Semester {
         this.gradeEntryEnd = gradeEntryEnd;
     }
 
+    public LocalDateTime getEvaluationStart() {
+        return evaluationStart;
+    }
+
+    public void setEvaluationStart(LocalDateTime evaluationStart) {
+        this.evaluationStart = evaluationStart;
+    }
+
+    public LocalDateTime getEvaluationEnd() {
+        return evaluationEnd;
+    }
+
+    public void setEvaluationEnd(LocalDateTime evaluationEnd) {
+        this.evaluationEnd = evaluationEnd;
+    }
+
+    /** True when the instructor-evaluation window is open at the given moment. */
+    public boolean isEvaluationOpen(LocalDateTime moment) {
+        if (evaluationStart == null || evaluationEnd == null || moment == null) {
+            return false;
+        }
+        return !moment.isBefore(evaluationStart) && !moment.isAfter(evaluationEnd);
+    }
+
     public boolean isCurrent() {
         return current;
     }
@@ -167,3 +193,4 @@ public class Semester {
         return semesterName;
     }
 }
+

@@ -43,6 +43,11 @@ public final class SemesterFormDialog extends Dialog<Semester> {
     private final DatePicker gradeEntryStartPicker  = new DatePicker();
     private final DatePicker gradeEntryEndPicker    = new DatePicker();
 
+    private final DatePicker evaluationStartDatePicker = new DatePicker();
+    private final TextField evaluationStartTimeField   = new TextField();
+    private final DatePicker evaluationEndDatePicker   = new DatePicker();
+    private final TextField evaluationEndTimeField     = new TextField();
+
     private final Label errorLabel = new Label();
 
     private final boolean editMode;
@@ -66,6 +71,11 @@ public final class SemesterFormDialog extends Dialog<Semester> {
         regEndTimeField.setPromptText("17:00");
         regStartTimeField.setPrefWidth(80);
         regEndTimeField.setPrefWidth(80);
+
+        evaluationStartTimeField.setPromptText("09:00");
+        evaluationEndTimeField.setPromptText("17:00");
+        evaluationStartTimeField.setPrefWidth(80);
+        evaluationEndTimeField.setPrefWidth(80);
         errorLabel.getStyleClass().add("error-text");
         errorLabel.setWrapText(true);
         errorLabel.setVisible(false);
@@ -94,6 +104,13 @@ public final class SemesterFormDialog extends Dialog<Semester> {
 
         g.add(sectionHeader("Grade entry window"), 0, r++, 4, 1);
         g.addRow(r++, new Label("Grade entry start *"), gradeEntryStartPicker, new Label("Grade entry end *"), gradeEntryEndPicker);
+
+        g.add(sectionHeader("Instructor evaluation window"), 0, r++, 4, 1);
+        g.addRow(r++,
+                new Label("Evaluation start"),
+                dateTimeBox(evaluationStartDatePicker, evaluationStartTimeField),
+                new Label("Evaluation end"),
+                dateTimeBox(evaluationEndDatePicker, evaluationEndTimeField));
 
         Label helpText = new Label(
                 "Before the drop deadline a student may drop with no trace. Between the drop deadline and the "
@@ -172,6 +189,16 @@ public final class SemesterFormDialog extends Dialog<Semester> {
         withdrawDeadlinePicker.setValue(s.getWithdrawDeadline());
         gradeEntryStartPicker.setValue(s.getGradeEntryStart());
         gradeEntryEndPicker.setValue(s.getGradeEntryEnd());
+
+        if (s.getEvaluationStart() != null) {
+            evaluationStartDatePicker.setValue(s.getEvaluationStart().toLocalDate());
+            evaluationStartTimeField.setText(s.getEvaluationStart().toLocalTime().toString());
+        }
+
+        if (s.getEvaluationEnd() != null) {
+            evaluationEndDatePicker.setValue(s.getEvaluationEnd().toLocalDate());
+            evaluationEndTimeField.setText(s.getEvaluationEnd().toLocalTime().toString());
+        }
     }
 
     private LocalDateTime combine(DatePicker datePicker, TextField timeField) {
@@ -203,6 +230,14 @@ public final class SemesterFormDialog extends Dialog<Semester> {
             return mark(regEndTimeField, "Registration end time must look like 17:00.");
         }
 
+        if (evaluationStartDatePicker.getValue() != null
+                && ValidationUtil.parseTime(evaluationStartTimeField.getText()) == null) {
+            return mark(evaluationStartTimeField, "Evaluation start time must look like 09:00.");
+        }
+        if (evaluationEndDatePicker.getValue() != null
+                && ValidationUtil.parseTime(evaluationEndTimeField.getText()) == null) {
+            return mark(evaluationEndTimeField, "Evaluation end time must look like 17:00.");
+        }
         LocalDateTime registrationStart = combine(regStartDatePicker, regStartTimeField);
         LocalDateTime registrationEnd = combine(regEndDatePicker, regEndTimeField);
 
@@ -240,6 +275,34 @@ public final class SemesterFormDialog extends Dialog<Semester> {
         if (gradeEntryEndPicker.getValue().isBefore(gradeEntryStartPicker.getValue())) {
             return mark(gradeEntryEndPicker, "Grade entry must end on or after it starts.");
         }
+        boolean evaluationStartPresent = evaluationStartDatePicker.getValue() != null
+                || !ValidationUtil.isBlank(evaluationStartTimeField.getText());
+        boolean evaluationEndPresent = evaluationEndDatePicker.getValue() != null
+                || !ValidationUtil.isBlank(evaluationEndTimeField.getText());
+
+        if (evaluationStartPresent != evaluationEndPresent) {
+            return "Evaluation start and end must either both be set or both be left blank.";
+        }
+
+        if (evaluationStartPresent) {
+            LocalDateTime evaluationStart =
+                    combine(evaluationStartDatePicker, evaluationStartTimeField);
+            LocalDateTime evaluationEnd =
+                    combine(evaluationEndDatePicker, evaluationEndTimeField);
+
+            if (evaluationStart == null || evaluationEnd == null) {
+                return "Evaluation start and end must include a valid date and time.";
+            }
+
+            if (!evaluationStart.isBefore(evaluationEnd)) {
+                return mark(evaluationEndTimeField, "Evaluation must end after it starts.");
+            }
+
+            if (evaluationStart.toLocalDate().isBefore(start)
+                    || evaluationEnd.toLocalDate().isAfter(end)) {
+                return "The instructor evaluation window must fall within the semester dates.";
+            }
+        }
         return null;
     }
 
@@ -255,6 +318,16 @@ public final class SemesterFormDialog extends Dialog<Semester> {
         model.setWithdrawDeadline(withdrawDeadlinePicker.getValue());
         model.setGradeEntryStart(gradeEntryStartPicker.getValue());
         model.setGradeEntryEnd(gradeEntryEndPicker.getValue());
+
+        model.setEvaluationStart(
+                evaluationStartDatePicker.getValue() == null
+                        ? null
+                        : combine(evaluationStartDatePicker, evaluationStartTimeField));
+
+        model.setEvaluationEnd(
+                evaluationEndDatePicker.getValue() == null
+                        ? null
+                        : combine(evaluationEndDatePicker, evaluationEndTimeField));
     }
 
     private String mark(Control field, String message) {
@@ -266,7 +339,9 @@ public final class SemesterFormDialog extends Dialog<Semester> {
     private void clearErrorStyles() {
         for (Control c : List.<Control>of(nameField, academicYearField, termBox, startDatePicker, endDatePicker,
                 regStartDatePicker, regStartTimeField, regEndDatePicker, regEndTimeField,
-                dropDeadlinePicker, withdrawDeadlinePicker, gradeEntryStartPicker, gradeEntryEndPicker)) {
+                dropDeadlinePicker, withdrawDeadlinePicker, gradeEntryStartPicker, gradeEntryEndPicker,
+                evaluationStartDatePicker, evaluationStartTimeField,
+                evaluationEndDatePicker, evaluationEndTimeField)) {
             c.getStyleClass().remove("field-error");
         }
         errorLabel.setVisible(false);

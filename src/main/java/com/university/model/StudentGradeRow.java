@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 public class StudentGradeRow {
 
     private int enrollmentId;
+    private Integer instructorId;
     private int semesterId;
     private String semesterName;
     private String courseCode;
@@ -40,6 +41,14 @@ public class StudentGradeRow {
 
     public void setEnrollmentId(int enrollmentId) {
         this.enrollmentId = enrollmentId;
+    }
+
+    public Integer getInstructorId() {
+        return instructorId;
+    }
+
+    public void setInstructorId(Integer instructorId) {
+        this.instructorId = instructorId;
     }
 
     public int getSemesterId() {

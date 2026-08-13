@@ -57,6 +57,7 @@
             <TableColumn fx:id="colLetter"      text="Letter"     prefWidth="65"/>
             <TableColumn fx:id="colPoints"      text="Points"     prefWidth="65"/>
             <TableColumn fx:id="colStatus"      text="Status"     prefWidth="215"/>
+            <TableColumn fx:id="colEvaluation" text="Evaluation" prefWidth="85"/>
         </columns>
     </TableView>
 
