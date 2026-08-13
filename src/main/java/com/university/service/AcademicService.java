@@ -86,8 +86,8 @@ public class AcademicService {
      */
     public AcademicStanding refreshAcademicRecord(Connection connection, int studentId) {
         Student student = requireStudent(studentId);
-        BigDecimal gpa = gradeDao.calculateCumulativeGpa(studentId);
-        int credits = gradeDao.calculateCompletedCredits(studentId);
+        BigDecimal gpa = gradeDao.calculateCumulativeGpa(connection, studentId);
+        int credits = gradeDao.calculateCompletedCredits(connection, studentId);
 
         AcademicStanding previous = student.getAcademicStanding();
         int probationCount = nextProbationCount(previous, gpa, credits, student.getProbationCount());

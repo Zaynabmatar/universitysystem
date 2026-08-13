@@ -145,15 +145,23 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      * @return the average rounded HALF_UP to two decimals, or zero when nothing counts
      */
     public BigDecimal calculateCumulativeGpa(int studentId) {
-        return gpaQuery(studentId, null);
+        return gpaQuery(null, studentId, null);
     }
 
-    /** Term GPA — the same formula, restricted to one semester's sections (Section 5.3). */
+    public BigDecimal calculateCumulativeGpa(Connection connection, int studentId) {
+        return gpaQuery(connection, studentId, null);
+    }
+
+    /** Term GPA - the same formula, restricted to one semester's sections (Section 5.3). */
     public BigDecimal calculateTermGpa(int studentId, int semesterId) {
-        return gpaQuery(studentId, semesterId);
+        return gpaQuery(null, studentId, semesterId);
     }
 
-    private BigDecimal gpaQuery(int studentId, Integer semesterId) {
+    public BigDecimal calculateTermGpa(Connection connection, int studentId, int semesterId) {
+        return gpaQuery(connection, studentId, semesterId);
+    }
+
+    private BigDecimal gpaQuery(Connection connection, int studentId, Integer semesterId) {
         String sql = "SELECT CAST(CASE WHEN SUM(c.credits) IS NULL OR SUM(c.credits) = 0 THEN 0 "
                 + "ELSE SUM(g.grade_points * c.credits) / SUM(c.credits) END AS DECIMAL(5,4)) "
                 + "FROM dbo.grades g "
@@ -163,21 +171,38 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 + "WHERE e.student_id = ? AND e.status = 'COMPLETED' AND e.counts_in_gpa = 1 "
                 + "AND g.is_submitted = 1 AND g.letter_grade NOT IN ('W', 'I')"
                 + (semesterId == null ? "" : " AND s.semester_id = ?");
-        BigDecimal raw = semesterId == null
-                ? queryOne(sql, rs -> rs.getBigDecimal(1), studentId).orElse(BigDecimal.ZERO)
-                : queryOne(sql, rs -> rs.getBigDecimal(1), studentId, semesterId).orElse(BigDecimal.ZERO);
+
+        Optional<BigDecimal> value;
+        if (connection == null) {
+            value = semesterId == null
+                    ? queryOne(sql, rs -> rs.getBigDecimal(1), studentId)
+                    : queryOne(sql, rs -> rs.getBigDecimal(1), studentId, semesterId);
+        } else {
+            value = semesterId == null
+                    ? queryOne(connection, sql, rs -> rs.getBigDecimal(1), studentId)
+                    : queryOne(connection, sql, rs -> rs.getBigDecimal(1), studentId, semesterId);
+        }
+
+        BigDecimal raw = value.orElse(BigDecimal.ZERO);
         return raw.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     /** The credits a student has actually earned, meaning passed. */
     public int calculateCompletedCredits(int studentId) {
-        return queryInt("SELECT ISNULL(SUM(c.credits), 0) FROM dbo.grades g "
+        return calculateCompletedCredits(null, studentId);
+    }
+
+    public int calculateCompletedCredits(Connection connection, int studentId) {
+        String sql = "SELECT ISNULL(SUM(c.credits), 0) FROM dbo.grades g "
                 + "INNER JOIN dbo.enrollments e ON e.enrollment_id = g.enrollment_id "
                 + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
                 + "INNER JOIN dbo.courses c ON c.course_id = s.course_id "
                 + "WHERE e.student_id = ? AND e.status = 'COMPLETED' AND e.counts_in_gpa = 1 "
-                + "AND g.is_submitted = 1 AND g.result_status = 'PASSED'",
-                studentId);
+                + "AND g.is_submitted = 1 AND g.result_status = 'PASSED'";
+
+        return connection == null
+                ? queryInt(sql, studentId)
+                : queryInt(connection, sql, studentId);
     }
 
     /** How many grades in a section are still unsubmitted. */

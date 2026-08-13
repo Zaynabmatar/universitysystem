@@ -17,8 +17,8 @@ import java.util.Objects;
  * The single place that loads FXML and moves the user between screens.
  *
  * Two kinds of navigation:
- *   switchRoot(...)  â€” replaces the whole window content (login  <->  main shell)
- *   navigateTo(...)  â€” replaces only the content area inside the main shell (sidebar navigation)
+ *   switchRoot(...)  — replaces the whole window content (login  <->  main shell)
+ *   navigateTo(...)  — replaces only the content area inside the main shell (sidebar navigation)
  */
 public final class SceneManager {
 
@@ -26,7 +26,7 @@ public final class SceneManager {
 
     public static final String FXML_DIR = "/fxml/";
     public static final String CSS_PATH = "/css/app.css";
-    public static final double MIN_WIDTH  = 1200;   // project_details.md Section 13 â€” Responsiveness
+    public static final double MIN_WIDTH  = 1200;   // project_details.md Section 13 — Responsiveness
     public static final double MIN_HEIGHT = 780;
 
     private Stage primaryStage;
@@ -66,7 +66,7 @@ public final class SceneManager {
         return currentViewFxml;
     }
 
-    /** The title passed alongside the current view â€” what a "back" action should restore. */
+    /** The title passed alongside the current view — what a "back" action should restore. */
     public String getCurrentViewTitle() {
         return currentViewTitle;
     }
@@ -87,7 +87,7 @@ public final class SceneManager {
         try {
             // Forget the outgoing shell BEFORE loading the new root. Loading it
             // runs MainShellController.initialize(), which registers the new
-            // content area â€” clearing afterwards would throw that away, and
+            // content area — clearing afterwards would throw that away, and
             // every sidebar click would then fail with "No content area
             // registered".
             this.contentArea = null;
@@ -165,7 +165,7 @@ public final class SceneManager {
         }
     }
 
-    /** Reloads the current content view â€” useful after a dialog changed the data. */
+    /** Reloads the current content view — useful after a dialog changed the data. */
     public void reloadCurrentView(String title) {
         if (currentViewFxml != null) {
             navigateTo(currentViewFxml, title);

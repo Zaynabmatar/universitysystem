@@ -70,6 +70,10 @@ public class StudentDAO extends AbstractDAO implements GenericDAO<Student> {
         return queryOne(SELECT + " WHERE student_id = ?", MAPPER, id);
     }
 
+    public Optional<Student> findById(Connection connection, int id) {
+        return queryOne(connection, SELECT + " WHERE student_id = ?", MAPPER, id);
+    }
+
     @Override
     public List<Student> findAll() {
         return queryList(SELECT + " ORDER BY user_id", MAPPER);

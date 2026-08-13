@@ -189,21 +189,25 @@ public class GradeService {
         assertGradeWindowOpen(section);
         assertMarksValid(rows);
 
-        List<String> missing = new ArrayList<>();
+        boolean hasCompleteUnsubmittedRow = false;
         for (GradeSheetRow row : rows) {
             if (row.isSubmitted()) {
                 continue;
             }
-            boolean missingCore = row.getCourseworkMark() == null || row.getMidtermMark() == null
-                    || row.getFinalMark() == null;
-            boolean missingLab = row.isHasLab() && row.getLabMark() == null;
-            if (missingCore || missingLab) {
-                missing.add(row.getStudentUserId() + " " + row.getStudentName());
+
+            boolean completeCore = row.getCourseworkMark() != null
+                    && row.getMidtermMark() != null
+                    && row.getFinalMark() != null;
+            boolean completeLab = !row.isHasLab() || row.getLabMark() != null;
+
+            if (completeCore && completeLab) {
+                hasCompleteUnsubmittedRow = true;
+                break;
             }
         }
-        if (!missing.isEmpty()) {
-            throw new ValidationException("These students still have missing marks:\n• "
-                    + String.join("\n• ", missing));
+
+        if (!hasCompleteUnsubmittedRow) {
+            throw new ValidationException("There are no fully marked students ready to submit.");
         }
 
         Connection connection = transactions.beginTransaction();
@@ -212,6 +216,15 @@ public class GradeService {
                 if (row.isSubmitted()) {
                     continue;
                 }
+                boolean completeCore = row.getCourseworkMark() != null
+                        && row.getMidtermMark() != null
+                        && row.getFinalMark() != null;
+                boolean completeLab = !row.isHasLab() || row.getLabMark() != null;
+
+                if (!completeCore || !completeLab) {
+                    continue;
+                }
+
                 row.recompute();
                 int gradeId = upsertGrade(connection, row, actingUserId, true);
                 enrollmentDao.setStatus(connection, row.getEnrollmentId(), EnrollmentStatus.COMPLETED);
@@ -363,7 +376,7 @@ public class GradeService {
     private void notifySubmitted(Connection connection, Section section, GradeSheetRow row, int gradeId)
             throws SQLException {
         Course course = courseDao.findById(section.getCourseId()).orElse(null);
-        Student student = studentDao.findById(row.getStudentId()).orElse(null);
+        Student student = studentDao.findById(connection, row.getStudentId()).orElse(null);
         if (course == null || student == null) {
             return;
         }

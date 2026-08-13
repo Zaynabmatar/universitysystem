@@ -27,7 +27,8 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextInputDialog;
-import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
 import javafx.util.StringConverter;
 
 import java.io.File;
@@ -106,10 +107,10 @@ public class InstructorGradesController {
                 c.getValue().getLetterGrade() == null ? null : c.getValue().getLetterGrade().getLabel()));
 
         StringConverter<BigDecimal> markConverter = markConverter();
-        colCoursework.setCellFactory(TextFieldTableCell.forTableColumn(markConverter));
-        colMidterm.setCellFactory(TextFieldTableCell.forTableColumn(markConverter));
-        colLab.setCellFactory(TextFieldTableCell.forTableColumn(markConverter));
-        colFinal.setCellFactory(TextFieldTableCell.forTableColumn(markConverter));
+        colCoursework.setCellFactory(col -> editableMarkCell(markConverter));
+        colMidterm.setCellFactory(col -> editableMarkCell(markConverter));
+        colLab.setCellFactory(col -> editableMarkCell(markConverter));
+        colFinal.setCellFactory(col -> editableMarkCell(markConverter));
 
         colCoursework.setOnEditCommit(e -> applyEdit(e, Mark.COURSEWORK));
         colMidterm.setOnEditCommit(e -> applyEdit(e, Mark.MIDTERM));
@@ -254,10 +255,9 @@ public class InstructorGradesController {
             rows.setAll(gradeService.getGradeSheet(sectionId));
 
             boolean locked = gradeService.isSectionSubmitted(sectionId);
-            boolean readOnly = locked && !adminMode;
 
-            gradeTable.setEditable(!readOnly);
-            setButtonsDisabled(readOnly);
+            gradeTable.setEditable(true);
+            setButtonsDisabled(false);
             exportButton.setDisable(false);
 
             applyLabVisibility();
@@ -467,6 +467,86 @@ public class InstructorGradesController {
      * Blank means "not marked yet", never zero; anything unparseable is refused rather than
      * thrown, so a typo in a cell cannot take the screen down.
      */
+    private TableCell<GradeSheetRow, BigDecimal> editableMarkCell(StringConverter<BigDecimal> converter) {
+        return new TableCell<>() {
+            private final TextField editor = new TextField();
+
+            {
+                editor.setOnAction(event -> commitEditorValue());
+
+                editor.focusedProperty().addListener((observable, wasFocused, isFocused) -> {
+                    if (wasFocused && !isFocused && isEditing()) {
+                        commitEditorValue();
+                    }
+                });
+
+                editor.setOnKeyPressed(event -> {
+                    if (event.getCode() == KeyCode.ESCAPE) {
+                        cancelEdit();
+                        event.consume();
+                    }
+                });
+            }
+
+            private void commitEditorValue() {
+                String text = editor.getText();
+
+                if (text == null || text.isBlank()) {
+                    commitEdit(null);
+                    return;
+                }
+
+                BigDecimal value = converter.fromString(text);
+                if (value != null) {
+                    commitEdit(value);
+                } else {
+                    cancelEdit();
+                }
+            }
+
+            @Override
+            public void startEdit() {
+                GradeSheetRow row = getTableRow() == null ? null : getTableRow().getItem();
+                if (!isEditable()
+                        || !getTableView().isEditable()
+                        || !getTableColumn().isEditable()
+                        || (row != null && row.isSubmitted() && !adminMode)) {
+                    return;
+                }
+
+                super.startEdit();
+                editor.setText(converter.toString(getItem()));
+                setText(null);
+                setGraphic(editor);
+                editor.requestFocus();
+                editor.selectAll();
+            }
+
+            @Override
+            public void cancelEdit() {
+                super.cancelEdit();
+                setGraphic(null);
+                setText(converter.toString(getItem()));
+            }
+
+            @Override
+            protected void updateItem(BigDecimal value, boolean empty) {
+                super.updateItem(value, empty);
+
+                if (empty) {
+                    setText(null);
+                    setGraphic(null);
+                } else if (isEditing()) {
+                    editor.setText(converter.toString(value));
+                    setText(null);
+                    setGraphic(editor);
+                } else {
+                    setGraphic(null);
+                    setText(converter.toString(value));
+                }
+            }
+        };
+    }
     private StringConverter<BigDecimal> markConverter() {
         return new StringConverter<>() {
             @Override
@@ -501,5 +581,8 @@ public class InstructorGradesController {
     }
 
 }
+
+
+
 
 
