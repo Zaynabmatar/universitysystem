@@ -186,7 +186,7 @@ public class StudentDashboardController {
         bindHeightToContent(examsTable, examRows);
         bindHeightToContent(todaysScheduleTable, todayRows);
 
-        Platform.runLater(this::reload);
+        reload();
 
         aiAssistantController.configure(
                 "Hi! I'm the University AI Assistant. Ask me about registration, your classes, "
@@ -544,3 +544,4 @@ maximizeButton.setOnAction(a -> stage.setMaximized(!stage.isMaximized()));
         aiAssistantToggleButton.setManaged(!expand);
     }
 }
+

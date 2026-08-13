@@ -2,6 +2,7 @@ package com.university.service;
 
 import com.university.dao.SectionDAO;
 import com.university.dao.SemesterDAO;
+import com.university.dao.TuitionInstallmentDAO;
 import com.university.model.Semester;
 
 import java.util.List;
@@ -22,6 +23,7 @@ public class SemesterService {
 
     private final SemesterDAO semesterDao = new SemesterDAO();
     private final SectionDAO sectionDao = new SectionDAO();
+    private final TuitionInstallmentDAO installmentDao = new TuitionInstallmentDAO();
 
     // ------------------------------------------------------------------ read
 
@@ -78,6 +80,18 @@ public class SemesterService {
         requireUniqueName(semester.getSemesterName(), semester.getSemesterId());
         requireNoDateOverlap(semester, semester.getSemesterId());
         semesterDao.update(semester);
+
+        java.time.LocalDate firstDue = semester.getStartDate().plusWeeks(1);
+        java.time.LocalDate lastDue = semester.getEndDate();
+
+        if (firstDue.isAfter(lastDue)) {
+            firstDue = semester.getStartDate();
+        }
+
+        installmentDao.rescheduleUnpaidForSemester(
+                semester.getSemesterId(), firstDue, lastDue);
+
+        installmentDao.refreshDelinquency(semester.getSemesterId());
     }
 
     /**
@@ -149,3 +163,5 @@ public class SemesterService {
                 .orElseThrow(() -> new ServiceException("That semester no longer exists."));
     }
 }
+
+

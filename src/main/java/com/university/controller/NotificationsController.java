@@ -62,7 +62,7 @@ public class NotificationsController {
                 VBox box = new VBox(3, title, body, meta);
                 box.getStyleClass().add(n.isRead() ? "notif-cell-read" : "notif-cell-unread");
 
-                if ("High Absence Warning".equals(n.getTitle())) {
+                if ("High Absence Warning".equals(n.getTitle()) || "Payment Overdue".equals(n.getTitle())) {
                     box.getStyleClass().add("notif-high-absence");
                     title.getStyleClass().add("notif-high-absence-title");
                 }
@@ -124,3 +124,5 @@ public class NotificationsController {
         ((Stage) closeButton.getScene().getWindow()).close();
     }
 }
+
+

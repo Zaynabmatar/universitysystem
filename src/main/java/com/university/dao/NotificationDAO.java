@@ -86,6 +86,18 @@ public class NotificationDAO extends AbstractDAO implements GenericDAO<Notificat
                 MAPPER, userId, type);
     }
 
+    /** True when this exact event was already notified for the related record. */
+    public boolean existsForUserEntityAndTitle(int userId, String entityType,
+                                                int entityId, String title) {
+        return queryInt(
+                "SELECT COUNT(*) FROM dbo.notifications "
+                + "WHERE user_id = ? "
+                + "AND related_entity_type = ? "
+                + "AND related_entity_id = ? "
+                + "AND title = ?",
+                userId, entityType, entityId, title) > 0;
+    }
+
     /** Marks one item as seen. */
     public boolean markRead(int notificationId) {
         return executeUpdate("UPDATE dbo.notifications SET is_read = 1 WHERE notification_id = ?",
@@ -155,3 +167,4 @@ public class NotificationDAO extends AbstractDAO implements GenericDAO<Notificat
         };
     }
 }
+

@@ -87,6 +87,11 @@ public class NotificationService {
     }
 
     /** One person's inbox, newest first. */
+    /** Prevents sending the same event twice for the same related record. */
+    public boolean alreadyNotified(int userId, String entityType, int entityId, String title) {
+        return notificationDao.existsForUserEntityAndTitle(
+                userId, entityType, entityId, title);
+    }
     public List<Notification> inbox(int userId) {
         return notificationDao.findByUser(userId);
     }
@@ -134,3 +139,4 @@ public class NotificationService {
         return notification;
     }
 }
+

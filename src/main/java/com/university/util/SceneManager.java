@@ -127,6 +127,14 @@ public final class SceneManager {
      * @return the controller, or null when the placeholder was shown
      */
     public <T> T navigateTo(String fxmlFileName, String title) {
+        return navigateTo(fxmlFileName, title, true);
+    }
+
+    public <T> T navigateToInstant(String fxmlFileName, String title) {
+        return navigateTo(fxmlFileName, title, false);
+    }
+
+    private <T> T navigateTo(String fxmlFileName, String title, boolean animate) {
         if (contentArea == null) {
             throw new IllegalStateException("No content area registered. Is the main shell loaded?");
         }
@@ -142,7 +150,7 @@ public final class SceneManager {
             FXMLLoader loader = new FXMLLoader(requireResource(fxmlFileName));
             Parent view = loader.load();
             contentArea.getChildren().setAll(view);
-            AnimationUtility.playPageEnter(view);
+            if (animate) AnimationUtility.playPageEnter(view);
             currentViewFxml = fxmlFileName;
             currentViewTitle = title;
             return loader.getController();
@@ -197,3 +205,6 @@ public final class SceneManager {
         return box;
     }
 }
+
+
+
