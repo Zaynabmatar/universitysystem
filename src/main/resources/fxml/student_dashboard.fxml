@@ -45,6 +45,7 @@
                     <TableColumn fx:id="colGrade"      text="Grade"          prefWidth="60"/>
                     <TableColumn fx:id="colAbsences"   text="Total Absences" prefWidth="110"/>
                     <TableColumn fx:id="colStatus"     text="Status"      prefWidth="90"/>
+                    <TableColumn fx:id="colEvaluation" text="Evaluation" prefWidth="80"/>
                 </columns>
             </TableView>
 

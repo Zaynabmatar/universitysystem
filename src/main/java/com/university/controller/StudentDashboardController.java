@@ -1,5 +1,6 @@
 package com.university.controller;
 
+import com.university.controller.dialog.InstructorEvaluationDialog;
 import com.university.enums.DayOfWeekCode;
 import com.university.enums.EnrollmentStatus;
 import com.university.enums.UserRole;
@@ -15,6 +16,7 @@ import com.university.model.StudentGradeRow;
 import com.university.service.AcademicService;
 import com.university.service.AttendanceService;
 import com.university.service.CourseService;
+import com.university.service.EvaluationService;
 import com.university.service.ExamService;
 import com.university.service.InstructorService;
 import com.university.service.RegistrationService;
@@ -85,6 +87,7 @@ public class StudentDashboardController {
     @FXML private TableColumn<ClassRow, String> colGrade;
     @FXML private TableColumn<ClassRow, String> colAbsences;
     @FXML private TableColumn<ClassRow, String> colStatus;
+    @FXML private TableColumn<ClassRow, String> colEvaluation;
 
     @FXML private Label totalCoursesLabel;
     @FXML private Label totalCreditsLabel;
@@ -114,6 +117,7 @@ public class StudentDashboardController {
     private final InstructorService instructorService = new InstructorService();
     private final AcademicService academicService = new AcademicService();
     private final ExamService examService = new ExamService();
+    private final EvaluationService evaluationService = new EvaluationService();
     private final AttendanceService attendanceService = new AttendanceService();
 
     private final ObservableList<ClassRow> rows = FXCollections.observableArrayList();
@@ -142,6 +146,60 @@ public class StudentDashboardController {
         colGrade.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().grade));
         colAbsences.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().totalAbsences)));
         colStatus.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().status.getLabel()));
+        colEvaluation.setCellValueFactory(c -> {
+            int enrollmentId = c.getValue().enrollmentId;
+
+            if (evaluationService.hasSubmitted(enrollmentId)) {
+                return new SimpleStringProperty("★");
+            }
+
+            if (evaluationService.isAvailable(enrollmentId)) {
+                return new SimpleStringProperty("☆");
+            }
+
+            return new SimpleStringProperty("");
+        });
+
+        colEvaluation.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String value, boolean empty) {
+                super.updateItem(value, empty);
+
+                setText(null);
+                setGraphic(null);
+                setOnMouseClicked(null);
+                setStyle("-fx-alignment: CENTER;");
+
+                if (empty || value == null || value.isBlank()) {
+                    return;
+                }
+
+                Label star = new Label(value);
+                star.setStyle(
+                        "-fx-font-size: 20px;"
+                        + "-fx-font-weight: bold;"
+                        + "-fx-text-fill: #4F46E5;"
+                        + "-fx-cursor: hand;"
+                );
+
+                if ("★".equals(value)) {
+                    star.setStyle(
+                            "-fx-font-size: 20px;"
+                            + "-fx-font-weight: bold;"
+                            + "-fx-text-fill: #4F46E5;"
+                    );
+                } else if ("☆".equals(value)) {
+                    star.setOnMouseClicked(event -> {
+                        ClassRow row = getTableRow() == null ? null : getTableRow().getItem();
+                        if (row != null) {
+                            openEvaluation(row);
+                        }
+                    });
+                }
+
+                setGraphic(star);
+            }
+        });
         colStatus.setCellFactory(col -> new TableCell<>() {
             @Override protected void updateItem(String value, boolean empty) {
                 super.updateItem(value, empty);
@@ -253,10 +311,18 @@ public class StudentDashboardController {
 
                 Course course = courseOf(section.getCourseId());
                 StudentGradeRow gradeRow = gradeByEnrollment.get(enrollment.getEnrollmentId());
-                String grade = (gradeRow != null && gradeRow.getLetterGrade() != null)
-                        ? gradeRow.getLetterGrade().getLabel() : "--";
+
+                boolean evaluationSubmitted =
+                        evaluationService.hasSubmitted(enrollment.getEnrollmentId());
+
+                String grade = (evaluationSubmitted
+                        && gradeRow != null
+                        && gradeRow.getLetterGrade() != null)
+                        ? gradeRow.getLetterGrade().getLabel()
+                        : "--";
 
                 built.add(new ClassRow(
+                        enrollment.getEnrollmentId(),
                         course == null ? "—" : course.getCourseCode(),
                         course == null ? "—" : course.getCourseTitle(),
                         section.getSectionNumber(),
@@ -380,6 +446,41 @@ public class StudentDashboardController {
                 .collect(Collectors.joining(", "));
     }
 
+    private void openEvaluation(ClassRow row) {
+        if (row == null) {
+            return;
+        }
+
+        try {
+            if (!evaluationService.isAvailable(row.enrollmentId)) {
+                loadRegisteredCourses();
+                return;
+            }
+
+            var questions = evaluationService.getQuestions();
+
+            InstructorEvaluationDialog dialog =
+                    new InstructorEvaluationDialog(row.courseCode, row.instructor, questions);
+
+            var result = dialog.showAndWait();
+
+            if (result.isEmpty()) {
+                return;
+            }
+
+            evaluationService.submit(row.enrollmentId, result.get());
+
+            // Re-read the real database state so the empty star becomes a filled star.
+            loadRegisteredCourses();
+
+        } catch (RuntimeException e) {
+            AlertUtil.error(
+                    "Instructor Evaluation",
+                    "The instructor evaluation could not be completed.",
+                    e
+            );
+        }
+    }
     // ------------------------------------------------------------------ actions
 
     /** Every exam this student has, across every semester — not only the ones on this page. */
@@ -462,6 +563,7 @@ maximizeButton.setOnAction(a -> stage.setMaximized(!stage.isMaximized()));
     // ------------------------------------------------------------------ row types
 
     private static final class ClassRow {
+        final int enrollmentId;
         final String courseCode;
         final String courseName;
         final String section;
@@ -475,9 +577,10 @@ maximizeButton.setOnAction(a -> stage.setMaximized(!stage.isMaximized()));
         final EnrollmentStatus status;
         final int credits;
 
-        ClassRow(String courseCode, String courseName, String section, String campus, String instructor,
+        ClassRow(int enrollmentId, String courseCode, String courseName, String section, String campus, String instructor,
                  String crn, String schedule, String room, String grade, int totalAbsences,
                  EnrollmentStatus status, int credits) {
+            this.enrollmentId = enrollmentId;
             this.courseCode = courseCode;
             this.courseName = courseName;
             this.section = section;

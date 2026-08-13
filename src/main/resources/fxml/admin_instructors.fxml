@@ -41,7 +41,8 @@
             <TableColumn fx:id="colDepartment" text="Department"   prefWidth="110"/>
             <TableColumn fx:id="colRank"       text="Rank"         prefWidth="150"/>
             <TableColumn fx:id="colHireDate"   text="Hire Date"    prefWidth="100"/>
-            <TableColumn fx:id="colActive"     text="Account"      prefWidth="100"/>
+            <TableColumn fx:id="colActive"         text="Account"          prefWidth="100"/>
+            <TableColumn fx:id="colEvaluationRate" text="Evaluation Rate" prefWidth="125"/>
         </columns>
     </TableView>
 

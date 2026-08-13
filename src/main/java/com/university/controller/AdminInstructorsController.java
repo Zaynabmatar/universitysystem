@@ -7,6 +7,7 @@ import com.university.enums.UserRole;
 import com.university.model.Department;
 import com.university.model.Instructor;
 import com.university.service.CourseService;
+import com.university.service.EvaluationService;
 import com.university.service.InstructorService;
 import com.university.service.AccountService;
 import com.university.service.NotificationService;
@@ -42,6 +43,7 @@ public class AdminInstructorsController {
     @FXML private TableColumn<Instructor, String> colRank;
     @FXML private TableColumn<Instructor, String> colHireDate;
     @FXML private TableColumn<Instructor, String> colActive;
+    @FXML private TableColumn<Instructor, String> colEvaluationRate;
     @FXML private Button editButton;
     @FXML private Button deactivateButton;
     @FXML private Button reactivateButton;
@@ -61,6 +63,7 @@ public class AdminInstructorsController {
     @FXML private TextArea notifyMessageField;
 
     private final InstructorService instructorService = new InstructorService();
+    private final EvaluationService evaluationService = new EvaluationService();
     private final CourseService courseService = new CourseService();
     private final NotificationService notificationService = new NotificationService();
 
@@ -81,6 +84,16 @@ public class AdminInstructorsController {
         colHireDate  .setCellValueFactory(c -> new SimpleStringProperty(
                 c.getValue().getHireDate() == null ? "—" : c.getValue().getHireDate().toString()));
         colActive    .setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isActive() ? "Active" : "Deactivated"));
+
+        colEvaluationRate.setCellValueFactory(c -> {
+            int instructorId = c.getValue().getInstructorId();
+
+            return new SimpleStringProperty(
+                    evaluationService.averageForInstructor(instructorId)
+                            .map(avg -> avg.toPlainString() + "/5")
+                            .orElse("—")
+            );
+        });
 
         instructorTable.setItems(rows);
         instructorTable.setPlaceholder(new Label("No instructors match your filters."));

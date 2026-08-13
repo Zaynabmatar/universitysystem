@@ -258,7 +258,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      * @param semesterId one semester, or null for every semester
      */
     public List<StudentGradeRow> findStudentGradeRows(int studentId, Integer semesterId) {
-        String sql = "SELECT e.enrollment_id, e.status, e.counts_in_gpa, "
+        String sql = "SELECT e.enrollment_id, e.status, e.counts_in_gpa, s.instructor_id, "
                 + "sem.semester_id, sem.semester_name, c.course_code, c.course_title, c.credits, c.has_lab, "
                 + "ISNULL(g.is_submitted, 0) AS is_submitted, "
                 + "CASE WHEN g.is_submitted = 1 THEN g.coursework_mark END AS coursework_mark, "
@@ -279,6 +279,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         RowMapper<StudentGradeRow> mapper = rs -> {
             StudentGradeRow row = new StudentGradeRow();
             row.setEnrollmentId(rs.getInt("enrollment_id"));
+            row.setInstructorId(DaoUtils.getInteger(rs, "instructor_id"));
             row.setEnrollmentStatus(EnrollmentStatus.fromDb(rs.getString("status")));
             row.setCountsInGpa(rs.getBoolean("counts_in_gpa"));
             row.setSemesterId(rs.getInt("semester_id"));

@@ -21,19 +21,19 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
     private static final String SELECT =
             "SELECT semester_id, semester_name, academic_year, term, start_date, end_date, "
             + "registration_start, registration_end, drop_deadline, withdraw_deadline, "
-            + "grade_entry_start, grade_entry_end, is_current FROM dbo.semesters";
+            + "grade_entry_start, grade_entry_end, evaluation_start, evaluation_end, is_current FROM dbo.semesters";
 
     private static final String INSERT =
             "INSERT INTO dbo.semesters (semester_name, academic_year, term, start_date, end_date, "
             + "registration_start, registration_end, drop_deadline, withdraw_deadline, "
-            + "grade_entry_start, grade_entry_end, is_current) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + "grade_entry_start, grade_entry_end, evaluation_start, evaluation_end, is_current) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String UPDATE =
             "UPDATE dbo.semesters SET semester_name = ?, academic_year = ?, term = ?, "
             + "start_date = ?, end_date = ?, registration_start = ?, registration_end = ?, "
             + "drop_deadline = ?, withdraw_deadline = ?, grade_entry_start = ?, "
-            + "grade_entry_end = ? WHERE semester_id = ?";
+            + "grade_entry_end = ?, evaluation_start = ?, evaluation_end = ? WHERE semester_id = ?";
 
     private static final String DELETE = "DELETE FROM dbo.semesters WHERE semester_id = ?";
 
@@ -53,6 +53,8 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
         semester.setWithdrawDeadline(DaoUtils.getLocalDate(rs, "withdraw_deadline"));
         semester.setGradeEntryStart(DaoUtils.getLocalDate(rs, "grade_entry_start"));
         semester.setGradeEntryEnd(DaoUtils.getLocalDate(rs, "grade_entry_end"));
+        semester.setEvaluationStart(DaoUtils.getLocalDateTime(rs, "evaluation_start"));
+        semester.setEvaluationEnd(DaoUtils.getLocalDateTime(rs, "evaluation_end"));
         semester.setCurrent(rs.getBoolean("is_current"));
         return semester;
     }
@@ -78,14 +80,14 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
     }
 
     /**
-     * Every semester the student actually has enrollments in, newest first — the choices for the
+     * Every semester the student actually has enrollments in, newest first â€” the choices for the
      * My Grades semester selector. A semester they never studied in is not offered.
      */
     public List<Semester> findWithEnrollments(int studentId) {
         return queryList("SELECT DISTINCT sem.semester_id, sem.semester_name, sem.academic_year, "
                 + "sem.term, sem.start_date, sem.end_date, sem.registration_start, "
                 + "sem.registration_end, sem.drop_deadline, sem.withdraw_deadline, "
-                + "sem.grade_entry_start, sem.grade_entry_end, sem.is_current "
+                + "sem.grade_entry_start, sem.grade_entry_end, sem.evaluation_start, sem.evaluation_end, sem.is_current "
                 + "FROM dbo.semesters sem "
                 + "INNER JOIN dbo.sections s ON s.semester_id = sem.semester_id "
                 + "INNER JOIN dbo.enrollments e ON e.section_id = s.section_id "
@@ -116,7 +118,7 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
      * <p>A single UPDATE, not two: {@code trg_semesters_enforce_single_open} rejects the whole
      * statement when the semester losing the flag is a DIFFERENT one from the one gaining it,
      * and a trigger can only see that both rows changed at once when they change in the same
-     * statement — two separate UPDATEs would each show the trigger only one side of the change.
+     * statement â€” two separate UPDATEs would each show the trigger only one side of the change.
      * In practice {@link com.university.service.SemesterService#setCurrent} only ever calls this
      * when nothing else is current (or re-selects the semester already current), so the trigger
      * should never actually fire here; it exists to refuse the swap even if that Java-level check
@@ -148,7 +150,7 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
     }
 
     /**
-     * Clears the current flag with nobody taking it — the explicit "close" step a semester now
+     * Clears the current flag with nobody taking it â€” the explicit "close" step a semester now
      * needs before a different one may become current (Section 8: no direct swap any more).
      *
      * @return true when a semester actually was current and got closed
@@ -210,6 +212,8 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
                 entity.getWithdrawDeadline(),
                 entity.getGradeEntryStart(),
                 entity.getGradeEntryEnd(),
+                entity.getEvaluationStart(),
+                entity.getEvaluationEnd(),
                 entity.isCurrent()
         };
     }
@@ -227,7 +231,11 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
                 entity.getWithdrawDeadline(),
                 entity.getGradeEntryStart(),
                 entity.getGradeEntryEnd(),
+                entity.getEvaluationStart(),
+                entity.getEvaluationEnd(),
                 entity.getSemesterId()
         };
     }
 }
+
+
