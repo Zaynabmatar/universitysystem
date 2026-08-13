@@ -159,10 +159,10 @@ public class StudentGradesController {
                 return null;
             }
         });
-        semesterCombo.valueProperty().addListener((obs, old, chosen) -> reloadRows());
 
         loadSemesters();
         reloadRows();
+        semesterCombo.valueProperty().addListener((obs, old, chosen) -> reloadRows());
     }
 
     @FXML

@@ -21,10 +21,10 @@ import javafx.util.Duration;
 import java.util.List;
 
 /**
- * The University AI Assistant chat panel â€” embedded via {@code ai_assistant_panel.fxml} on the
+ * The University AI Assistant chat panel — embedded via {@code ai_assistant_panel.fxml} on the
  * Student, Instructor and Admin screens. Each host screen calls {@link #configure} once, right
  * after this panel loads, with a greeting and a set of quick questions appropriate to that role.
- * Everything else â€” bubbles, the typing indicator, scrolling, New Chat, Enter-to-send â€” is
+ * Everything else — bubbles, the typing indicator, scrolling, New Chat, Enter-to-send — is
  * identical across roles and lives only here.
  *
  * <p>Every reply comes from {@link AIAssistantService#respond}, which for now always returns the
@@ -48,9 +48,9 @@ public class AIAssistantPanelController {
     /**
      * True from the moment a message is sent until its reply (or the Gemini timeout) comes back.
      * Guards against a second Send/quick-question/Enter firing a second background lookup while
-     * one is already in flight. Only ever read or written on the JavaFX Application Thread â€” the
+     * one is already in flight. Only ever read or written on the JavaFX Application Thread — the
      * background lookup thread never touches it directly, it hops back via {@link Platform#runLater}
-     * first â€” so a plain boolean is enough.
+     * first — so a plain boolean is enough.
      */
     private boolean waitingForReply = false;
     private Timeline typingDotsTimeline;
@@ -129,7 +129,7 @@ public class AIAssistantPanelController {
 
     /**
      * {@link AIAssistantService#respond} may now call out to Gemini for general questions, which
-     * is a blocking network call â€” running it straight off the {@link PauseTransition} callback
+     * is a blocking network call — running it straight off the {@link PauseTransition} callback
      * would freeze the whole window for however long that request takes. So the lookup runs on a
      * background thread and only the UI update hops back onto the JavaFX Application Thread.
      */
