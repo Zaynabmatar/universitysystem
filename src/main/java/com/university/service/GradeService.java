@@ -195,12 +195,13 @@ public class GradeService {
                 continue;
             }
 
-            boolean completeCore = row.getCourseworkMark() != null
-                    && row.getMidtermMark() != null
+            boolean completeCore = row.getMidtermMark() != null
                     && row.getFinalMark() != null;
-            boolean completeLab = !row.isHasLab() || row.getLabMark() != null;
+            boolean completeComponent = row.isHasLab()
+                    ? row.getLabMark() != null
+                    : row.getCourseworkMark() != null;
 
-            if (completeCore && completeLab) {
+            if (completeCore && completeComponent) {
                 hasCompleteUnsubmittedRow = true;
                 break;
             }
@@ -216,12 +217,13 @@ public class GradeService {
                 if (row.isSubmitted()) {
                     continue;
                 }
-                boolean completeCore = row.getCourseworkMark() != null
-                        && row.getMidtermMark() != null
+                boolean completeCore = row.getMidtermMark() != null
                         && row.getFinalMark() != null;
-                boolean completeLab = !row.isHasLab() || row.getLabMark() != null;
+                boolean completeComponent = row.isHasLab()
+                        ? row.getLabMark() != null
+                        : row.getCourseworkMark() != null;
 
-                if (!completeCore || !completeLab) {
+                if (!completeCore || !completeComponent) {
                     continue;
                 }
 
@@ -411,3 +413,5 @@ public class GradeService {
                 .orElseThrow(() -> new ServiceException("That section no longer exists."));
     }
 }
+
+
