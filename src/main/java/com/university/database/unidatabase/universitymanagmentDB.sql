@@ -81,8 +81,6 @@ BEGIN TRY
     DROP TABLE IF EXISTS dbo.invoice_items;
     DROP TABLE IF EXISTS dbo.student_invoices;
     DROP TABLE IF EXISTS dbo.fee_types;
-    DROP TABLE IF EXISTS dbo.advisors_directory;
-    DROP TABLE IF EXISTS dbo.university_news;
     DROP TABLE IF EXISTS dbo.grades;
     DROP TABLE IF EXISTS dbo.enrollments;
     DROP TABLE IF EXISTS dbo.section_schedules;
@@ -531,65 +529,6 @@ BEGIN TRY
     );
 
     /* ========================================================================
-       MODULE G - UNIVERSITY NEWS
-       ======================================================================== */
-    PRINT N'--- MODULE G: university news ---';
-
-    /* General public news. NOT the same as notifications, which are personal
-       and addressed to exactly one user.                                    */
-    CREATE TABLE dbo.university_news
-    (
-        news_id          INT            IDENTITY(1,1) NOT NULL,
-        title            NVARCHAR(150)  NOT NULL,
-        content          NVARCHAR(MAX)  NOT NULL,
-        image_path       NVARCHAR(500)  NULL,
-        category         NVARCHAR(50)   NULL,
-        publication_date DATETIME2      NOT NULL
-                         CONSTRAINT DF_university_news_pubdate DEFAULT (GETDATE()),
-        expiry_date      DATETIME2      NULL,
-        is_published     BIT            NOT NULL
-                         CONSTRAINT DF_university_news_published DEFAULT (1),
-        created_by       INT            NOT NULL,
-        created_at       DATETIME2      NOT NULL
-                         CONSTRAINT DF_university_news_created_at DEFAULT (GETDATE()),
-        updated_at       DATETIME2      NULL,
-
-        CONSTRAINT PK_university_news PRIMARY KEY (news_id),
-
-        CONSTRAINT FK_university_news_creator FOREIGN KEY (created_by)
-            REFERENCES dbo.users (user_id) ON DELETE NO ACTION,
-
-        CONSTRAINT CK_university_news_expiry CHECK (expiry_date IS NULL OR expiry_date > publication_date)
-    );
-
-
-    /* ========================================================================
-       MODULE H - ADVISORS DIRECTORY
-       ======================================================================== */
-    PRINT N'--- MODULE H: advisors directory ---';
-
-    /* A read-only contact list shown inside My Account.
-       Deliberately standalone: no student_advisors table, no FK to students. */
-    CREATE TABLE dbo.advisors_directory
-    (
-        advisor_id       INT           IDENTITY(1,1) NOT NULL,
-        full_name        NVARCHAR(100) NOT NULL,
-        department       NVARCHAR(100) NULL,
-        university_email NVARCHAR(150) NOT NULL,
-        office           NVARCHAR(100) NULL,
-        phone            NVARCHAR(30)  NULL,
-        is_active        BIT           NOT NULL
-                         CONSTRAINT DF_advisors_directory_is_active DEFAULT (1),
-        created_at       DATETIME2     NOT NULL
-                         CONSTRAINT DF_advisors_directory_created_at DEFAULT (GETDATE()),
-        updated_at       DATETIME2     NULL,
-
-        CONSTRAINT PK_advisors_directory       PRIMARY KEY (advisor_id),
-        CONSTRAINT UQ_advisors_directory_email UNIQUE      (university_email)
-    );
-
-
-    /* ========================================================================
        MODULE J - FINANCE AND PAYMENTS
        ======================================================================== */
     PRINT N'--- MODULE J: finance and payments ---';
@@ -853,10 +792,6 @@ BEGIN TRY
     CREATE INDEX IX_grades_submitted_by            ON dbo.grades (submitted_by);
     CREATE INDEX IX_grades_modified_by             ON dbo.grades (last_modified_by);
 
-    CREATE INDEX IX_university_news_creator        ON dbo.university_news (created_by);
-    CREATE INDEX IX_university_news_published      ON dbo.university_news (is_published, publication_date);
-
-    CREATE INDEX IX_advisors_directory_active      ON dbo.advisors_directory (is_active);
 
     CREATE INDEX IX_student_invoices_student       ON dbo.student_invoices (student_id, status);
     CREATE INDEX IX_student_invoices_semester      ON dbo.student_invoices (semester_id);
@@ -890,7 +825,7 @@ BEGIN TRY
         WHERE is_current = 1;
 
     COMMIT TRANSACTION;
-    PRINT N'>>> SCHEMA CREATED SUCCESSFULLY (27 tables).';
+    PRINT N'>>> SCHEMA CREATED SUCCESSFULLY (25 tables).';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
@@ -1090,18 +1025,6 @@ BEGIN TRY
          letter_grade, grade_points, result_status, is_submitted, submitted_by, submitted_at) VALUES
         (1, 85.00, 90.00, 88.00, 87.70, N'B+', 3.30, N'PASSED', 1, 2, '2025-06-05T14:00:00'),
         (2, 40.00, 45.00, 30.00, 37.50, N'F', 0.00, N'FAILED', 1, 2, '2025-06-05T14:05:00');
-
-    /* ---- advisors_directory ---------------------------------------------- */
-    INSERT INTO dbo.advisors_directory (full_name, department, university_email, office, phone) VALUES
-        (N'Dr. Rami Nasr',    N'Computer Science',       N'r.nasr@university.edu.lb',    N'Block B, Office 214', N'+9611000111'),
-        (N'Dr. Lina Aoun',    N'Information Technology', N'l.aoun@university.edu.lb',    N'Block A, Office 118', N'+9611000222'),
-        (N'Mr. Hadi Chidiac', N'Student Affairs',        N'h.chidiac@university.edu.lb', N'Block C, Office 005', N'+9611000333');
-
-    /* ---- university_news --------------------------------------------------- */
-    INSERT INTO dbo.university_news (title, content, category, publication_date, expiry_date, is_published, created_by) VALUES
-        (N'Fall 2025 Graduation Ceremony', N'The graduation ceremony will be held at the Khaldeh Campus main hall on 5 July 2026. Families are welcome.', N'GRADUATION', '2026-05-01T10:00:00', '2026-07-06T00:00:00', 1, 1),
-        (N'New Robotics Laboratory',       N'A new robotics laboratory has opened in Block B, equipped for embedded systems and automation projects.',      N'FACILITY',   '2026-03-15T09:00:00', NULL,                  1, 1),
-        (N'Library Opening Hours Update',  N'From 1 April the library will stay open until 20:00 on weekdays.',                                             N'GENERAL',    '2026-03-25T08:00:00', '2026-09-01T00:00:00', 1, 1);
 
     /* ---- fee_types (1..5) -------------------------------------------------- */
     INSERT INTO dbo.fee_types (fee_name, description) VALUES
