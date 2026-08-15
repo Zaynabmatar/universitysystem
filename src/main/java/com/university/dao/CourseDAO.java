@@ -15,15 +15,21 @@ public class CourseDAO extends AbstractDAO implements GenericDAO<Course> {
 
     private static final String SELECT =
             "SELECT course_id, course_code, course_title, description, credits, dept_id, "
-            + "level_year, is_active, has_lab FROM dbo.courses";
+            + "level_year, is_active, has_lab, coursework_weight, midterm_weight, final_weight, "
+            + "coursework_max_mark, midterm_max_mark, final_max_mark "
+            + "FROM dbo.courses";
 
     private static final String INSERT =
             "INSERT INTO dbo.courses (course_code, course_title, description, credits, dept_id, "
-            + "level_year, is_active, has_lab) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            + "level_year, is_active, has_lab, coursework_weight, midterm_weight, final_weight, "
+            + "coursework_max_mark, midterm_max_mark, final_max_mark) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String UPDATE =
             "UPDATE dbo.courses SET course_code = ?, course_title = ?, description = ?, "
-            + "credits = ?, dept_id = ?, level_year = ?, is_active = ?, has_lab = ? WHERE course_id = ?";
+            + "credits = ?, dept_id = ?, level_year = ?, is_active = ?, has_lab = ?, "
+            + "coursework_weight = ?, midterm_weight = ?, final_weight = ?, "
+            + "coursework_max_mark = ?, midterm_max_mark = ?, final_max_mark = ? WHERE course_id = ?";
 
     private static final String DELETE = "DELETE FROM dbo.courses WHERE course_id = ?";
 
@@ -40,6 +46,12 @@ public class CourseDAO extends AbstractDAO implements GenericDAO<Course> {
         course.setLevelYear(rs.getInt("level_year"));
         course.setActive(rs.getBoolean("is_active"));
         course.setHasLab(rs.getBoolean("has_lab"));
+        course.setCourseworkWeight(rs.getBigDecimal("coursework_weight"));
+        course.setMidtermWeight(rs.getBigDecimal("midterm_weight"));
+        course.setFinalWeight(rs.getBigDecimal("final_weight"));
+        course.setCourseworkMaxMark(rs.getBigDecimal("coursework_max_mark"));
+        course.setMidtermMaxMark(rs.getBigDecimal("midterm_max_mark"));
+        course.setFinalMaxMark(rs.getBigDecimal("final_max_mark"));
         return course;
     }
 
@@ -132,7 +144,13 @@ public class CourseDAO extends AbstractDAO implements GenericDAO<Course> {
                 entity.getDepartmentId(),
                 entity.getLevelYear(),
                 entity.isActive(),
-                entity.isHasLab()
+                entity.isHasLab(),
+                entity.getCourseworkWeight(),
+                entity.getMidtermWeight(),
+                entity.getFinalWeight(),
+                entity.getCourseworkMaxMark(),
+                entity.getMidtermMaxMark(),
+                entity.getFinalMaxMark()
         };
     }
 
@@ -146,6 +164,12 @@ public class CourseDAO extends AbstractDAO implements GenericDAO<Course> {
                 entity.getLevelYear(),
                 entity.isActive(),
                 entity.isHasLab(),
+                entity.getCourseworkWeight(),
+                entity.getMidtermWeight(),
+                entity.getFinalWeight(),
+                entity.getCourseworkMaxMark(),
+                entity.getMidtermMaxMark(),
+                entity.getFinalMaxMark(),
                 entity.getCourseId()
         };
     }

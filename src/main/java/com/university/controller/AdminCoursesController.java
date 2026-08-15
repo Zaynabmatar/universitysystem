@@ -15,8 +15,12 @@ import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,11 +44,29 @@ public class AdminCoursesController {
     @FXML private Button editButton;
     @FXML private Button deactivateButton;
     @FXML private Button reactivateButton;
+    @FXML private VBox weightsPanel;
 
     private final CourseService courseService = new CourseService();
 
     private final ObservableList<Course> rows = FXCollections.observableArrayList();
     private List<Department> departments = List.of();
+
+    // ---- Grading Weights panel (built in code; no FXML Spinner value-factory support) ----
+    private final Label weightsHintLabel = new Label("Select a course above to view or edit its grading configuration.");
+    private final Label weightsCourseLabel = new Label();
+    private final Label courseworkWeightLabel = new Label("Coursework/Lab weight %");
+    private final Label courseworkMaxLabel = new Label("Coursework/Lab max mark");
+    private final Spinner<Integer> courseworkWeightSpinner = new Spinner<>(0, 100, 20);
+    private final Spinner<Integer> midtermWeightSpinner = new Spinner<>(0, 100, 30);
+    private final Spinner<Integer> finalWeightSpinner = new Spinner<>(0, 100, 50);
+    // Max mark is a 2-option choice, not a free range: it's either the weight value itself or 100.
+    private final ComboBox<Integer> courseworkMaxBox = new ComboBox<>();
+    private final ComboBox<Integer> midtermMaxBox = new ComboBox<>();
+    private final ComboBox<Integer> finalMaxBox = new ComboBox<>();
+    private final Label weightsSumLabel = new Label();
+    private final Button saveWeightsButton = new Button("Save Grading Config");
+    private final GridPane weightsGrid = new GridPane();
+    private boolean loadingWeights;
 
     @FXML
     private void initialize() {
@@ -95,7 +117,143 @@ public class AdminCoursesController {
         reactivateButton.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> selected.get() == null || selected.get().isActive(), selected));
 
+        buildWeightsPanel();
+        selected.addListener((o, a, b) -> loadWeightsForSelection(b));
+        loadWeightsForSelection(null);
+
         reload();
+    }
+
+    // ------------------------------------------------------------- grading weights
+
+    /** Builds the weight-editing controls in code, same as {@link CourseFormDialog}'s Spinners. */
+    private void buildWeightsPanel() {
+        List<Spinner<Integer>> weightSpinners = List.of(courseworkWeightSpinner, midtermWeightSpinner,
+                finalWeightSpinner);
+        for (Spinner<Integer> s : weightSpinners) {
+            s.setEditable(true);
+            s.setPrefWidth(90);
+        }
+        for (ComboBox<Integer> b : List.of(courseworkMaxBox, midtermMaxBox, finalMaxBox)) {
+            b.setPrefWidth(90);
+        }
+        courseworkWeightSpinner.valueProperty().addListener((obs, old, val) -> refreshMaxMarkOptions(courseworkWeightSpinner, courseworkMaxBox));
+        midtermWeightSpinner.valueProperty().addListener((obs, old, val) -> refreshMaxMarkOptions(midtermWeightSpinner, midtermMaxBox));
+        finalWeightSpinner.valueProperty().addListener((obs, old, val) -> refreshMaxMarkOptions(finalWeightSpinner, finalMaxBox));
+        for (Spinner<Integer> s : weightSpinners) {
+            s.valueProperty().addListener((obs, old, val) -> updateWeightsSumLabel());
+        }
+        weightsSumLabel.getStyleClass().add("error-text");
+        weightsCourseLabel.getStyleClass().add("muted-text");
+        weightsHintLabel.getStyleClass().add("muted-text");
+
+        weightsGrid.setHgap(12);
+        weightsGrid.setVgap(9);
+        weightsGrid.addRow(0, courseworkWeightLabel, courseworkWeightSpinner,
+                new Label("Midterm weight %"), midtermWeightSpinner,
+                new Label("Final weight %"), finalWeightSpinner);
+        weightsGrid.addRow(1, courseworkMaxLabel, courseworkMaxBox,
+                new Label("Midterm max mark"), midtermMaxBox,
+                new Label("Final max mark"), finalMaxBox);
+
+        HBox saveRow = new HBox(10, weightsSumLabel, saveWeightsButton);
+        saveRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        saveWeightsButton.setOnAction(e -> handleSaveWeights());
+
+        weightsPanel.getChildren().addAll(weightsHintLabel, weightsCourseLabel, weightsGrid, saveRow);
+        setWeightsControlsVisible(false);
+    }
+
+    private void setWeightsControlsVisible(boolean visible) {
+        weightsCourseLabel.setVisible(visible);
+        weightsCourseLabel.setManaged(visible);
+        weightsGrid.setVisible(visible);
+        weightsGrid.setManaged(visible);
+        saveWeightsButton.getParent().setVisible(visible);
+        saveWeightsButton.getParent().setManaged(visible);
+        weightsHintLabel.setVisible(!visible);
+        weightsHintLabel.setManaged(!visible);
+    }
+
+    private void loadWeightsForSelection(Course course) {
+        if (course == null) {
+            setWeightsControlsVisible(false);
+            return;
+        }
+        loadingWeights = true;
+        setWeightsControlsVisible(true);
+        weightsCourseLabel.setText("Editing grading config for " + course.getCourseCode() + " - " + course.getCourseTitle());
+        String componentName = course.isHasLab() ? "Lab" : "Coursework";
+        courseworkWeightLabel.setText(componentName + " weight %");
+        courseworkMaxLabel.setText(componentName + " max mark");
+        courseworkWeightSpinner.getValueFactory().setValue(course.getCourseworkWeight().intValue());
+        midtermWeightSpinner.getValueFactory().setValue(course.getMidtermWeight().intValue());
+        finalWeightSpinner.getValueFactory().setValue(course.getFinalWeight().intValue());
+        refreshMaxMarkOptions(courseworkWeightSpinner, courseworkMaxBox);
+        refreshMaxMarkOptions(midtermWeightSpinner, midtermMaxBox);
+        refreshMaxMarkOptions(finalWeightSpinner, finalMaxBox);
+        setMaxMarkValue(courseworkMaxBox, course.getCourseworkMaxMark().intValue());
+        setMaxMarkValue(midtermMaxBox, course.getMidtermMaxMark().intValue());
+        setMaxMarkValue(finalMaxBox, course.getFinalMaxMark().intValue());
+        loadingWeights = false;
+        updateWeightsSumLabel();
+    }
+
+    /** Max mark is always either the component's weight value or 100 — never a free-typed range. */
+    private void refreshMaxMarkOptions(Spinner<Integer> weightSpinner, ComboBox<Integer> maxBox) {
+        int weight = weightSpinner.getValue();
+        Integer previous = maxBox.getValue();
+        List<Integer> options = weight == 100 ? List.of(100) : List.of(weight, 100);
+        maxBox.getItems().setAll(options);
+        maxBox.setValue(previous != null && options.contains(previous) ? previous : options.get(0));
+    }
+
+    /** Selects the option matching the course's stored max mark, falling back to the weight option. */
+    private void setMaxMarkValue(ComboBox<Integer> maxBox, int desired) {
+        maxBox.setValue(maxBox.getItems().contains(desired) ? desired : maxBox.getItems().get(0));
+    }
+
+    private void updateWeightsSumLabel() {
+        if (loadingWeights) return;
+        int sum = courseworkWeightSpinner.getValue() + midtermWeightSpinner.getValue() + finalWeightSpinner.getValue();
+        weightsSumLabel.setText(sum == 100 ? "" : "Sum: " + sum + "% (must total 100%)");
+        saveWeightsButton.setDisable(sum != 100);
+    }
+
+    private void handleSaveWeights() {
+        Course selected = courseTable.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        int sum = courseworkWeightSpinner.getValue() + midtermWeightSpinner.getValue() + finalWeightSpinner.getValue();
+        if (sum != 100) {
+            AlertUtil.warn("Could not save", "Coursework/Lab, Midterm and Final weights must total 100%.");
+            return;
+        }
+
+        selected.setCourseworkWeight(new BigDecimal(courseworkWeightSpinner.getValue()));
+        selected.setMidtermWeight(new BigDecimal(midtermWeightSpinner.getValue()));
+        selected.setFinalWeight(new BigDecimal(finalWeightSpinner.getValue()));
+        selected.setCourseworkMaxMark(new BigDecimal(courseworkMaxBox.getValue()));
+        selected.setMidtermMaxMark(new BigDecimal(midtermMaxBox.getValue()));
+        selected.setFinalMaxMark(new BigDecimal(finalMaxBox.getValue()));
+
+        try {
+            courseService.updateCourse(selected);
+            AlertUtil.success("Saved", "The grading configuration was updated.");
+            reload();
+            selectCourseById(selected.getCourseId());
+        } catch (ServiceException se) {
+            AlertUtil.warn("Could not save", se.getMessage());
+        } catch (Exception e) {
+            AlertUtil.error("Could not save", "The grading configuration could not be updated.", e);
+        }
+    }
+
+    private void selectCourseById(int courseId) {
+        rows.stream()
+                .filter(c -> c.getCourseId() == courseId)
+                .findFirst()
+                .ifPresent(c -> courseTable.getSelectionModel().select(c));
     }
 
     // ------------------------------------------------------------------ data

@@ -75,7 +75,13 @@ public final class CourseFormDialog extends Dialog<Course> {
         VBox box = new VBox(6, g, errorLabel);
         box.setPadding(new Insets(0, 14, 12, 14));
         box.setMinHeight(Region.USE_PREF_SIZE);
-        getDialogPane().setContent(box);
+
+        ScrollPane scroll = new ScrollPane(box);
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroll.setPrefViewportHeight(420);
+        getDialogPane().setContent(scroll);
 
         if (editMode) fillFromModel(existing, departments);
 

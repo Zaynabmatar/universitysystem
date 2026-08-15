@@ -18,20 +18,17 @@ public final class GradeCalculator {
     private GradeCalculator() {
     }
 
-    // ---- Section 5.1: the weights ---------------------------------------
-    public static final BigDecimal COURSEWORK_WEIGHT = new BigDecimal("0.20");
-    public static final BigDecimal MIDTERM_WEIGHT = new BigDecimal("0.30");
-    public static final BigDecimal FINAL_WEIGHT = new BigDecimal("0.50");
-
-    /**
-     * Weights for a course with a lab component ({@code courses.has_lab}). Coursework and
-     * Midterm are trimmed to make room for Lab; Final is unaffected. Applies to any course
-     * flagged as having a lab, never one hardcoded course.
-     */
-    
-    public static final BigDecimal LAB_MIDTERM_WEIGHT = new BigDecimal("0.30");
-    public static final BigDecimal LAB_WEIGHT = new BigDecimal("0.20");
-    public static final BigDecimal LAB_FINAL_WEIGHT = new BigDecimal("0.50");
+    // ---- Section 5.1: the weights -----------------------------------------
+    //
+    // No longer hardcoded here: each course carries its own coursework_weight/midterm_weight/
+    // final_weight (dbo.courses, always summing to 100), configured by the admin on the course
+    // and passed in by the caller. These defaults exist only for callers with no course to ask
+    // (tests, and the no-weight convenience overloads below) — production callers (GradeSheetRow,
+    // GradeService) always pass the course's own weights.
+    private static final BigDecimal DEFAULT_COMPONENT_WEIGHT = new BigDecimal("20.00");
+    private static final BigDecimal DEFAULT_MIDTERM_WEIGHT = new BigDecimal("30.00");
+    private static final BigDecimal DEFAULT_FINAL_WEIGHT = new BigDecimal("50.00");
+    private static final BigDecimal DEFAULT_MAX_MARK = new BigDecimal("100.00");
 
     /** One row of the Section 5.2 conversion table, highest band first. */
     private record Band(BigDecimal minInclusive, LetterGrade letter) {
@@ -65,47 +62,76 @@ public final class GradeCalculator {
     // =====================================================================
 
     /**
-     * @return the weighted total for a course with no lab component, rounded HALF_UP to 2
-     *         decimal places, or null if any component is still missing — a missing mark means
-     *         "not marked yet", never zero.
+     * @return the weighted total for a course with no lab component, using the default 20/30/50
+     *         weights, rounded HALF_UP to 2 decimal places, or null if any component is still
+     *         missing — a missing mark means "not marked yet", never zero.
      */
     public static BigDecimal totalMark(BigDecimal coursework, BigDecimal midterm, BigDecimal finalMark) {
         return totalMark(coursework, midterm, null, finalMark, false);
     }
 
     /**
+     * Convenience overload using the default 20/30/50 weights — see
+     * {@link #totalMark(BigDecimal, BigDecimal, BigDecimal, BigDecimal, boolean, BigDecimal, BigDecimal, BigDecimal)}
+     * for the course-configurable version production code actually uses.
+     *
      * @param lab    the lab mark; ignored when {@code hasLab} is false, required when it is true
      * @param hasLab whether this course has a lab component ({@code courses.has_lab}) — decides
      *               which weighting is applied, never which single course it is
+     */
+    public static BigDecimal totalMark(BigDecimal coursework, BigDecimal midterm, BigDecimal lab,
+                                        BigDecimal finalMark, boolean hasLab) {
+        return totalMark(coursework, midterm, lab, finalMark, hasLab,
+                DEFAULT_COMPONENT_WEIGHT, DEFAULT_MIDTERM_WEIGHT, DEFAULT_FINAL_WEIGHT,
+                DEFAULT_MAX_MARK, DEFAULT_MAX_MARK, DEFAULT_MAX_MARK);
+    }
+
+    /**
+     * project_details.md Section 5.1, with weights and max marks read from the course
+     * ({@code courses.coursework_weight}/{@code midterm_weight}/{@code final_weight} and
+     * {@code coursework_max_mark}/{@code midterm_max_mark}/{@code final_max_mark}) rather than
+     * fixed constants — an admin configures these per course; the weights always sum to 100 and
+     * each max mark is &gt; 0. Each component contributes {@code mark / max * weight}.
+     *
+     * @param lab                the lab mark; ignored when {@code hasLab} is false, required when it is true
+     * @param hasLab             whether this course has a lab component ({@code courses.has_lab})
+     * @param componentWeight    percent weight (0-100) of Coursework (no lab) or Lab (has lab)
+     * @param midtermWeight      percent weight (0-100) of the Midterm mark
+     * @param finalWeight        percent weight (0-100) of the Final mark
+     * @param componentMaxMark   the mark Coursework (no lab) or Lab (has lab) is out of
+     * @param midtermMaxMark     the mark the Midterm is out of
+     * @param finalMaxMark       the mark the Final is out of
      * @return the weighted total, rounded HALF_UP to 2 decimal places, or null if any required
      *         component is still missing — a missing mark means "not marked yet", never zero.
      */
     public static BigDecimal totalMark(BigDecimal coursework, BigDecimal midterm, BigDecimal lab,
-                                    BigDecimal finalMark, boolean hasLab) {
-    if (midterm == null || finalMark == null) {
-        return null;
-    }
-
-    if (hasLab) {
-        if (lab == null) {
+                                        BigDecimal finalMark, boolean hasLab, BigDecimal componentWeight,
+                                        BigDecimal midtermWeight, BigDecimal finalWeight,
+                                        BigDecimal componentMaxMark, BigDecimal midtermMaxMark,
+                                        BigDecimal finalMaxMark) {
+        if (midterm == null || finalMark == null) {
             return null;
         }
 
-        return midterm.multiply(LAB_MIDTERM_WEIGHT)
-                .add(lab.multiply(LAB_WEIGHT))
-                .add(finalMark.multiply(LAB_FINAL_WEIGHT))
-                .setScale(2, RoundingMode.HALF_UP);
-    }
+        BigDecimal midtermPart = midterm.divide(midtermMaxMark, 6, RoundingMode.HALF_UP).multiply(midtermWeight);
+        BigDecimal finalPart = finalMark.divide(finalMaxMark, 6, RoundingMode.HALF_UP).multiply(finalWeight);
 
-    if (coursework == null) {
-        return null;
-    }
+        if (hasLab) {
+            if (lab == null) {
+                return null;
+            }
 
-    return coursework.multiply(COURSEWORK_WEIGHT)
-            .add(midterm.multiply(MIDTERM_WEIGHT))
-            .add(finalMark.multiply(FINAL_WEIGHT))
-            .setScale(2, RoundingMode.HALF_UP);
-}
+            BigDecimal labPart = lab.divide(componentMaxMark, 6, RoundingMode.HALF_UP).multiply(componentWeight);
+            return midtermPart.add(labPart).add(finalPart).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        if (coursework == null) {
+            return null;
+        }
+
+        BigDecimal courseworkPart = coursework.divide(componentMaxMark, 6, RoundingMode.HALF_UP).multiply(componentWeight);
+        return courseworkPart.add(midtermPart).add(finalPart).setScale(2, RoundingMode.HALF_UP);
+    }
 
     // =====================================================================
     // Section 5.2 — mark -> letter
@@ -127,11 +153,16 @@ public final class GradeCalculator {
         return LetterGrade.F; // negative marks cannot occur, but never return null here
     }
 
-    /** True when the mark is a legal 0-100 value (rule G3). */
+    /** True when the mark is a legal 0-100 value — the default max mark (rule G3). */
     public static boolean isValidMark(BigDecimal mark) {
-        return mark != null
+        return isValidMark(mark, DEFAULT_MAX_MARK);
+    }
+
+    /** True when the mark is a legal 0..max value — max is the component's own max mark (rule G3). */
+    public static boolean isValidMark(BigDecimal mark, BigDecimal max) {
+        return mark != null && max != null
                 && mark.compareTo(BigDecimal.ZERO) >= 0
-                && mark.compareTo(new BigDecimal("100")) <= 0;
+                && mark.compareTo(max) <= 0;
     }
 
     // =====================================================================

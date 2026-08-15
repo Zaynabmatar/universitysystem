@@ -35,6 +35,7 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * The grade sheet. Marks are edited in place and the Total / Letter / Points columns are
@@ -67,6 +68,7 @@ public class InstructorGradesController {
     @FXML private TableColumn<GradeSheetRow, String> colLetter;
     @FXML private TableColumn<GradeSheetRow, BigDecimal> colPoints;
     @FXML private Button saveDraftButton;
+    @FXML private Button publishButton;
     @FXML private Button submitButton;
     @FXML private Button exportButton;
 
@@ -80,6 +82,9 @@ public class InstructorGradesController {
     private int sectionId;
     private String sectionTitle = "";
     private boolean adminMode;
+    /** G2 — whether the current section's grade window is still open (lets an instructor
+     *  correct an already-submitted row in place instead of only the registrar). */
+    private boolean gradeWindowOpen;
     /** Guards the combo listener while {@link #load} is setting the selection itself. */
     private boolean loading;
 
@@ -107,10 +112,10 @@ public class InstructorGradesController {
                 c.getValue().getLetterGrade() == null ? null : c.getValue().getLetterGrade().getLabel()));
 
         StringConverter<BigDecimal> markConverter = markConverter();
-        colCoursework.setCellFactory(col -> editableMarkCell(markConverter));
-        colMidterm.setCellFactory(col -> editableMarkCell(markConverter));
-        colLab.setCellFactory(col -> editableMarkCell(markConverter));
-        colFinal.setCellFactory(col -> editableMarkCell(markConverter));
+        colCoursework.setCellFactory(col -> editableMarkCell(markConverter, GradeSheetRow::getCourseworkMaxMark));
+        colMidterm.setCellFactory(col -> editableMarkCell(markConverter, GradeSheetRow::getMidtermMaxMark));
+        colLab.setCellFactory(col -> editableMarkCell(markConverter, GradeSheetRow::getCourseworkMaxMark));
+        colFinal.setCellFactory(col -> editableMarkCell(markConverter, GradeSheetRow::getFinalMaxMark));
 
         colCoursework.setOnEditCommit(e -> applyEdit(e, Mark.COURSEWORK));
         colMidterm.setOnEditCommit(e -> applyEdit(e, Mark.MIDTERM));
@@ -143,6 +148,8 @@ public class InstructorGradesController {
         submitButton.setText(adminMode ? "Apply Correction" : "Submit and Lock");
         saveDraftButton.setVisible(!adminMode);
         saveDraftButton.setManaged(!adminMode);
+        publishButton.setVisible(!adminMode);
+        publishButton.setManaged(!adminMode);
         setButtonsDisabled(true);
 
         fillSectionChooser();
@@ -188,17 +195,26 @@ public class InstructorGradesController {
         }
         BigDecimal value = event.getNewValue();
 
-        if (row.isSubmitted() && !adminMode) { // rule G4
+        boolean submittedRowLocked = row.isSubmitted() && !adminMode && !gradeWindowOpen;
+        if (submittedRowLocked) { // rule G4
             AlertUtil.error("Locked",
-                    "These grades have already been submitted. Only the registrar can change them.");
+                    "These grades have already been submitted and the grade window is closed. "
+                    + "Only the registrar can change them now.");
             gradeTable.refresh();
             return;
         }
-        if (value != null && !GradeCalculator.isValidMark(value)) { // rule G3
-            AlertUtil.error("Invalid mark", "Marks must be between 0 and 100.");
+        BigDecimal max = switch (which) {
+            case COURSEWORK, LAB -> row.getCourseworkMaxMark();
+            case MIDTERM -> row.getMidtermMaxMark();
+            case FINAL -> row.getFinalMaxMark();
+        };
+        if (value != null && !GradeCalculator.isValidMark(value, max)) { // rule G3
+            AlertUtil.error("Invalid mark",
+                    "Marks must be between 0 and " + max.stripTrailingZeros().toPlainString() + ".");
             gradeTable.refresh();
             return;
         }
+        boolean wasSubmitted = row.isSubmitted();
         switch (which) {
             case COURSEWORK -> row.setCourseworkMark(value);
             case MIDTERM -> row.setMidtermMark(value);
@@ -206,6 +222,9 @@ public class InstructorGradesController {
             case FINAL -> row.setFinalMark(value);
         }
         row.recompute(); // <- the live letter and points
+        if (wasSubmitted && !adminMode) {
+            row.setEditedAfterSubmit(true); // picked up by "Submit and Lock" as a correction
+        }
         gradeTable.refresh();
         updateStats();
     }
@@ -255,6 +274,7 @@ public class InstructorGradesController {
             rows.setAll(gradeService.getGradeSheet(sectionId));
 
             boolean locked = gradeService.isSectionSubmitted(sectionId);
+            gradeWindowOpen = gradeService.isGradeWindowOpen(sectionId);
 
             gradeTable.setEditable(true);
             setButtonsDisabled(false);
@@ -266,8 +286,11 @@ public class InstructorGradesController {
                     ? (adminMode
                         ? "This section is submitted. As registrar you may still correct it — every "
                           + "change is written to the audit log."
-                        : "🔒 Submitted on record — you can no longer edit these grades. "
-                          + "Contact the registrar for a correction.")
+                        : gradeWindowOpen
+                            ? "🔓 Submitted, but the grade window is still open — you may still fix "
+                              + "a mistake. Re-enter a mark and press \"Submit and Lock\" again."
+                            : "🔒 Submitted on record — the grade window is closed, so you can no "
+                              + "longer edit these grades. Contact the registrar for a correction.")
                     : "");
             lockBanner.setVisible(locked);
             lockBanner.setManaged(locked);
@@ -286,23 +309,64 @@ public class InstructorGradesController {
      * actually has a lab component ({@code courses.has_lab}) — never for one hardcoded course.
      */
     private void applyLabVisibility() {
-    boolean hasLab = rows.isEmpty() ? currentSectionHasLab() : rows.get(0).isHasLab();
+        boolean hasLab = rows.isEmpty() ? currentSectionHasLab() : rows.get(0).isHasLab();
 
-    colCoursework.setVisible(!hasLab);
+        colCoursework.setVisible(!hasLab);
 
-    colLab.setVisible(hasLab);
+        colLab.setVisible(hasLab);
 
-    weightingLabel.setText(hasLab
-            ? "Weighting: midterm 30%  •  lab 20%  •  final 50%"
-            : "Weighting: coursework 20%  •  midterm 30%  •  final 50%");
-}
+        weightingLabel.setText(weightingLabelText(hasLab));
+    }
+
+    /** Reads the course's own weights and max marks straight from the loaded rows — never a hardcoded string. */
+    private String weightingLabelText(boolean hasLab) {
+        BigDecimal componentWeight, midtermWeight, finalWeight;
+        BigDecimal componentMax, midtermMax, finalMax;
+        if (!rows.isEmpty()) {
+            GradeSheetRow first = rows.get(0);
+            componentWeight = first.getCourseworkWeight();
+            midtermWeight = first.getMidtermWeight();
+            finalWeight = first.getFinalWeight();
+            componentMax = first.getCourseworkMaxMark();
+            midtermMax = first.getMidtermMaxMark();
+            finalMax = first.getFinalMaxMark();
+        } else {
+            Course course = currentSectionCourse();
+            componentWeight = course == null ? null : course.getCourseworkWeight();
+            midtermWeight = course == null ? null : course.getMidtermWeight();
+            finalWeight = course == null ? null : course.getFinalWeight();
+            componentMax = course == null ? null : course.getCourseworkMaxMark();
+            midtermMax = course == null ? null : course.getMidtermMaxMark();
+            finalMax = course == null ? null : course.getFinalMaxMark();
+        }
+        if (componentWeight == null || midtermWeight == null || finalWeight == null) {
+            return "";
+        }
+
+        String componentLabel = (hasLab ? "lab" : "coursework") + " " + pct(componentWeight, componentMax);
+        String midtermLabel = "midterm " + pct(midtermWeight, midtermMax);
+        String finalLabel = "final " + pct(finalWeight, finalMax);
+        return hasLab
+                ? "Weighting: " + midtermLabel + "  •  " + componentLabel + "  •  " + finalLabel
+                : "Weighting: " + componentLabel + "  •  " + midtermLabel + "  •  " + finalLabel;
+    }
+
+    private String pct(BigDecimal weight, BigDecimal max) {
+        return weight.stripTrailingZeros().toPlainString() + "% (out of "
+                + max.stripTrailingZeros().toPlainString() + ")";
+    }
 
     private boolean currentSectionHasLab() {
+        Course course = currentSectionCourse();
+        return course != null && course.isHasLab();
+    }
+
+    private Course currentSectionCourse() {
         Section section = sectionService.findById(sectionId);
         if (section == null) {
-            return false;
+            return null;
         }
-        return courseService.findCourseById(section.getCourseId()).map(Course::isHasLab).orElse(false);
+        return courseService.findCourseById(section.getCourseId()).orElse(null);
     }
 
     /** Rule G2 made visible before the instructor types anything. */
@@ -323,6 +387,7 @@ public class InstructorGradesController {
 
     private void setButtonsDisabled(boolean disabled) {
         saveDraftButton.setDisable(disabled);
+        publishButton.setDisable(disabled);
         submitButton.setDisable(disabled);
         exportButton.setDisable(disabled);
     }
@@ -332,8 +397,10 @@ public class InstructorGradesController {
         long passing = rows.stream()
                 .filter(r -> r.getLetterGrade() != null && r.getLetterGrade().isPassing())
                 .count();
+        long invalid = rows.stream().filter(GradeSheetRow::hasInvalidMark).count();
         statsLabel.setText(rows.size() + " students  •  " + marked + " fully marked  •  "
-                + passing + " passing");
+                + passing + " passing"
+                + (invalid == 0 ? "" : "  •  " + invalid + " with a mark above the max — must be corrected"));
     }
 
     // ------------------------------------------------------------------ actions1
@@ -358,6 +425,29 @@ public class InstructorGradesController {
             AlertUtil.error("Cannot save", e.getMessage());
         } catch (ServiceException e) {
             AlertUtil.error("Cannot save", "The marks could not be saved. Please try again.", e);
+        }
+    }
+
+    /** Releases whatever marks are currently entered to the students, component by component --
+     *  Coursework/Midterm can go out well before Final exists; the overall Total/Letter/Points
+     *  still wait for "Submit and Lock". */
+    @FXML
+    private void handlePublish() {
+        if (!requireSection()) {
+            return;
+        }
+        try {
+            gradeService.publishComponents(sectionId, rows, actingUserId());
+            AlertUtil.success("Marks published",
+                    "Every mark currently entered has been released to its student — even a "
+                    + "single component such as Coursework or Midterm, if that is all you have "
+                    + "so far. The overall Total/Letter/Points only appear once every required "
+                    + "component exists and you press \"Submit and Lock\".");
+            refresh();
+        } catch (ValidationException e) {
+            AlertUtil.error("Cannot publish", e.getMessage());
+        } catch (ServiceException e) {
+            AlertUtil.error("Cannot publish", "The marks could not be published. Please try again.", e);
         }
     }
 
@@ -467,7 +557,8 @@ public class InstructorGradesController {
      * Blank means "not marked yet", never zero; anything unparseable is refused rather than
      * thrown, so a typo in a cell cannot take the screen down.
      */
-    private TableCell<GradeSheetRow, BigDecimal> editableMarkCell(StringConverter<BigDecimal> converter) {
+    private TableCell<GradeSheetRow, BigDecimal> editableMarkCell(StringConverter<BigDecimal> converter,
+                                                                    Function<GradeSheetRow, BigDecimal> maxMarkOf) {
         return new TableCell<>() {
             private final TextField editor = new TextField();
 
@@ -510,7 +601,7 @@ public class InstructorGradesController {
                 if (!isEditable()
                         || !getTableView().isEditable()
                         || !getTableColumn().isEditable()
-                        || (row != null && row.isSubmitted() && !adminMode)) {
+                        || (row != null && row.isSubmitted() && !adminMode && !gradeWindowOpen)) {
                     return;
                 }
 
@@ -533,10 +624,20 @@ public class InstructorGradesController {
             protected void updateItem(BigDecimal value, boolean empty) {
                 super.updateItem(value, empty);
 
+                getStyleClass().remove("mark-invalid");
                 if (empty) {
                     setText(null);
                     setGraphic(null);
-                } else if (isEditing()) {
+                    return;
+                }
+
+                GradeSheetRow row = getTableRow() == null ? null : getTableRow().getItem();
+                if (row != null && value != null
+                        && !GradeCalculator.isValidMark(value, maxMarkOf.apply(row))) {
+                    getStyleClass().add("mark-invalid");
+                }
+
+                if (isEditing()) {
                     editor.setText(converter.toString(value));
                     setText(null);
                     setGraphic(editor);
@@ -562,8 +663,7 @@ public class InstructorGradesController {
                 try {
                     return new BigDecimal(text.trim());
                 } catch (NumberFormatException e) {
-                    AlertUtil.error("Invalid mark", "\"" + text.trim() + "\" is not a number. "
-                            + "Marks must be between 0 and 100.");
+                    AlertUtil.error("Invalid mark", "\"" + text.trim() + "\" is not a number.");
                     return null;
                 }
             }

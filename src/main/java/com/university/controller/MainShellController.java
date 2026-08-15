@@ -7,13 +7,13 @@ import com.university.service.Session;
 import com.university.service.TuitionService;
 import com.university.util.AlertUtil;
 import com.university.util.AnimationUtility;
+import com.university.util.Async;
 import com.university.util.SceneManager;
 import javafx.animation.Animation;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
-import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Group;
@@ -165,20 +165,28 @@ public class MainShellController {
         List<MenuEntry> menu = menuFor(session.getRole());
         buildSidebar(menu);
 
-        // Role-based routing: land on the dashboard for this role.
-        // Show the shell first; load the home page and notifications on the next JavaFX pulse.
+        // Role-based routing: land on the dashboard for this role. Loading its FXML here is
+        // cheap — no DB calls; each dashboard fetches its own data off the FX thread via
+        // Async — so it happens synchronously, as part of the very scene the login screen
+        // swaps to, instead of leaving the content area blank for a frame while it loads.
         MenuEntry home = menu.get(0);
-        Platform.runLater(() -> {
-            SceneManager.getInstance().navigateToInstant(home.fxml(), home.label());
+        SceneManager.getInstance().navigateToInstant(home.fxml(), home.label());
 
-            if (session.getRole() == UserRole.STUDENT && session.getStudent() != null) {
-                tuitionService.refreshPaymentNotificationsForStudent(
-                        session.getStudent().getStudentId());
+        // Payment-due notifications and the unread-count bell are background upkeep, not
+        // something the user is waiting on. Run the DB work off the FX thread so it can't
+        // stall the dashboard that was just shown (refreshPaymentNotificationsForAllStudents
+        // sweeps every unpaid installment in the system on every login).
+        Integer studentId = session.getStudent() == null ? null : session.getStudent().getStudentId();
+        UserRole role = session.getRole();
+        Async.<Void>run(() -> {
+            if (role == UserRole.STUDENT && studentId != null) {
+                tuitionService.refreshPaymentNotificationsForStudent(studentId);
             }
-
             tuitionService.refreshPaymentNotificationsForAllStudents();
-            initNotificationBell();
-        });
+            return null;
+        }, ignored -> { }, error -> { });
+
+        initNotificationBell();
     }
 
     /**
@@ -203,23 +211,32 @@ public class MainShellController {
         bellRefresh.play();
     }
 
-    /** Public so any screen can call it right after an action that creates a notification. */
+    /**
+     * Public so any screen can call it right after an action that creates a notification.
+     * The count fetch runs off the FX thread ({@link Async}) so it never adds to the perceived
+     * delay of whatever just triggered the refresh — the badge updates a beat later instead.
+     */
     public void refreshBell() {
-        try {
-            int unread = notificationService.unreadCount(Session.current().getUser().getUserId());
-            boolean show = unread > 0;
-            unreadBadge.setText(unread > 99 ? "99+" : String.valueOf(unread));
-            unreadBadge.setVisible(show);
-            unreadBadge.setManaged(show);
-            if (show) {
-                unreadBadge.setVisible(true); unreadBadge.setManaged(true); notificationsButton.setStyle("-fx-text-fill: white;"); notificationsButton.lookupAll(".ikon").forEach(n -> n.setStyle("-fx-fill: white;")); if (!bellPlayedOnce) {
-                    bellPlayedOnce = true;
-                    AnimationUtility.playBell(notificationsButton, () -> { notificationsButton.setStyle("-fx-text-fill: white;"); notificationsButton.lookupAll(".ikon").forEach(n -> n.setStyle("-fx-fill: white;")); unreadBadge.setVisible(true); unreadBadge.setManaged(true); });
-                }
+        int userId = Session.current().getUser().getUserId();
+        Async.run(
+                () -> notificationService.unreadCount(userId),
+                this::applyUnreadCount,
+                error -> {
+                    unreadBadge.setVisible(false);
+                    unreadBadge.setManaged(false);
+                });
+    }
+
+    private void applyUnreadCount(int unread) {
+        boolean show = unread > 0;
+        unreadBadge.setText(unread > 99 ? "99+" : String.valueOf(unread));
+        unreadBadge.setVisible(show);
+        unreadBadge.setManaged(show);
+        if (show) {
+            unreadBadge.setVisible(true); unreadBadge.setManaged(true); notificationsButton.setStyle("-fx-text-fill: white;"); notificationsButton.lookupAll(".ikon").forEach(n -> n.setStyle("-fx-fill: white;")); if (!bellPlayedOnce) {
+                bellPlayedOnce = true;
+                AnimationUtility.playBell(notificationsButton, () -> { notificationsButton.setStyle("-fx-text-fill: white;"); notificationsButton.lookupAll(".ikon").forEach(n -> n.setStyle("-fx-fill: white;")); unreadBadge.setVisible(true); unreadBadge.setManaged(true); });
             }
-        } catch (RuntimeException e) {
-            unreadBadge.setVisible(false);
-            unreadBadge.setManaged(false);
         }
     }
 

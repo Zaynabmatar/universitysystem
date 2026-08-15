@@ -65,6 +65,11 @@ public class StudentService {
         return programDao.findById(student.getProgramId()).orElse(null);
     }
 
+    /** The live average GPA across every student with completed credits, or null if none yet. */
+    public BigDecimal universityAverageGpa() {
+        return studentDao.averageCumulativeGpa();
+    }
+
     // ------------------------------------------------------------------ create
 
     /**

@@ -63,6 +63,10 @@
                 <Label fx:id="kpiSections" text="—" styleClass="kpi-value" style="-fx-font-size: 20px;"/>
                 <Label text="Active sections this semester" styleClass="kpi-label"/>
             </VBox>
+            <VBox styleClass="kpi-card" spacing="2" style="-fx-padding: 8; -fx-min-width: 150;">
+                <Label fx:id="kpiAvgGpa" text="—" styleClass="kpi-value" style="-fx-font-size: 20px;"/>
+                <Label text="University average GPA" styleClass="kpi-label"/>
+            </VBox>
         </FlowPane>
 
         <Label fx:id="secondaryLabel" text="" styleClass="muted-text" style="-fx-font-size: 11px;"/>

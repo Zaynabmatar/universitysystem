@@ -11,7 +11,9 @@ import com.university.service.GradeService;
 import com.university.service.SectionService;
 import com.university.service.SemesterService;
 import com.university.service.Session;
+import com.university.service.StudentService;
 import com.university.util.AlertUtil;
+import com.university.util.Async;
 import com.university.util.SceneManager;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -23,12 +25,15 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.VBox;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -45,6 +50,7 @@ public class InstructorDashboardController {
     @FXML private Label kpiStudents;
     @FXML private Label kpiPendingGrades;
     @FXML private Label kpiGradeWindow;
+    @FXML private Label kpiUniversityGpa;
     @FXML private TableView<TodayClass> todayTable;
     @FXML private TableColumn<TodayClass, String> colTime;
     @FXML private TableColumn<TodayClass, String> colCourse;
@@ -58,6 +64,7 @@ public class InstructorDashboardController {
     private final SemesterService semesterService = new SemesterService();
     private final CourseService courseService = new CourseService();
     private final GradeService gradeService = new GradeService();
+    private final StudentService studentService = new StudentService();
 
     private final ObservableList<TodayClass> todaysClasses = FXCollections.observableArrayList();
 
@@ -113,32 +120,52 @@ public class InstructorDashboardController {
         aiAssistantToggleButton.setManaged(!expand);
     }
 
+    /** Everything {@link #reload()} needs from the database, fetched together off the FX thread. */
+    private record InstructorData(Semester current, BigDecimal universityGpa, List<Section> mine,
+                                   Set<Integer> submittedSectionIds, Map<Integer, Course> coursesById,
+                                   Map<Integer, List<SectionSchedule>> meetingsBySection) {
+    }
+
     private void reload() {
-        try {
-            Semester current = semesterService.getCurrentSemester();
-            todaysClasses.clear();
+        int instructorId = Session.current().requireInstructorId();
+        Async.run(
+                () -> {
+                    Semester current = semesterService.getCurrentSemester();
+                    BigDecimal universityGpa = studentService.universityAverageGpa();
+                    if (current == null) {
+                        return new InstructorData(null, universityGpa, List.of(), Set.of(), Map.of(), Map.of());
+                    }
+                    List<Section> mine = sectionService.searchSections(
+                            current.getSemesterId(), null, instructorId, null);
+                    Set<Integer> submitted = gradeService.submittedSectionIds(instructorId, current.getSemesterId());
+                    Map<Integer, Course> coursesById = courseService.listCourses(false).stream()
+                            .collect(Collectors.toMap(c -> c.getCourseId(), c -> c, (a, b) -> a));
+                    Map<Integer, List<SectionSchedule>> meetingsBySection =
+                            sectionService.listMeetingsForInstructor(instructorId, current.getSemesterId());
+                    return new InstructorData(current, universityGpa, mine, submitted, coursesById, meetingsBySection);
+                },
+                this::applyReload,
+                error -> AlertUtil.error("Dashboard", "Your dashboard could not be loaded.", error));
+    }
 
-            if (current == null) {
-                semesterLabel.setText("No current semester is set.");
-                showFigures(0, 0, 0, "—");
-                return;
-            }
-            semesterLabel.setText("Semester: " + current.getSemesterName());
+    private void applyReload(InstructorData data) {
+        todaysClasses.clear();
+        kpiUniversityGpa.setText(formatGpa(data.universityGpa()));
 
-            int instructorId = Session.current().requireInstructorId();
-            List<Section> mine = sectionService.searchSections(
-                    current.getSemesterId(), null, instructorId, null);
-
-            int students = mine.stream().mapToInt(section -> section.getEnrolledCount()).sum();
-            long pending = mine.stream()
-                    .filter(section -> !gradeService.isSectionSubmitted(section.getSectionId()))
-                    .count();
-
-            showFigures(mine.size(), students, (int) pending, gradeWindowText(current));
-            fillTodaysClasses(mine);
-        } catch (Exception e) {
-            AlertUtil.error("Dashboard", "Your dashboard could not be loaded.", e);
+        if (data.current() == null) {
+            semesterLabel.setText("No current semester is set.");
+            showFigures(0, 0, 0, "—");
+            return;
         }
+        semesterLabel.setText("Semester: " + data.current().getSemesterName());
+
+        int students = data.mine().stream().mapToInt(section -> section.getEnrolledCount()).sum();
+        long pending = data.mine().stream()
+                .filter(section -> !data.submittedSectionIds().contains(section.getSectionId()))
+                .count();
+
+        showFigures(data.mine().size(), students, (int) pending, gradeWindowText(data.current()));
+        fillTodaysClasses(data.mine(), data.coursesById(), data.meetingsBySection());
     }
 
     private void showFigures(int sections, int students, int pending, String window) {
@@ -146,6 +173,14 @@ public class InstructorDashboardController {
         kpiStudents.setText(String.valueOf(students));
         kpiPendingGrades.setText(String.valueOf(pending));
         kpiGradeWindow.setText(window);
+    }
+
+    /** e.g. "3.12 / 4.00", or "—" when no student has completed any credits yet. */
+    private String formatGpa(BigDecimal averageGpa) {
+        if (averageGpa == null) {
+            return "—";
+        }
+        return averageGpa.setScale(2, RoundingMode.HALF_UP) + " / 4.00";
     }
 
     /** Rule G2 stated up front, so nobody types a full sheet of marks into a closed window. */
@@ -165,17 +200,16 @@ public class InstructorDashboardController {
         return "OPEN until " + end;
     }
 
-    private void fillTodaysClasses(List<Section> sections) {
+    private void fillTodaysClasses(List<Section> sections, Map<Integer, Course> coursesById,
+                                    Map<Integer, List<SectionSchedule>> meetingsBySection) {
         DayOfWeekCode today = todayCode();
         if (today == null) {
             return;
         }
-        Map<Integer, Course> coursesById = courseService.listCourses(false).stream()
-                .collect(Collectors.toMap(c -> c.getCourseId(), c -> c, (a, b) -> a));
 
         List<TodayClass> found = new ArrayList<>();
         for (Section section : sections) {
-            for (SectionSchedule meeting : sectionService.listMeetings(section.getSectionId())) {
+            for (SectionSchedule meeting : meetingsBySection.getOrDefault(section.getSectionId(), List.of())) {
                 if (meeting.getDayOfWeek() != today) {
                     continue;
                 }

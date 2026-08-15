@@ -40,8 +40,9 @@ import java.util.Optional;
  * <pre>
  *   G1  only the instructor assigned to a section may enter its grades
  *   G2  only between the semester's grade_entry_start and grade_entry_end
- *   G3  marks must be 0-100                              (GradeCalculator.isValidMark)
- *   G4  once is_submitted = 1 the instructor can no longer edit
+ *   G3  marks must be 0..the component's own max mark    (GradeCalculator.isValidMark)
+ *   G4  once is_submitted = 1 the instructor can no longer edit, UNLESS the grade window (G2) is
+ *       still open, in which case the same row may be corrected in place (see submitSection)
  *   G5  only ADMIN may change a submitted grade, and the change is audited (by trg_Grade_Audit —
  *       this class never writes to audit_log itself)
  *   G6  on submission: enrollment -&gt; COMPLETED, then the academic record is recalculated
@@ -79,6 +80,14 @@ public class GradeService {
     /** True once at least one grade in the section has been submitted (rule G4). */
     public boolean isSectionSubmitted(int sectionId) {
         return gradeDao.isSectionSubmitted(sectionId);
+    }
+
+    /**
+     * Which of one instructor's sections in one semester already have a submitted grade — the
+     * same fact as {@link #isSectionSubmitted}, for every section in one round trip.
+     */
+    public java.util.Set<Integer> submittedSectionIds(int instructorId, int semesterId) {
+        return gradeDao.submittedSectionIds(instructorId, semesterId);
     }
 
     /** "Not started" / "Draft saved" / "Submitted 🔒" — shown on the My Sections list. */
@@ -121,20 +130,49 @@ public class GradeService {
         }
     }
 
-    /** G3 — every supplied mark must be 0..100. */
-    private void assertMarksValid(List<GradeSheetRow> rows) {
-        for (GradeSheetRow row : rows) {
-            checkOne(row, row.getCourseworkMark(), "Coursework");
-            checkOne(row, row.getMidtermMark(), "Midterm");
-            checkOne(row, row.getLabMark(), "Lab");
-            checkOne(row, row.getFinalMark(), "Final");
+    /**
+     * The same G2 rule as {@link #assertGradeWindowOpen}, without throwing — lets the grade sheet
+     * decide, before any edit, whether a submitted row may still be corrected in place.
+     */
+    public boolean isGradeWindowOpen(int sectionId) {
+        Section section = sectionDao.findById(sectionId).orElse(null);
+        if (section == null) {
+            return false;
+        }
+        try {
+            assertGradeWindowOpen(section);
+            return true;
+        } catch (ServiceException e) {
+            return false;
         }
     }
 
-    private void checkOne(GradeSheetRow row, BigDecimal mark, String label) {
-        if (mark != null && !GradeCalculator.isValidMark(mark)) {
+    /**
+     * G3 — every mark actually being written must be 0..the component's own max mark.
+     *
+     * <p>Skips a submitted row that is not being corrected in this call: it is locked (G4) and
+     * neither {@link #saveDraft} nor {@link #submitSection} will write it, so an old mark that a
+     * later change to the course's max mark left out of range must not block saving/submitting
+     * the rest of the section. The instructor still sees it flagged on the sheet and must correct
+     * it before it can ever be re-submitted.</p>
+     */
+    private void assertMarksValid(List<GradeSheetRow> rows) {
+        for (GradeSheetRow row : rows) {
+            if (row.isSubmitted() && !row.isEditedAfterSubmit()) {
+                continue;
+            }
+            checkOne(row, row.getCourseworkMark(), "Coursework", row.getCourseworkMaxMark());
+            checkOne(row, row.getMidtermMark(), "Midterm", row.getMidtermMaxMark());
+            checkOne(row, row.getLabMark(), "Lab", row.getCourseworkMaxMark());
+            checkOne(row, row.getFinalMark(), "Final", row.getFinalMaxMark());
+        }
+    }
+
+    private void checkOne(GradeSheetRow row, BigDecimal mark, String label, BigDecimal max) {
+        if (mark != null && !GradeCalculator.isValidMark(mark, max)) {
             throw new ValidationException(label + " mark for " + row.getStudentName()
-                    + " must be between 0 and 100 (you entered " + mark.toPlainString() + ").");
+                    + " must be between 0 and " + max.stripTrailingZeros().toPlainString()
+                    + " (you entered " + mark.toPlainString() + ").");
         }
     }
 
@@ -143,8 +181,12 @@ public class GradeService {
     // =====================================================================
 
     /**
-     * Writes the marks WITHOUT submitting. {@code is_submitted} stays 0, the enrollment stays
-     * ENROLLED, no GPA is recalculated, the student sees nothing yet.
+     * Writes the marks WITHOUT submitting. For a never-submitted row {@code is_submitted} stays
+     * 0, the enrollment stays ENROLLED, no GPA is recalculated. For a row already submitted and
+     * corrected in place while the grade window is open ({@link GradeSheetRow#isEditedAfterSubmit()}),
+     * the corrected marks are written immediately so they are never lost on the next refresh —
+     * {@code submitted}/{@code editedAfterSubmit} stay as they were; only {@link #submitSection}
+     * finalizes the correction (GPA recalculated, student notified, flag cleared).
      */
     public void saveDraft(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
         Section section = requireSection(sectionId);
@@ -156,7 +198,13 @@ public class GradeService {
         try {
             for (GradeSheetRow row : rows) {
                 if (row.isSubmitted()) {
-                    continue; // G4 — never touch a locked row
+                    if (row.isEditedAfterSubmit()) {
+                        // Persist the in-place correction now instead of losing it on refresh —
+                        // "Submit and Lock" still does the GPA recalc/notification/flag reset.
+                        row.recompute();
+                        resubmitGrade(connection, row, actingUserId);
+                    }
+                    continue; // G4 — never touch a locked row otherwise
                 }
                 row.recompute();
                 upsertGrade(connection, row, actingUserId, false);
@@ -174,6 +222,64 @@ public class GradeService {
     }
 
     // =====================================================================
+    // Partial publish — release individual components ahead of Submit and Lock
+    // =====================================================================
+
+    /**
+     * Releases whatever components are currently marked -- Coursework, Midterm, Lab, Final,
+     * independently of one another -- to the students on this sheet, without requiring every
+     * component to be present the way {@link #submitSection} does. A component with no mark yet
+     * is simply left unpublished; the instructor can press this again once it is filled in (Final
+     * added later, for instance). Already-submitted rows are skipped: submission already means
+     * every component is visible (see the student query in {@link GradeDAO#findStudentGradeRows}).
+     *
+     * <p>The Total/Letter/Points the student sees still only appear once the row is fully
+     * submitted (rule G6) -- publishing components here never finalizes them, since they are not
+     * meaningful until every required component exists.</p>
+     */
+    public void publishComponents(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
+        Section section = requireSection(sectionId);
+        assertOwnsSection(section, actingUserId);
+        assertGradeWindowOpen(section);
+        assertMarksValid(rows);
+
+        Connection connection = transactions.beginTransaction();
+        try {
+            for (GradeSheetRow row : rows) {
+                if (row.isSubmitted()) {
+                    continue; // already fully visible; nothing left to publish
+                }
+                row.recompute();
+                int gradeId = upsertGrade(connection, row, actingUserId, false);
+
+                boolean publishCoursework = row.getCourseworkMark() != null;
+                boolean publishMidterm = row.getMidtermMark() != null;
+                boolean publishLab = row.getLabMark() != null;
+                boolean publishFinal = row.getFinalMark() != null;
+                if (!publishCoursework && !publishMidterm && !publishLab && !publishFinal) {
+                    continue;
+                }
+
+                gradeDao.publishComponents(connection, gradeId, publishCoursework, publishMidterm,
+                        publishLab, publishFinal);
+                row.setCourseworkPublished(row.isCourseworkPublished() || publishCoursework);
+                row.setMidtermPublished(row.isMidtermPublished() || publishMidterm);
+                row.setLabPublished(row.isLabPublished() || publishLab);
+                row.setFinalPublished(row.isFinalPublished() || publishFinal);
+            }
+            connection.commit();
+        } catch (SQLException e) {
+            transactions.rollbackQuietly(connection);
+            throw new ServiceException("The marks could not be published.", e);
+        } catch (RuntimeException e) {
+            transactions.rollbackQuietly(connection);
+            throw e;
+        } finally {
+            transactions.closeQuietly(connection);
+        }
+    }
+
+    // =====================================================================
     // Submit and Lock — G4 and G6
     // =====================================================================
 
@@ -182,6 +288,13 @@ public class GradeService {
      * {@code grades.is_submitted = 1} (G4), {@code enrollments.status = COMPLETED} and the
      * student's academic record is recalculated (G6), and the student is notified (N9). All of
      * it happens in ONE transaction.
+     *
+     * <p>A row that was already submitted and has since been edited in the sheet (see
+     * {@link GradeSheetRow#isEditedAfterSubmit()}) is corrected in place instead of being
+     * skipped — this is how the instructor fixes a mistake while the grade window (G2) is still
+     * open, distinct from {@link #adminOverride}, which needs no open window but does need
+     * ADMIN. Same grade row, same {@code submitted_by}/{@code submitted_at}; only the marks,
+     * total/letter/points and {@code last_modified_by}/{@code last_modified_at} change.</p>
      */
     public void submitSection(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
         Section section = requireSection(sectionId);
@@ -190,8 +303,10 @@ public class GradeService {
         assertMarksValid(rows);
 
         boolean hasCompleteUnsubmittedRow = false;
+        boolean hasEditedSubmittedRow = false;
         for (GradeSheetRow row : rows) {
             if (row.isSubmitted()) {
+                hasEditedSubmittedRow = hasEditedSubmittedRow || row.isEditedAfterSubmit();
                 continue;
             }
 
@@ -203,11 +318,10 @@ public class GradeService {
 
             if (completeCore && completeComponent) {
                 hasCompleteUnsubmittedRow = true;
-                break;
             }
         }
 
-        if (!hasCompleteUnsubmittedRow) {
+        if (!hasCompleteUnsubmittedRow && !hasEditedSubmittedRow) {
             throw new ValidationException("There are no fully marked students ready to submit.");
         }
 
@@ -215,6 +329,13 @@ public class GradeService {
         try {
             for (GradeSheetRow row : rows) {
                 if (row.isSubmitted()) {
+                    if (row.isEditedAfterSubmit()) {
+                        row.recompute();
+                        resubmitGrade(connection, row, actingUserId);
+                        academicService.refreshAcademicRecord(connection, row.getStudentId());
+                        notifySubmitted(connection, section, row, row.getGradeId());
+                        row.setEditedAfterSubmit(false);
+                    }
                     continue;
                 }
                 boolean completeCore = row.getMidtermMark() != null
@@ -263,10 +384,6 @@ public class GradeService {
         if (reason == null || reason.trim().length() < 5) {
             throw new ValidationException("Please type a reason for the change (at least 5 characters).");
         }
-        checkOverrideMark(coursework, "Coursework");
-        checkOverrideMark(midterm, "Midterm");
-        checkOverrideMark(lab, "Lab");
-        checkOverrideMark(finalMark, "Final");
         assertIsAdmin(adminUserId);
 
         Enrollment enrollment = enrollmentDao.findById(enrollmentId)
@@ -277,10 +394,18 @@ public class GradeService {
 
         Section correctionSection = sectionDao.findById(enrollment.getSectionId())
                 .orElseThrow(() -> new ServiceException("That section no longer exists."));
-        boolean hasLab = courseDao.findById(correctionSection.getCourseId())
-                .map(Course::isHasLab).orElse(false);
+        Course course = courseDao.findById(correctionSection.getCourseId())
+                .orElseThrow(() -> new ServiceException("That course no longer exists."));
+        boolean hasLab = course.isHasLab();
 
-        BigDecimal total = GradeCalculator.totalMark(coursework, midterm, lab, finalMark, hasLab);
+        checkOverrideMark(coursework, "Coursework", course.getCourseworkMaxMark());
+        checkOverrideMark(midterm, "Midterm", course.getMidtermMaxMark());
+        checkOverrideMark(lab, "Lab", course.getCourseworkMaxMark());
+        checkOverrideMark(finalMark, "Final", course.getFinalMaxMark());
+
+        BigDecimal total = GradeCalculator.totalMark(coursework, midterm, lab, finalMark, hasLab,
+                course.getCourseworkWeight(), course.getMidtermWeight(), course.getFinalWeight(),
+                course.getCourseworkMaxMark(), course.getMidtermMaxMark(), course.getFinalMaxMark());
         LetterGrade newLetter = GradeCalculator.letterGrade(total);
 
         Grade correction = new Grade();
@@ -317,9 +442,10 @@ public class GradeService {
         }
     }
 
-    private void checkOverrideMark(BigDecimal mark, String label) {
-        if (mark != null && !GradeCalculator.isValidMark(mark)) {
-            throw new ValidationException(label + " mark must be between 0 and 100.");
+    private void checkOverrideMark(BigDecimal mark, String label, BigDecimal max) {
+        if (mark != null && !GradeCalculator.isValidMark(mark, max)) {
+            throw new ValidationException(label + " mark must be between 0 and "
+                    + max.stripTrailingZeros().toPlainString() + ".");
         }
     }
 
@@ -356,6 +482,10 @@ public class GradeService {
         grade.setGradePoints(row.getGradePoints());
         grade.setResultStatus(row.getLetterGrade() == null ? null : row.getLetterGrade().toResultStatus());
         grade.setSubmitted(false);
+        grade.setCourseworkPublished(row.isCourseworkPublished());
+        grade.setMidtermPublished(row.isMidtermPublished());
+        grade.setLabPublished(row.isLabPublished());
+        grade.setFinalPublished(row.isFinalPublished());
         grade.setLastModifiedBy(actingUserId);
         grade.setLastModifiedAt(LocalDateTime.now());
 
@@ -372,6 +502,30 @@ public class GradeService {
             gradeDao.submit(connection, gradeId, actingUserId, LocalDateTime.now());
         }
         return gradeId;
+    }
+
+    /**
+     * Corrects an already-submitted row in place while the grade window is still open (called
+     * from {@link #submitSection} for a row with {@link GradeSheetRow#isEditedAfterSubmit()}).
+     * Reuses {@link GradeDAO#overrideSubmitted}, the same write G5's {@link #adminOverride} uses,
+     * so {@code submitted_by}/{@code submitted_at} are preserved and only
+     * {@code last_modified_by}/{@code last_modified_at} change — {@code trg_Grade_Audit} picks up
+     * the correction the same way either time.
+     */
+    private void resubmitGrade(Connection connection, GradeSheetRow row, int actingUserId) throws SQLException {
+        Grade grade = new Grade();
+        grade.setGradeId(row.getGradeId());
+        grade.setCourseworkMark(row.getCourseworkMark());
+        grade.setMidtermMark(row.getMidtermMark());
+        grade.setLabMark(row.isHasLab() ? row.getLabMark() : null);
+        grade.setFinalMark(row.getFinalMark());
+        grade.setTotalMark(row.getTotalMark());
+        grade.setLetterGrade(row.getLetterGrade());
+        grade.setGradePoints(row.getGradePoints());
+        grade.setResultStatus(row.getLetterGrade() == null ? null : row.getLetterGrade().toResultStatus());
+        grade.setLastModifiedBy(actingUserId);
+        grade.setLastModifiedAt(LocalDateTime.now());
+        gradeDao.overrideSubmitted(connection, grade);
     }
 
     /** Notification N9 — phase-10 context/NOTIFICATION_MESSAGES.md. */
@@ -411,6 +565,67 @@ public class GradeService {
     private Section requireSection(int sectionId) {
         return sectionDao.findById(sectionId)
                 .orElseThrow(() -> new ServiceException("That section no longer exists."));
+    }
+
+    // =====================================================================
+    // Rescaling stored marks when the admin changes a component's max mark
+    // =====================================================================
+
+    /**
+     * Called by {@link CourseService#updateCourse} in the same transaction as the course update.
+     * When a component's max mark changes, every mark already stored for that course (submitted
+     * or not) is rescaled proportionally to the new max — 95/100 becomes 19/20 — so its
+     * percentage/grade meaning is preserved instead of the mark silently becoming invalid (rule
+     * G3). This is not a correction (no reason, no audit entry, {@code is_submitted}/{@code
+     * submitted_by}/{@code last_modified_by} untouched): the grade itself has not changed, only
+     * the ruler it is measured against.
+     */
+    public void rescaleMarksForMaxMarkChange(Connection connection, Course oldCourse, Course newCourse)
+            throws SQLException {
+        boolean componentChanged = oldCourse.getCourseworkMaxMark().compareTo(newCourse.getCourseworkMaxMark()) != 0;
+        boolean midtermChanged = oldCourse.getMidtermMaxMark().compareTo(newCourse.getMidtermMaxMark()) != 0;
+        boolean finalChanged = oldCourse.getFinalMaxMark().compareTo(newCourse.getFinalMaxMark()) != 0;
+        if (!componentChanged && !midtermChanged && !finalChanged) {
+            return;
+        }
+
+        for (Grade grade : gradeDao.findByCourse(connection, newCourse.getCourseId())) {
+            grade.setCourseworkMark(rescaleMark(grade.getCourseworkMark(),
+                    oldCourse.getCourseworkMaxMark(), newCourse.getCourseworkMaxMark()));
+            grade.setLabMark(rescaleMark(grade.getLabMark(),
+                    oldCourse.getCourseworkMaxMark(), newCourse.getCourseworkMaxMark()));
+            grade.setMidtermMark(rescaleMark(grade.getMidtermMark(),
+                    oldCourse.getMidtermMaxMark(), newCourse.getMidtermMaxMark()));
+            grade.setFinalMark(rescaleMark(grade.getFinalMark(),
+                    oldCourse.getFinalMaxMark(), newCourse.getFinalMaxMark()));
+
+            BigDecimal total = GradeCalculator.totalMark(grade.getCourseworkMark(), grade.getMidtermMark(),
+                    grade.getLabMark(), grade.getFinalMark(), newCourse.isHasLab(),
+                    newCourse.getCourseworkWeight(), newCourse.getMidtermWeight(), newCourse.getFinalWeight(),
+                    newCourse.getCourseworkMaxMark(), newCourse.getMidtermMaxMark(), newCourse.getFinalMaxMark());
+            LetterGrade letter = GradeCalculator.letterGrade(total);
+            grade.setTotalMark(total);
+            grade.setLetterGrade(letter);
+            grade.setGradePoints(letter == null ? null : letter.getGradePoints());
+            grade.setResultStatus(letter == null ? null : letter.toResultStatus());
+
+            gradeDao.rescaleStoredGrade(connection, grade);
+        }
+
+        // Submitted grades feed students.cumulative_gpa/completed_credits (cached columns) —
+        // the rescale just changed grade_points for some of them, so the cache must follow.
+        for (int studentId : gradeDao.findSubmittedStudentIdsByCourse(connection, newCourse.getCourseId())) {
+            academicService.refreshAcademicRecord(connection, studentId);
+        }
+    }
+
+    /** {@code mark * newMax / oldMax}, rounded HALF_UP to 2 decimals — null and a 0 old max pass through unchanged. */
+    private BigDecimal rescaleMark(BigDecimal mark, BigDecimal oldMax, BigDecimal newMax) {
+        if (mark == null || oldMax == null || newMax == null
+                || oldMax.compareTo(BigDecimal.ZERO) == 0 || oldMax.compareTo(newMax) == 0) {
+            return mark;
+        }
+        return mark.multiply(newMax).divide(oldMax, 2, java.math.RoundingMode.HALF_UP);
     }
 }
 

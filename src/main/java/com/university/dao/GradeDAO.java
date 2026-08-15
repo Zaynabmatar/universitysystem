@@ -30,17 +30,20 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
 
     private static final String SELECT =
             "SELECT grade_id, enrollment_id, coursework_mark, midterm_mark, lab_mark, final_mark, "
-            + "total_mark, letter_grade, grade_points, result_status, is_submitted, submitted_by, "
+            + "total_mark, letter_grade, grade_points, result_status, is_submitted, "
+            + "coursework_published, midterm_published, lab_published, final_published, submitted_by, "
             + "submitted_at, last_modified_by, last_modified_at FROM dbo.grades";
 
     private static final String INSERT =
             "INSERT INTO dbo.grades (enrollment_id, coursework_mark, midterm_mark, lab_mark, final_mark, "
             + "total_mark, letter_grade, grade_points, result_status, is_submitted, "
-            + "submitted_by, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + "coursework_published, midterm_published, lab_published, final_published, "
+            + "submitted_by, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String UPDATE =
             "UPDATE dbo.grades SET coursework_mark = ?, midterm_mark = ?, lab_mark = ?, final_mark = ?, "
             + "total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ?, is_submitted = ?, "
+            + "coursework_published = ?, midterm_published = ?, lab_published = ?, final_published = ?, "
             + "last_modified_by = ?, last_modified_at = ? WHERE grade_id = ? AND is_submitted = 0";
 
     private static final String DELETE = "DELETE FROM dbo.grades WHERE grade_id = ?";
@@ -60,6 +63,10 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         grade.setGradePoints(rs.getBigDecimal("grade_points"));
         grade.setResultStatus(ResultStatus.fromDb(rs.getString("result_status")));
         grade.setSubmitted(rs.getBoolean("is_submitted"));
+        grade.setCourseworkPublished(rs.getBoolean("coursework_published"));
+        grade.setMidtermPublished(rs.getBoolean("midterm_published"));
+        grade.setLabPublished(rs.getBoolean("lab_published"));
+        grade.setFinalPublished(rs.getBoolean("final_published"));
         grade.setSubmittedBy(DaoUtils.getInteger(rs, "submitted_by"));
         grade.setSubmittedAt(DaoUtils.getLocalDateTime(rs, "submitted_at"));
         grade.setLastModifiedBy(DaoUtils.getInteger(rs, "last_modified_by"));
@@ -220,7 +227,9 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
     public List<GradeSheetRow> findSectionRoster(int sectionId) {
         String sql = "SELECT e.enrollment_id, e.student_id, st.user_id, st.first_name, st.last_name, "
                 + "g.grade_id, g.coursework_mark, g.midterm_mark, g.lab_mark, g.final_mark, "
-                + "g.is_submitted, c.has_lab "
+                + "g.is_submitted, g.coursework_published, g.midterm_published, g.lab_published, "
+                + "g.final_published, c.has_lab, c.coursework_weight, c.midterm_weight, c.final_weight, "
+                + "c.coursework_max_mark, c.midterm_max_mark, c.final_max_mark "
                 + "FROM dbo.enrollments e "
                 + "INNER JOIN dbo.students st ON st.student_id = e.student_id "
                 + "INNER JOIN dbo.sections sec ON sec.section_id = e.section_id "
@@ -240,7 +249,17 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
             row.setLabMark(rs.getBigDecimal("lab_mark"));
             row.setFinalMark(rs.getBigDecimal("final_mark"));
             row.setHasLab(rs.getBoolean("has_lab"));
+            row.setCourseworkWeight(rs.getBigDecimal("coursework_weight"));
+            row.setMidtermWeight(rs.getBigDecimal("midterm_weight"));
+            row.setFinalWeight(rs.getBigDecimal("final_weight"));
+            row.setCourseworkMaxMark(rs.getBigDecimal("coursework_max_mark"));
+            row.setMidtermMaxMark(rs.getBigDecimal("midterm_max_mark"));
+            row.setFinalMaxMark(rs.getBigDecimal("final_max_mark"));
             row.setSubmitted(rs.getBoolean("is_submitted"));
+            row.setCourseworkPublished(rs.getBoolean("coursework_published"));
+            row.setMidtermPublished(rs.getBoolean("midterm_published"));
+            row.setLabPublished(rs.getBoolean("lab_published"));
+            row.setFinalPublished(rs.getBoolean("final_published"));
             row.recompute();
             return row;
         }, sectionId);
@@ -261,9 +280,20 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         String sql = "SELECT e.enrollment_id, e.status, e.counts_in_gpa, s.instructor_id, "
                 + "sem.semester_id, sem.semester_name, c.course_code, c.course_title, c.credits, c.has_lab, "
                 + "ISNULL(g.is_submitted, 0) AS is_submitted, "
-                + "CASE WHEN g.is_submitted = 1 THEN g.coursework_mark END AS coursework_mark, "
-                + "CASE WHEN g.is_submitted = 1 THEN g.midterm_mark    END AS midterm_mark, "
-                + "CASE WHEN g.is_submitted = 1 THEN g.final_mark      END AS final_mark, "
+                // Each component is revealed the moment its OWN publish flag is set, or once the
+                // whole row is submitted (submission always implied full visibility, unchanged) --
+                // this is what lets Coursework/Midterm show up before Final even exists.
+                + "CASE WHEN g.is_submitted = 1 OR g.coursework_published = 1 "
+                + "     THEN g.coursework_mark END AS coursework_mark, "
+                + "CASE WHEN g.is_submitted = 1 OR g.midterm_published    = 1 "
+                + "     THEN g.midterm_mark    END AS midterm_mark, "
+                + "CASE WHEN g.is_submitted = 1 OR g.lab_published        = 1 "
+                + "     THEN g.lab_mark        END AS lab_mark, "
+                + "CASE WHEN g.is_submitted = 1 OR g.final_published      = 1 "
+                + "     THEN g.final_mark      END AS final_mark, "
+                // Total/Letter/Points finalize only once every required component exists, which is
+                // exactly what is_submitted already means (submitSection refuses to flip it on
+                // otherwise) -- so these three stay gated on is_submitted alone.
                 + "CASE WHEN g.is_submitted = 1 THEN g.total_mark      END AS total_mark, "
                 + "CASE WHEN g.is_submitted = 1 THEN g.letter_grade    END AS letter_grade, "
                 + "CASE WHEN g.is_submitted = 1 THEN g.grade_points    END AS grade_points "
@@ -287,9 +317,11 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
             row.setCourseCode(rs.getString("course_code"));
             row.setCourseTitle(rs.getString("course_title"));
             row.setCredits(rs.getInt("credits"));
+            row.setHasLab(rs.getBoolean("has_lab"));
             row.setSubmitted(rs.getBoolean("is_submitted"));
             row.setCourseworkMark(rs.getBigDecimal("coursework_mark"));
             row.setMidtermMark(rs.getBigDecimal("midterm_mark"));
+            row.setLabMark(rs.getBigDecimal("lab_mark"));
             row.setFinalMark(rs.getBigDecimal("final_mark"));
             row.setTotalMark(rs.getBigDecimal("total_mark"));
             row.setLetterGrade(LetterGrade.fromDb(rs.getString("letter_grade")));
@@ -302,11 +334,94 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 : queryList(sql, mapper, studentId, semesterId);
     }
 
+    /**
+     * Every grade belonging to a section of one course — used to rescale marks when the admin
+     * changes a component's max mark (regardless of {@code is_submitted}: rescaling preserves the
+     * mark's meaning, it is not a correction, so G4 does not apply).
+     */
+    public List<Grade> findByCourse(Connection connection, int courseId) {
+        String sql = "SELECT g.grade_id, g.enrollment_id, g.coursework_mark, g.midterm_mark, g.lab_mark, "
+                + "g.final_mark, g.total_mark, g.letter_grade, g.grade_points, g.result_status, "
+                + "g.is_submitted, g.coursework_published, g.midterm_published, g.lab_published, "
+                + "g.final_published, g.submitted_by, g.submitted_at, g.last_modified_by, g.last_modified_at "
+                + "FROM dbo.grades g "
+                + "INNER JOIN dbo.enrollments e ON e.enrollment_id = g.enrollment_id "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "WHERE s.course_id = ?";
+        return queryList(connection, sql, MAPPER, courseId);
+    }
+
+    /**
+     * Every student with a SUBMITTED grade in a course — used after rescaling stored marks
+     * (see {@link com.university.service.GradeService#rescaleMarksForMaxMarkChange}) to know
+     * whose cached {@code students.cumulative_gpa}/credits need recomputing, since only
+     * submitted grades feed the GPA (unsubmitted rows never counted, so no refresh is needed
+     * for them).
+     */
+    public List<Integer> findSubmittedStudentIdsByCourse(Connection connection, int courseId) {
+        String sql = "SELECT DISTINCT e.student_id FROM dbo.grades g "
+                + "INNER JOIN dbo.enrollments e ON e.enrollment_id = g.enrollment_id "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "WHERE s.course_id = ? AND g.is_submitted = 1";
+        return queryList(connection, sql, rs -> rs.getInt("student_id"), courseId);
+    }
+
+    /**
+     * Rewrites only the mark/total/letter/points columns of an already-loaded grade, regardless
+     * of {@code is_submitted} — used solely by the proportional rescale in {@link
+     * com.university.service.GradeService#rescaleMarksForMaxMarkChange}, never for a per-student
+     * correction (see {@link #overrideSubmitted} for that). {@code submitted_by}/{@code
+     * submitted_at}/{@code last_modified_by}/{@code last_modified_at} are deliberately untouched.
+     */
+    public boolean rescaleStoredGrade(Connection connection, Grade entity) {
+        String sql = "UPDATE dbo.grades SET coursework_mark = ?, midterm_mark = ?, lab_mark = ?, "
+                + "final_mark = ?, total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ? "
+                + "WHERE grade_id = ?";
+        return executeUpdate(connection, sql,
+                entity.getCourseworkMark(), entity.getMidtermMark(), entity.getLabMark(), entity.getFinalMark(),
+                entity.getTotalMark(), letterOrNull(entity), entity.getGradePoints(),
+                resultOrNull(entity), entity.getGradeId()) > 0;
+    }
+
     /** True once at least one grade in the section has been submitted — rule G4's read side. */
     public boolean isSectionSubmitted(int sectionId) {
         return queryInt("SELECT COUNT(*) FROM dbo.grades g "
                 + "INNER JOIN dbo.enrollments e ON e.enrollment_id = g.enrollment_id "
                 + "WHERE e.section_id = ? AND g.is_submitted = 1", sectionId) > 0;
+    }
+
+    /**
+     * Which of one instructor's sections in one semester have at least one submitted grade — the
+     * same fact as {@link #isSectionSubmitted}, but for every section in a single round trip
+     * instead of one query per section.
+     */
+    public java.util.Set<Integer> submittedSectionIds(int instructorId, int semesterId) {
+        return new java.util.HashSet<>(queryList(
+                "SELECT DISTINCT e.section_id AS section_id FROM dbo.grades g "
+                + "INNER JOIN dbo.enrollments e ON e.enrollment_id = g.enrollment_id "
+                + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
+                + "WHERE s.instructor_id = ? AND s.semester_id = ? AND g.is_submitted = 1",
+                rs -> rs.getInt("section_id"), instructorId, semesterId));
+    }
+
+    /**
+     * Releases individual components to the student ahead of the whole row being submitted --
+     * this is the "partial grade publish" a component earns the moment the instructor has a mark
+     * for it, independent of whether the others (typically Final) exist yet.
+     *
+     * <p>Each flag only ever moves 0 -&gt; 1 here: a {@code false} argument leaves that component's
+     * current flag untouched rather than clearing it, so calling this again after the instructor
+     * adds the Final mark does not un-publish an already-visible Coursework/Midterm.</p>
+     */
+    public boolean publishComponents(Connection connection, int gradeId, boolean coursework, boolean midterm,
+                                      boolean lab, boolean finalMark) {
+        String sql = "UPDATE dbo.grades SET "
+                + "coursework_published = CASE WHEN ? = 1 THEN 1 ELSE coursework_published END, "
+                + "midterm_published    = CASE WHEN ? = 1 THEN 1 ELSE midterm_published    END, "
+                + "lab_published        = CASE WHEN ? = 1 THEN 1 ELSE lab_published        END, "
+                + "final_published      = CASE WHEN ? = 1 THEN 1 ELSE final_published      END "
+                + "WHERE grade_id = ?";
+        return executeUpdate(connection, sql, coursework, midterm, lab, finalMark, gradeId) > 0;
     }
 
     /**
@@ -387,6 +502,10 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 entity.getGradePoints(),
                 resultOrNull(entity),
                 entity.isSubmitted(),
+                entity.isCourseworkPublished(),
+                entity.isMidtermPublished(),
+                entity.isLabPublished(),
+                entity.isFinalPublished(),
                 entity.getSubmittedBy(),
                 entity.getSubmittedAt()
         };
@@ -403,6 +522,10 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 entity.getGradePoints(),
                 resultOrNull(entity),
                 entity.isSubmitted(),
+                entity.isCourseworkPublished(),
+                entity.isMidtermPublished(),
+                entity.isLabPublished(),
+                entity.isFinalPublished(),
                 entity.getLastModifiedBy(),
                 entity.getLastModifiedAt(),
                 entity.getGradeId()
