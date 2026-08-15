@@ -525,6 +525,11 @@
 .table-row-cell.row-repeated         { -fx-opacity: 0.75; }
 .table-row-cell.row-inprogress .text { -fx-fill: #8a6d1f; }
 
+/* Rule S4 — a Deactivated (CANCELLED) section's whole row reads red in Admin > Sections. */
+.table-row-cell.row-deactivated                  { -fx-background-color: #fbdcdc; }
+.table-row-cell.row-deactivated:filled:selected  { -fx-background-color: #f3b7b7; }
+.table-row-cell.row-deactivated .text             { -fx-fill: #7a1f1f; }
+
 .degree-progress          { -fx-accent: #2f7d4f; }
 .degree-progress > .bar   { -fx-background-insets: 0; -fx-background-radius: 6; }
 .degree-progress > .track { -fx-background-color: #e6ebf1; -fx-background-radius: 6; }

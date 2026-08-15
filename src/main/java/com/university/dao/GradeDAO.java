@@ -31,8 +31,9 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
     private static final String SELECT =
             "SELECT grade_id, enrollment_id, coursework_mark, midterm_mark, lab_mark, final_mark, "
             + "total_mark, letter_grade, grade_points, result_status, is_submitted, "
-            + "coursework_published, midterm_published, lab_published, final_published, submitted_by, "
-            + "submitted_at, last_modified_by, last_modified_at FROM dbo.grades";
+            + "coursework_published, midterm_published, lab_published, final_published, "
+            + "coursework_published_mark, midterm_published_mark, lab_published_mark, final_published_mark, "
+            + "submitted_by, submitted_at, last_modified_by, last_modified_at FROM dbo.grades";
 
     private static final String INSERT =
             "INSERT INTO dbo.grades (enrollment_id, coursework_mark, midterm_mark, lab_mark, final_mark, "
@@ -67,6 +68,10 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         grade.setMidtermPublished(rs.getBoolean("midterm_published"));
         grade.setLabPublished(rs.getBoolean("lab_published"));
         grade.setFinalPublished(rs.getBoolean("final_published"));
+        grade.setCourseworkPublishedMark(rs.getBigDecimal("coursework_published_mark"));
+        grade.setMidtermPublishedMark(rs.getBigDecimal("midterm_published_mark"));
+        grade.setLabPublishedMark(rs.getBigDecimal("lab_published_mark"));
+        grade.setFinalPublishedMark(rs.getBigDecimal("final_published_mark"));
         grade.setSubmittedBy(DaoUtils.getInteger(rs, "submitted_by"));
         grade.setSubmittedAt(DaoUtils.getLocalDateTime(rs, "submitted_at"));
         grade.setLastModifiedBy(DaoUtils.getInteger(rs, "last_modified_by"));
@@ -274,6 +279,12 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      * "a student must never see a draft". Dropped rows are left out; withdrawn ones are kept,
      * because a W belongs on the record.</p>
      *
+     * <p>Midterm is revealed the moment it is published, independent of everything else. Every
+     * other component — Coursework/Lab, Final, and the Total/Letter/Points that only exist once
+     * every required component is present — belongs to the final result, so each of those also
+     * requires the student to have already completed this enrollment's instructor evaluation
+     * ({@code dbo.instructor_evaluations}); an already-published mark stays hidden until then.</p>
+     *
      * @param semesterId one semester, or null for every semester
      */
     public List<StudentGradeRow> findStudentGradeRows(int studentId, Integer semesterId) {
@@ -282,26 +293,50 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 + "ISNULL(g.is_submitted, 0) AS is_submitted, "
                 // Each component is revealed the moment its OWN publish flag is set, or once the
                 // whole row is submitted (submission always implied full visibility, unchanged) --
-                // this is what lets Coursework/Midterm show up before Final even exists.
-                + "CASE WHEN g.is_submitted = 1 OR g.coursework_published = 1 "
-                + "     THEN g.coursework_mark END AS coursework_mark, "
+                // this is what lets Coursework/Midterm show up before Final even exists. Midterm is
+                // never gated by the evaluation; every other final-stage column is.
+                // Once submitted, the raw mark IS the final truth (no further draft edit is
+                // possible without an Admin Unlock, which itself does not touch these columns).
+                // Before that, only the snapshot frozen at the last Publish is shown -- the raw
+                // mark column keeps moving with every Save Draft, whether or not this component
+                // has ever been published, so it must never be read directly here.
+                + "CASE WHEN (g.is_submitted = 1 OR g.coursework_published = 1) AND ev.evaluation_done = 1 "
+                + "     THEN CASE WHEN g.is_submitted = 1 THEN g.coursework_mark ELSE g.coursework_published_mark END "
+                + "     END AS coursework_mark, "
                 + "CASE WHEN g.is_submitted = 1 OR g.midterm_published    = 1 "
-                + "     THEN g.midterm_mark    END AS midterm_mark, "
-                + "CASE WHEN g.is_submitted = 1 OR g.lab_published        = 1 "
-                + "     THEN g.lab_mark        END AS lab_mark, "
-                + "CASE WHEN g.is_submitted = 1 OR g.final_published      = 1 "
-                + "     THEN g.final_mark      END AS final_mark, "
-                // Total/Letter/Points finalize only once every required component exists, which is
-                // exactly what is_submitted already means (submitSection refuses to flip it on
-                // otherwise) -- so these three stay gated on is_submitted alone.
-                + "CASE WHEN g.is_submitted = 1 THEN g.total_mark      END AS total_mark, "
-                + "CASE WHEN g.is_submitted = 1 THEN g.letter_grade    END AS letter_grade, "
-                + "CASE WHEN g.is_submitted = 1 THEN g.grade_points    END AS grade_points "
+                + "     THEN CASE WHEN g.is_submitted = 1 THEN g.midterm_mark ELSE g.midterm_published_mark END "
+                + "     END AS midterm_mark, "
+                + "CASE WHEN (g.is_submitted = 1 OR g.lab_published = 1) AND ev.evaluation_done = 1 "
+                + "     THEN CASE WHEN g.is_submitted = 1 THEN g.lab_mark ELSE g.lab_published_mark END "
+                + "     END AS lab_mark, "
+                + "CASE WHEN (g.is_submitted = 1 OR g.final_published = 1) AND ev.evaluation_done = 1 "
+                + "     THEN CASE WHEN g.is_submitted = 1 THEN g.final_mark ELSE g.final_published_mark END "
+                + "     END AS final_mark, "
+                // Total/Letter/Points finalize once every required final-stage component is
+                // published (Midterm + Lab/Coursework + Final) -- independent of is_submitted, so
+                // they are available before "Submit and Lock" is ever pressed -- plus the same
+                // evaluation gate as the rest of the final-stage columns above. A submitted row is
+                // always fully visible too, same as every other column here.
+                + "CASE WHEN ev.evaluation_done = 1 AND (g.is_submitted = 1 OR (g.midterm_published = 1 "
+                + "     AND g.final_published = 1 AND ((c.has_lab = 1 AND g.lab_published = 1) "
+                + "     OR (c.has_lab = 0 AND g.coursework_published = 1)))) "
+                + "     THEN g.total_mark   END AS total_mark, "
+                + "CASE WHEN ev.evaluation_done = 1 AND (g.is_submitted = 1 OR (g.midterm_published = 1 "
+                + "     AND g.final_published = 1 AND ((c.has_lab = 1 AND g.lab_published = 1) "
+                + "     OR (c.has_lab = 0 AND g.coursework_published = 1)))) "
+                + "     THEN g.letter_grade END AS letter_grade, "
+                + "CASE WHEN ev.evaluation_done = 1 AND (g.is_submitted = 1 OR (g.midterm_published = 1 "
+                + "     AND g.final_published = 1 AND ((c.has_lab = 1 AND g.lab_published = 1) "
+                + "     OR (c.has_lab = 0 AND g.coursework_published = 1)))) "
+                + "     THEN g.grade_points END AS grade_points "
                 + "FROM dbo.enrollments e "
                 + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
                 + "INNER JOIN dbo.semesters sem ON sem.semester_id = s.semester_id "
                 + "INNER JOIN dbo.courses c ON c.course_id = s.course_id "
                 + "LEFT JOIN dbo.grades g ON g.enrollment_id = e.enrollment_id "
+                + "CROSS APPLY (SELECT CASE WHEN EXISTS ("
+                + "     SELECT 1 FROM dbo.instructor_evaluations ie "
+                + "     WHERE ie.enrollment_id = e.enrollment_id) THEN 1 ELSE 0 END AS evaluation_done) ev "
                 + "WHERE e.student_id = ? AND e.status <> 'DROPPED'"
                 + (semesterId == null ? "" : " AND sem.semester_id = ?")
                 + " ORDER BY sem.start_date DESC, c.course_code";
@@ -343,7 +378,9 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         String sql = "SELECT g.grade_id, g.enrollment_id, g.coursework_mark, g.midterm_mark, g.lab_mark, "
                 + "g.final_mark, g.total_mark, g.letter_grade, g.grade_points, g.result_status, "
                 + "g.is_submitted, g.coursework_published, g.midterm_published, g.lab_published, "
-                + "g.final_published, g.submitted_by, g.submitted_at, g.last_modified_by, g.last_modified_at "
+                + "g.final_published, g.coursework_published_mark, g.midterm_published_mark, "
+                + "g.lab_published_mark, g.final_published_mark, "
+                + "g.submitted_by, g.submitted_at, g.last_modified_by, g.last_modified_at "
                 + "FROM dbo.grades g "
                 + "INNER JOIN dbo.enrollments e ON e.enrollment_id = g.enrollment_id "
                 + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
@@ -375,12 +412,30 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      */
     public boolean rescaleStoredGrade(Connection connection, Grade entity) {
         String sql = "UPDATE dbo.grades SET coursework_mark = ?, midterm_mark = ?, lab_mark = ?, "
-                + "final_mark = ?, total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ? "
+                + "final_mark = ?, total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ?, "
+                + "coursework_published_mark = ?, midterm_published_mark = ?, "
+                + "lab_published_mark = ?, final_published_mark = ? "
                 + "WHERE grade_id = ?";
         return executeUpdate(connection, sql,
                 entity.getCourseworkMark(), entity.getMidtermMark(), entity.getLabMark(), entity.getFinalMark(),
-                entity.getTotalMark(), letterOrNull(entity), entity.getGradePoints(),
-                resultOrNull(entity), entity.getGradeId()) > 0;
+                entity.getTotalMark(), letterOrNull(entity), entity.getGradePoints(), resultOrNull(entity),
+                entity.getCourseworkPublishedMark(), entity.getMidtermPublishedMark(),
+                entity.getLabPublishedMark(), entity.getFinalPublishedMark(),
+                entity.getGradeId()) > 0;
+    }
+
+    /**
+     * Admin Unlock: reverts every submitted grade in a section back to {@code is_submitted = 0} so
+     * the instructor can edit it normally again — marks and publish flags are left exactly as they
+     * were, nothing is cleared.
+     *
+     * @return how many grade rows were unlocked (0 means the section was not locked)
+     */
+    public int unlockSection(Connection connection, int sectionId) {
+        String sql = "UPDATE g SET g.is_submitted = 0 FROM dbo.grades g "
+                + "INNER JOIN dbo.enrollments e ON e.enrollment_id = g.enrollment_id "
+                + "WHERE e.section_id = ? AND g.is_submitted = 1";
+        return executeUpdate(connection, sql, sectionId);
     }
 
     /** True once at least one grade in the section has been submitted — rule G4's read side. */
@@ -419,9 +474,19 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 + "coursework_published = CASE WHEN ? = 1 THEN 1 ELSE coursework_published END, "
                 + "midterm_published    = CASE WHEN ? = 1 THEN 1 ELSE midterm_published    END, "
                 + "lab_published        = CASE WHEN ? = 1 THEN 1 ELSE lab_published        END, "
-                + "final_published      = CASE WHEN ? = 1 THEN 1 ELSE final_published      END "
+                + "final_published      = CASE WHEN ? = 1 THEN 1 ELSE final_published      END, "
+                // The snapshot the student actually sees -- only moves when its own flag argument
+                // is true, so it always freezes at exactly the mark just written by the same
+                // upsertGrade call this method follows, never a later, still-unpublished edit.
+                + "coursework_published_mark = CASE WHEN ? = 1 THEN coursework_mark ELSE coursework_published_mark END, "
+                + "midterm_published_mark    = CASE WHEN ? = 1 THEN midterm_mark    ELSE midterm_published_mark    END, "
+                + "lab_published_mark        = CASE WHEN ? = 1 THEN lab_mark        ELSE lab_published_mark        END, "
+                + "final_published_mark      = CASE WHEN ? = 1 THEN final_mark      ELSE final_published_mark      END "
                 + "WHERE grade_id = ?";
-        return executeUpdate(connection, sql, coursework, midterm, lab, finalMark, gradeId) > 0;
+        return executeUpdate(connection, sql,
+                coursework, midterm, lab, finalMark,
+                coursework, midterm, lab, finalMark,
+                gradeId) > 0;
     }
 
     /**
@@ -478,6 +543,35 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
     @Override
     public boolean update(Connection connection, Grade entity) {
         return executeUpdate(connection, UPDATE, updateParams(entity)) > 0;
+    }
+
+    /**
+     * Save Draft: always writes the instructor's current mark values, whether or not any
+     * component is already published -- the whole point of a draft is that it must never be
+     * silently discarded (that used to be preserved-on-publish here, which meant a published
+     * component's edit reappeared as the OLD value after every reload). What the student sees
+     * stays frozen at {@code *_published_mark} (only {@link #publishComponents} moves that), so
+     * writing the raw mark here freely never leaks an unpublished edit early.
+     */
+    public boolean updateDraft(Connection connection, Grade entity) {
+        String sql = "UPDATE dbo.grades SET "
+                + "coursework_mark = ?, midterm_mark = ?, lab_mark = ?, final_mark = ?, "
+                + "total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ?, "
+                + "last_modified_by = ?, last_modified_at = ? "
+                + "WHERE grade_id = ? AND is_submitted = 0";
+
+        return executeUpdate(connection, sql,
+                entity.getCourseworkMark(),
+                entity.getMidtermMark(),
+                entity.getLabMark(),
+                entity.getFinalMark(),
+                entity.getTotalMark(),
+                letterOrNull(entity),
+                entity.getGradePoints(),
+                resultOrNull(entity),
+                entity.getLastModifiedBy(),
+                entity.getLastModifiedAt(),
+                entity.getGradeId()) > 0;
     }
 
     @Override
@@ -541,4 +635,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         return entity.getResultStatus() == null ? null : entity.getResultStatus().toDb();
     }
 }
+
+
+
 

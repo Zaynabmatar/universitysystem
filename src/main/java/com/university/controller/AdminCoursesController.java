@@ -84,6 +84,18 @@ public class AdminCoursesController {
         colState.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isActive() ? "Active" : "Inactive"));
 
         courseTable.setItems(rows);
+
+        // Deactivated courses are highlighted across the whole row.
+        courseTable.setRowFactory(view -> new TableRow<>() {
+            @Override
+            protected void updateItem(Course item, boolean empty) {
+                super.updateItem(item, empty);
+                getStyleClass().remove("row-deactivated");
+                if (!empty && item != null && !item.isActive()) {
+                    getStyleClass().add("row-deactivated");
+                }
+            }
+        });
         courseTable.setPlaceholder(new Label("No courses match your filters."));
 
         departments = courseService.listDepartments(false);
@@ -374,3 +386,4 @@ public class AdminCoursesController {
         }
     }
 }
+

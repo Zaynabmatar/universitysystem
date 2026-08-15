@@ -13,7 +13,6 @@ import com.university.service.CourseService;
 import com.university.service.InstructorService;
 import com.university.service.SectionService;
 import com.university.service.SemesterService;
-import com.university.service.ServiceException;
 import com.university.service.Session;
 import com.university.util.AlertUtil;
 import com.university.util.SceneManager;
@@ -57,7 +56,6 @@ public class AdminSectionsController {
     @FXML private Button editButton;
     @FXML private Button cancelButton;
     @FXML private Button reopenButton;
-    @FXML private Button deleteButton;
     @FXML private Button gradesButton;
 
     private final SectionService sectionService = new SectionService();
@@ -113,6 +111,19 @@ public class AdminSectionsController {
         sectionTable.setItems(rows);
         sectionTable.setPlaceholder(new Label("No sections match your filters."));
 
+        // Rule S4 — a Deactivated (CANCELLED) section is marked red across the WHOLE row, not just
+        // the status cell, so it reads as "not currently offered" at a glance.
+        sectionTable.setRowFactory(view -> new TableRow<>() {
+            @Override
+            protected void updateItem(Section item, boolean empty) {
+                super.updateItem(item, empty);
+                getStyleClass().remove("row-deactivated");
+                if (!empty && item != null && item.getStatus() == SectionStatus.CANCELLED) {
+                    getStyleClass().add("row-deactivated");
+                }
+            }
+        });
+
         semesterFilter.getItems().add(null);
         semesterFilter.getItems().addAll(semesters);
         semesterFilter.setConverter(nullableConverter(s -> s.toString(), "All semesters"));
@@ -143,7 +154,6 @@ public class AdminSectionsController {
         editButton.disableProperty().bind(selected.isNull());
         cancelButton.disableProperty().bind(selected.isNull());
         reopenButton.disableProperty().bind(selected.isNull());
-        deleteButton.disableProperty().bind(selected.isNull());
         gradesButton.disableProperty().bind(selected.isNull());
 
         reload();
@@ -258,11 +268,11 @@ public class AdminSectionsController {
     }
 
     /**
-     * RULE G5 — the registrar's way into a grade sheet. There is deliberately no
+     * The registrar's way into a grade sheet ("Grades / Unlock"). There is deliberately no
      * {@code admin_grades.fxml}: this opens the instructor's own screen, which detects the ADMIN
-     * role and switches itself into correction mode (submitted rows stay editable, the button
-     * reads "Apply Correction", a reason is required). The role is re-checked in
-     * {@code GradeService.adminOverride}, so opening the screen grants nothing on its own.
+     * role and switches itself into a read-only view with a single action, "Unlock Grades", that
+     * reopens a whole Submit-&amp;-Locked section for the instructor. The role is re-checked in
+     * {@code GradeService.unlockSection}, so opening the screen grants nothing on its own.
      */
     @FXML
     private void handleGrades() {
@@ -281,63 +291,49 @@ public class AdminSectionsController {
         }
     }
 
+    /**
+     * Deactivates a section (rule S4 — {@code SectionStatus.CANCELLED} under the hood). The
+     * section and every enrolment/grade record tied to it stay in the database for history/audit;
+     * this only stops new registrations, via {@code RegistrationService}'s {@code status != OPEN} check.
+     */
     @FXML
     private void handleCancel() {
         Section selected = sectionTable.getSelectionModel().getSelectedItem();
         if (selected == null) return;
 
         int n = sectionService.countEnrollments(selected.getSectionId());
-        boolean ok = AlertUtil.confirm("Cancel section",
-                "Cancel " + labelOf(selected) + "?\n\n"
-                + n + " student(s) have an enrolment record in it. Cancelling keeps every one of those "
-                + "records and every grade — it only stops new registrations. Nothing is deleted.");
+        boolean ok = AlertUtil.confirm("Deactivate section",
+                "Deactivate " + labelOf(selected) + "?\n\n"
+                + n + " student(s) have an enrolment record in it. Deactivating keeps every one of "
+                + "those records and every grade — it only stops new registrations. Nothing is deleted.");
         if (!ok) return;
 
         try {
             sectionService.cancelSection(selected.getSectionId());
-            AlertUtil.success("Cancelled", labelOf(selected) + " is now cancelled.");
+            AlertUtil.success("Deactivated", labelOf(selected) + " is now deactivated.");
             reload();
         } catch (Exception e) {
-            AlertUtil.error("Could not cancel", "The section could not be cancelled.", e);
+            AlertUtil.error("Could not deactivate", "The section could not be deactivated.", e);
         }
     }
 
+    /** Reactivates a deactivated section (rule S4 — back to {@code SectionStatus.OPEN}). */
     @FXML
     private void handleReopen() {
         Section selected = sectionTable.getSelectionModel().getSelectedItem();
         if (selected == null) return;
 
-        if (!AlertUtil.confirm("Re-open section",
-                "Re-open " + labelOf(selected) + "? Students will be able to register for it again.")) {
+        if (!AlertUtil.confirm("Activate section",
+                "Activate " + labelOf(selected) + "? Students will be able to register for it again.")) {
             return;
         }
         try {
             sectionService.reopenSection(selected.getSectionId());
-            AlertUtil.success("Re-opened", labelOf(selected) + " is open again.");
+            AlertUtil.success("Activated", labelOf(selected) + " is active again.");
             reload();
         } catch (Exception e) {
-            AlertUtil.error("Could not re-open", "The section could not be re-opened.", e);
+            AlertUtil.error("Could not activate", "The section could not be activated.", e);
         }
     }
 
-    @FXML
-    private void handleDelete() {
-        Section selected = sectionTable.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
-
-        if (!AlertUtil.confirm("Delete section",
-                "Permanently delete " + labelOf(selected) + "? This is only possible because it has "
-                + "never had a single enrolment.")) {
-            return;
-        }
-        try {
-            sectionService.deleteSection(selected.getSectionId());
-            AlertUtil.success("Deleted", "The section was deleted.");
-            reload();
-        } catch (ServiceException se) {
-            AlertUtil.warn("Cannot delete this section", se.getMessage());
-        } catch (Exception e) {
-            AlertUtil.error("Could not delete", "The section could not be deleted.", e);
-        }
-    }
 }

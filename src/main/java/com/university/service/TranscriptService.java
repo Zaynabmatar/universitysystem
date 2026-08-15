@@ -213,6 +213,14 @@ public class TranscriptService {
         /** {@link #requirements}, grouped by recommended semester, in semester order — what
          *  Degree Progress' "Show Your Study Plan" section actually renders. */
         public final List<SemesterPlan> semesterPlans = new ArrayList<>();
+        /**
+         * The first semester (1-based) in which the student still has an incomplete mandatory
+         * course — {@link #studentStage}'s result. This is "the student's current planned
+         * semester" for any caller that needs one number, not a recomputation of it (the
+         * recommendation engine reads this rather than estimating a semester from raw credit
+         * counts). Defaults to 1 for a program with no plan rows.
+         */
+        public int currentStage = 1;
 
         /* --- Section 6.9, condition by condition, so the UI can show each one --- */
         public boolean allMandatoryPassed() { return mandatoryMissing == 0; }
@@ -442,6 +450,7 @@ public class TranscriptService {
         }
 
         int stage = studentStage(rows);
+        progress.currentStage = stage;
 
         for (RequirementRow row : rows) {
             List<TranscriptDAO.PrerequisiteLink> prereqs =

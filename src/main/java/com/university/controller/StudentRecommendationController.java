@@ -45,6 +45,8 @@ public class StudentRecommendationController {
     @FXML private Label neighbourLabel;
     @FXML private Label scaleLabel;
     @FXML private Label bannerLabel;
+    @FXML private VBox  warningsBox;
+    @FXML private Label warningsLabel;
     @FXML private VBox  cardsBox;
     @FXML private HBox  statsStrip;
     @FXML private ProgressIndicator busyIndicator;
@@ -89,6 +91,7 @@ public class StudentRecommendationController {
     private void render() {
         cardsBox.getChildren().clear();
         showBanner(null);
+        showWarnings(List.of());
 
         if (result.isBlocked()) {
             showBanner(result.blockedReason);
@@ -108,6 +111,8 @@ public class StudentRecommendationController {
                 + "  ·  " + result.currentCredits + " of " + result.creditLimit
                 + " credits taken this semester");
 
+        showWarnings(result.warnings);
+
         if (result.recommendations.isEmpty()) {
             showBanner("No course passed all of the eligibility rules right now. That usually "
                     + "means your credit limit is reached, every suitable section is full, or "
@@ -117,6 +122,14 @@ public class StudentRecommendationController {
         for (Recommendation recommendation : result.recommendations) {
             cardsBox.getChildren().add(buildCard(recommendation));
         }
+    }
+
+    /** One line per Study Plan course that is due but could not be recommended right now. */
+    private void showWarnings(List<String> warnings) {
+        boolean show = warnings != null && !warnings.isEmpty();
+        warningsBox.setVisible(show);
+        warningsBox.setManaged(show);
+        warningsLabel.setText(show ? String.join("\n", warnings) : "");
     }
 
     private void showBanner(String text) {
@@ -243,9 +256,10 @@ public class StudentRecommendationController {
 
         String text =
               "LAYER 1 — Eligibility (a rule-based expert system)\n"
-            + "  Every open section this semester is tested against registration rules R3–R7:\n"
-            + "  prerequisites, not already passed, a free seat, no timetable clash, and your\n"
-            + "  credit limit. Anything that fails any rule is removed.\n"
+            + "  Every open section this semester is tested against registration rules R3–R8:\n"
+            + "  prerequisites, not already passed, credit-based eligibility thresholds, a free\n"
+            + "  seat, no timetable clash, and your credit limit. Anything that fails any rule is\n"
+            + "  removed — and if it was due in your Study Plan, a Warning explains why.\n"
             + "  " + result.sectionsConsidered + " sections were considered; "
                    + result.sectionsSurviving + " survived.\n\n"
             + "LAYER 2 — Degree fit (content-based scoring, 100 points)\n"

@@ -5,7 +5,6 @@ import com.university.service.RecommendationService.Candidate;
 import com.university.service.RecommendationService.CourseStats;
 import com.university.service.RecommendationService.Meeting;
 import com.university.service.RecommendationService.PassedCourse;
-import com.university.service.RecommendationService.PlanEntry;
 import com.university.service.RecommendationService.Prereq;
 import com.university.service.RecommendationService.StudentProfile;
 
@@ -160,22 +159,6 @@ public class RecommendationDAO extends AbstractDAO {
                 RecommendationDAO::readMeeting)
                 .forEach(meeting ->
                         map.computeIfAbsent(meeting.sectionId, key -> new ArrayList<>()).add(meeting));
-        return map;
-    }
-
-    /** Factors 1 and 2's input: the student's published degree plan. */
-    public Map<Integer, PlanEntry> loadProgramRequirements(int programId) {
-        Map<Integer, PlanEntry> map = new HashMap<>();
-        queryList("SELECT course_id, is_mandatory, recommended_semester "
-                + "FROM dbo.program_requirements WHERE program_id = ?",
-                resultSet -> {
-                    PlanEntry entry = new PlanEntry();
-                    entry.courseId    = resultSet.getInt("course_id");
-                    entry.isMandatory = resultSet.getBoolean("is_mandatory");
-                    int semester      = resultSet.getInt("recommended_semester");
-                    entry.recommendedSemester = resultSet.wasNull() ? null : semester;
-                    return entry;
-                }, programId).forEach(entry -> map.put(entry.courseId, entry));
         return map;
     }
 

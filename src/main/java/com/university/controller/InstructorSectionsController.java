@@ -281,8 +281,35 @@ public class InstructorSectionsController {
         ExamFormDialog dialog = new ExamFormDialog(selected, label, examService, actingUserId);
         Boolean saved = dialog.showAndWait().orElse(false);
         if (Boolean.TRUE.equals(saved)) {
+            notifyExamScheduled(selected, label);
             AlertUtil.success("Exam added", "The exam for " + label + " is now visible to every enrolled student.");
         }
+    }
+
+    /**
+     * Notifies every student on the section's roster the same way {@link #handleViewExams}
+     * notifies them of an edit — the just-created row is the one with the highest {@code exam_id}
+     * for this section, since {@code ExamFormDialog} does not hand the created {@link Exam} back.
+     */
+    private void notifyExamScheduled(Section section, String label) {
+        Exam created = examService.examsForSection(section.getSectionId()).stream()
+                .max(Comparator.comparingInt(Exam::getExamId))
+                .orElse(null);
+        if (created == null || created.getStartTime() == null) {
+            return;
+        }
+
+        List<Integer> studentUserIds = gradeService.getGradeSheet(section.getSectionId()).stream()
+                .map(GradeSheetRow::getStudentUserId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        String notificationMessage = label + " has a new exam scheduled. Date: " + created.getExamDate()
+                + ", time: " + created.getStartTime().format(HM)
+                + ", duration: " + created.getDurationMinutes() + " minutes"
+                + (created.getRoom() == null ? "." : ", room: " + created.getRoom() + ".");
+
+        notificationService.notifyAll(studentUserIds, NotificationType.INFO, "Exam Scheduled", notificationMessage);
     }
 
     @FXML
@@ -362,12 +389,36 @@ public class InstructorSectionsController {
                             .collect(Collectors.toList())
             ));
 
-            table.setPlaceholder(
-                    new Label("No exams scheduled for this section.")
-            );
+            table.setPlaceholder(new Label("No exams scheduled for this section."));
+            table.setPrefWidth(560);
+            table.setPrefHeight(220);
 
-            table.setPrefWidth(500);
-            table.setPrefHeight(240);
+            javafx.scene.control.DatePicker editDate = new javafx.scene.control.DatePicker();
+            javafx.scene.control.TextField editTime = new javafx.scene.control.TextField();
+            javafx.scene.control.Spinner<Integer> editDuration =
+                    new javafx.scene.control.Spinner<>(15, 300, 120, 15);
+            javafx.scene.control.TextField editRoom = new javafx.scene.control.TextField();
+
+            editTime.setPromptText("10:00");
+            editRoom.setPromptText("Room");
+            editDuration.setEditable(true);
+
+            javafx.scene.layout.GridPane editGrid = new javafx.scene.layout.GridPane();
+            editGrid.setHgap(12);
+            editGrid.setVgap(9);
+            editGrid.addRow(0, new Label("Exam date"), editDate);
+            editGrid.addRow(1, new Label("Start time"), editTime);
+            editGrid.addRow(2, new Label("Duration"), editDuration);
+            editGrid.addRow(3, new Label("Room"), editRoom);
+
+            editGrid.setDisable(true);
+
+            Label editHint = new Label("Select an exam above to edit it.");
+
+            ButtonType saveType = new ButtonType(
+                    "Save",
+                    javafx.scene.control.ButtonBar.ButtonData.APPLY
+            );
 
             Dialog<Void> dialog = new Dialog<>();
             dialog.initStyle(javafx.stage.StageStyle.UNDECORATED);
@@ -381,13 +432,202 @@ public class InstructorSectionsController {
             );
 
             javafx.scene.layout.VBox content =
-                    new javafx.scene.layout.VBox(12, titleLabel, table);
+                    new javafx.scene.layout.VBox(
+                            12,
+                            titleLabel,
+                            table,
+                            editHint,
+                            editGrid
+                    );
+
             content.setPadding(new javafx.geometry.Insets(15));
-            content.setPrefWidth(500);
+            content.setPrefWidth(560);
 
             dialog.setHeaderText(null);
             dialog.getDialogPane().setContent(content);
-            dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CLOSE);
+
+            javafx.scene.Node saveButton =
+                    dialog.getDialogPane().lookupButton(saveType);
+            saveButton.setDisable(true);
+
+            final Exam[] selectedExam = new Exam[1];
+            final boolean[] loadingFields = {false};
+
+            Runnable updateSaveState = () -> {
+                if (loadingFields[0] || selectedExam[0] == null) {
+                    saveButton.setDisable(true);
+                    return;
+                }
+
+                Exam exam = selectedExam[0];
+
+                java.time.LocalTime parsedTime =
+                        ValidationUtil.parseTime(editTime.getText());
+
+                String newRoom = ValidationUtil.trimToNull(editRoom.getText());
+
+                boolean changed =
+                        !java.util.Objects.equals(
+                                exam.getExamDate(),
+                                editDate.getValue()
+                        )
+                        || !java.util.Objects.equals(
+                                exam.getStartTime(),
+                                parsedTime
+                        )
+                        || exam.getDurationMinutes() != editDuration.getValue()
+                        || !java.util.Objects.equals(
+                                exam.getRoom(),
+                                newRoom
+                        );
+
+                saveButton.setDisable(!changed);
+            };
+
+            table.getSelectionModel().selectedItemProperty().addListener(
+                    (obs, oldExam, newExam) -> {
+                        selectedExam[0] = newExam;
+
+                        if (newExam == null) {
+                            editGrid.setDisable(true);
+                            editHint.setText("Select an exam above to edit it.");
+                            saveButton.setDisable(true);
+                            return;
+                        }
+
+                        loadingFields[0] = true;
+
+                        editGrid.setDisable(false);
+                        editHint.setText("Edit the selected exam, then press Save.");
+
+                        editDate.setValue(newExam.getExamDate());
+                        editTime.setText(
+                                newExam.getStartTime() == null
+                                        ? ""
+                                        : newExam.getStartTime().format(HM)
+                        );
+                        editDuration.getValueFactory().setValue(
+                                newExam.getDurationMinutes()
+                        );
+                        editRoom.setText(
+                                newExam.getRoom() == null ? "" : newExam.getRoom()
+                        );
+
+                        loadingFields[0] = false;
+                        saveButton.setDisable(true);
+                    }
+            );
+
+            editDate.valueProperty().addListener((o, a, b) -> updateSaveState.run());
+            editTime.textProperty().addListener((o, a, b) -> updateSaveState.run());
+            editDuration.valueProperty().addListener((o, a, b) -> updateSaveState.run());
+            editRoom.textProperty().addListener((o, a, b) -> updateSaveState.run());
+
+            saveButton.addEventFilter(
+                    javafx.event.ActionEvent.ACTION,
+                    event -> {
+                        Exam exam = selectedExam[0];
+                        if (exam == null) {
+                            event.consume();
+                            return;
+                        }
+
+                        java.time.LocalTime parsedTime =
+                                ValidationUtil.parseTime(editTime.getText());
+
+                        if (editDate.getValue() == null) {
+                            AlertUtil.error(
+                                    "Edit Exam",
+                                    "Select the exam date.",
+                                    null
+                            );
+                            event.consume();
+                            return;
+                        }
+
+                        if (parsedTime == null) {
+                            AlertUtil.error(
+                                    "Edit Exam",
+                                    "Start time must look like 10:00.",
+                                    null
+                            );
+                            event.consume();
+                            return;
+                        }
+
+                        try {
+                            boolean updated = examService.updateExam(
+                                    exam.getExamId(),
+                                    editDate.getValue(),
+                                    parsedTime,
+                                    editDuration.getValue(),
+                                    ValidationUtil.trimToNull(editRoom.getText())
+                            );
+
+                            if (!updated) {
+                                AlertUtil.error(
+                                        "Edit Exam",
+                                        "The exam could not be updated.",
+                                        null
+                                );
+                                event.consume();
+                                return;
+                            }
+
+                            exam.setExamDate(editDate.getValue());
+                            exam.setStartTime(parsedTime);
+                            exam.setDurationMinutes(editDuration.getValue());
+                            exam.setRoom(
+                                    ValidationUtil.trimToNull(editRoom.getText())
+                            );
+
+                            table.refresh();
+                            saveButton.setDisable(true);
+
+                            List<Integer> studentUserIds = gradeService
+                                    .getGradeSheet(selected.getSectionId())
+                                    .stream()
+                                    .map(GradeSheetRow::getStudentUserId)
+                                    .distinct()
+                                    .collect(Collectors.toList());
+
+                            String notificationMessage =
+                                    label
+                                            + " exam schedule was changed. New date: "
+                                            + exam.getExamDate()
+                                            + ", time: "
+                                            + exam.getStartTime().format(HM)
+                                            + ", duration: "
+                                            + exam.getDurationMinutes()
+                                            + " minutes"
+                                            + (exam.getRoom() == null
+                                                    ? "."
+                                                    : ", room: " + exam.getRoom() + ".");
+
+                            notificationService.notifyAll(
+                                    studentUserIds,
+                                    NotificationType.WARNING,
+                                    "Exam Schedule Changed",
+                                    notificationMessage
+                            );
+
+                            AlertUtil.success(
+                                    "Exam updated",
+                                    "The exam changes were saved and students were notified."
+                            );
+
+                        } catch (ServiceException se) {
+                            AlertUtil.error(
+                                    "Edit Exam",
+                                    se.getMessage(),
+                                    se
+                            );
+                        }
+
+                        event.consume();
+                    }
+            );
 
             var css = getClass().getResource("/css/app.css");
             if (css != null) {
@@ -575,6 +815,8 @@ public class InstructorSectionsController {
                 .collect(Collectors.joining(", "));
     }
 }
+
+
 
 
 

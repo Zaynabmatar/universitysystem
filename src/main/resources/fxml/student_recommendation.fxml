@@ -52,6 +52,12 @@
     <Label fx:id="bannerLabel" managed="false" visible="false" styleClass="banner-warn"
            wrapText="true"/>
 
+    <!-- ===== Study Plan warnings: courses due now/overdue that could not be recommended ===== -->
+    <VBox fx:id="warningsBox" spacing="4" managed="false" visible="false">
+        <Label text="Study Plan Warnings" styleClass="reco-block-title"/>
+        <Label fx:id="warningsLabel" wrapText="true" styleClass="banner-warn"/>
+    </VBox>
+
     <ScrollPane fx:id="scrollPane" fitToWidth="true" VBox.vgrow="ALWAYS" styleClass="reco-scroll">
         <content>
             <VBox fx:id="cardsBox" spacing="14">

@@ -27,6 +27,9 @@
         <Label fx:id="sectionLabel" styleClass="muted-text"/>
     </HBox>
 
+    <Label styleClass="muted-label" wrapText="true"
+           text="You can publish Midterm alone. Final must be published together with Lab or Coursework, depending on the course."/>
+
     <HBox spacing="14" alignment="CENTER_LEFT">
         <Label fx:id="windowLabel" styleClass="muted-label"/>
         <Region HBox.hgrow="ALWAYS"/>
@@ -57,6 +60,7 @@
         <Button fx:id="exportButton"    text="Export CSV"      onAction="#handleExportCsv"/>
         <Button fx:id="saveDraftButton" text="Save Draft"      onAction="#handleSaveDraft"/>
         <Button fx:id="publishButton"   text="Publish"         onAction="#handlePublish"/>
+        <Button fx:id="unlockButton"    text="Unlock Grades"   onAction="#handleUnlock"/>
         <Button fx:id="submitButton"    text="Submit and Lock" onAction="#handleSubmit"/>
     </HBox>
 </VBox>

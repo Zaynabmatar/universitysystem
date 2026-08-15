@@ -4,6 +4,7 @@ import com.university.dao.ExamDAO;
 import com.university.model.Exam;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -26,6 +27,7 @@ public class ExamService {
         if (durationMinutes <= 0) {
             throw new ServiceException("Duration must be greater than zero.");
         }
+        assertNotInPast(examDate, startTime);
 
         Exam exam = new Exam();
         exam.setSectionId(sectionId);
@@ -56,4 +58,43 @@ public class ExamService {
     public List<Exam> examsForStudentInSemester(int studentId, int semesterId) {
         return examDao.findByStudentAndSemester(studentId, semesterId);
     }
+
+    public boolean updateExam(int examId, LocalDate examDate, LocalTime startTime,
+                              int durationMinutes, String room) {
+        if (examId <= 0) {
+            throw new ServiceException("A valid exam is required.");
+        }
+        if (examDate == null) {
+            throw new ServiceException("An exam date is required.");
+        }
+        if (startTime == null) {
+            throw new ServiceException("A start time is required.");
+        }
+        if (durationMinutes <= 0) {
+            throw new ServiceException("Duration must be greater than zero.");
+        }
+        assertNotInPast(examDate, startTime);
+
+        Exam exam = examDao.findById(examId)
+                .orElseThrow(() -> new ServiceException("Exam not found."));
+
+        exam.setExamDate(examDate);
+        exam.setStartTime(startTime);
+        exam.setDurationMinutes(durationMinutes);
+        exam.setRoom(room);
+
+        return examDao.update(exam);
+    }
+
+    /**
+     * An exam may never be scheduled in the past — checked here so that a caller other than the
+     * date picker (or a picker with no day-disabling of its own) cannot save one anyway. Today at
+     * an earlier clock time is still "in the past"; today at a later time is fine.
+     */
+    private void assertNotInPast(LocalDate examDate, LocalTime startTime) {
+        if (!LocalDateTime.of(examDate, startTime).isAfter(LocalDateTime.now())) {
+            throw new ServiceException("The exam date and time must be in the future.");
+        }
+    }
 }
+

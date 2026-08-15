@@ -26,7 +26,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.util.StringConverter;
@@ -42,11 +41,11 @@ import java.util.function.Function;
  * recomputed live by {@link GradeCalculator} on every committed edit — nothing reaches the
  * database until Save Draft or Submit and Lock is pressed (project_details.md Section 5.1/5.2).
  *
- * <p>ADMIN MODE: the same screen is reused for the Section 6.6 rule G5 registrar override, so
- * there is no {@code admin_grades.fxml}. When the signed-in user is an ADMIN, submitted rows stay
- * editable, the button reads "Apply Correction", and saving goes through
- * {@link GradeService#adminOverride} after a reason has been typed. The role is re-checked in the
- * service — this screen only decides what to show.</p>
+ * <p>ADMIN MODE: the same screen is reused for the registrar, so there is no
+ * {@code admin_grades.fxml}. When the signed-in user is an ADMIN the sheet is read-only — no
+ * Save Draft, Publish or Submit — and the only action available is "Unlock Grades", which reopens
+ * a whole Submit-&amp;-Locked section for the instructor via {@link GradeService#unlockSection}.
+ * The role is re-checked in the service — this screen only decides what to show.</p>
  */
 public class InstructorGradesController {
 
@@ -70,6 +69,7 @@ public class InstructorGradesController {
     @FXML private Button saveDraftButton;
     @FXML private Button publishButton;
     @FXML private Button submitButton;
+    @FXML private Button unlockButton;
     @FXML private Button exportButton;
 
     private final GradeService gradeService = new GradeService();
@@ -82,9 +82,6 @@ public class InstructorGradesController {
     private int sectionId;
     private String sectionTitle = "";
     private boolean adminMode;
-    /** G2 — whether the current section's grade window is still open (lets an instructor
-     *  correct an already-submitted row in place instead of only the registrar). */
-    private boolean gradeWindowOpen;
     /** Guards the combo listener while {@link #load} is setting the selection itself. */
     private boolean loading;
 
@@ -144,12 +141,15 @@ public class InstructorGradesController {
         gradeTable.setItems(rows);
         gradeTable.setPlaceholder(new Label("Choose one of your sections to start entering grades."));
 
-        titleLabel.setText(adminMode ? "Correct Grades (Registrar)" : "Enter Grades");
-        submitButton.setText(adminMode ? "Apply Correction" : "Submit and Lock");
+        titleLabel.setText(adminMode ? "Grades (Registrar)" : "Enter Grades");
         saveDraftButton.setVisible(!adminMode);
         saveDraftButton.setManaged(!adminMode);
         publishButton.setVisible(!adminMode);
         publishButton.setManaged(!adminMode);
+        submitButton.setVisible(!adminMode);
+        submitButton.setManaged(!adminMode);
+        unlockButton.setVisible(adminMode);
+        unlockButton.setManaged(adminMode);
         setButtonsDisabled(true);
 
         fillSectionChooser();
@@ -195,11 +195,11 @@ public class InstructorGradesController {
         }
         BigDecimal value = event.getNewValue();
 
-        boolean submittedRowLocked = row.isSubmitted() && !adminMode && !gradeWindowOpen;
+        boolean submittedRowLocked = row.isSubmitted();
         if (submittedRowLocked) { // rule G4
             AlertUtil.error("Locked",
-                    "These grades have already been submitted and the grade window is closed. "
-                    + "Only the registrar can change them now.");
+                    "This section has been submitted and locked. Only the registrar can change "
+                    + "these grades now — ask them to Unlock Grades first.");
             gradeTable.refresh();
             return;
         }
@@ -214,7 +214,6 @@ public class InstructorGradesController {
             gradeTable.refresh();
             return;
         }
-        boolean wasSubmitted = row.isSubmitted();
         switch (which) {
             case COURSEWORK -> row.setCourseworkMark(value);
             case MIDTERM -> row.setMidtermMark(value);
@@ -222,9 +221,6 @@ public class InstructorGradesController {
             case FINAL -> row.setFinalMark(value);
         }
         row.recompute(); // <- the live letter and points
-        if (wasSubmitted && !adminMode) {
-            row.setEditedAfterSubmit(true); // picked up by "Submit and Lock" as a correction
-        }
         gradeTable.refresh();
         updateStats();
     }
@@ -274,23 +270,20 @@ public class InstructorGradesController {
             rows.setAll(gradeService.getGradeSheet(sectionId));
 
             boolean locked = gradeService.isSectionSubmitted(sectionId);
-            gradeWindowOpen = gradeService.isGradeWindowOpen(sectionId);
 
-            gradeTable.setEditable(true);
+            gradeTable.setEditable(!adminMode);
             setButtonsDisabled(false);
             exportButton.setDisable(false);
+            unlockButton.setDisable(!locked);
 
             applyLabVisibility();
 
             lockBanner.setText(locked
                     ? (adminMode
-                        ? "This section is submitted. As registrar you may still correct it — every "
-                          + "change is written to the audit log."
-                        : gradeWindowOpen
-                            ? "🔓 Submitted, but the grade window is still open — you may still fix "
-                              + "a mistake. Re-enter a mark and press \"Submit and Lock\" again."
-                            : "🔒 Submitted on record — the grade window is closed, so you can no "
-                              + "longer edit these grades. Contact the registrar for a correction.")
+                        ? "This section is submitted. Use \"Unlock Grades\" to let the instructor "
+                          + "edit the whole section again."
+                        : "🔒 Submitted and locked — you can no longer edit these grades. Ask the "
+                          + "registrar to Unlock Grades if a correction is needed.")
                     : "");
             lockBanner.setVisible(locked);
             lockBanner.setManaged(locked);
@@ -389,10 +382,23 @@ public class InstructorGradesController {
         saveDraftButton.setDisable(disabled);
         publishButton.setDisable(disabled);
         submitButton.setDisable(disabled);
+        unlockButton.setDisable(disabled);
         exportButton.setDisable(disabled);
     }
 
     private void updateStats() {
+        // Submit & Lock is shown to the instructor only when EVERY student
+        // has the complete required grade set.
+        boolean allComplete = !rows.isEmpty() && rows.stream().allMatch(row ->
+                row.getMidtermMark() != null
+                        && row.getFinalMark() != null
+                        && (row.isHasLab()
+                            ? row.getLabMark() != null
+                            : row.getCourseworkMark() != null));
+
+        boolean showSubmit = !adminMode && allComplete;
+        submitButton.setVisible(showSubmit);
+        submitButton.setManaged(showSubmit);
         long marked = rows.stream().filter(r -> r.getTotalMark() != null).count();
         long passing = rows.stream()
                 .filter(r -> r.getLetterGrade() != null && r.getLetterGrade().isPassing())
@@ -429,20 +435,32 @@ public class InstructorGradesController {
     }
 
     /** Releases whatever marks are currently entered to the students, component by component --
-     *  Coursework/Midterm can go out well before Final exists; the overall Total/Letter/Points
-     *  still wait for "Submit and Lock". */
+     *  Midterm can go out well before Final exists; Lab/Coursework and Final only ever release
+     *  together; the overall Total/Letter/Points still wait for "Submit and Lock". */
     @FXML
     private void handlePublish() {
         if (!requireSection()) {
             return;
         }
         try {
-            gradeService.publishComponents(sectionId, rows, actingUserId());
-            AlertUtil.success("Marks published",
-                    "Every mark currently entered has been released to its student — even a "
-                    + "single component such as Coursework or Midterm, if that is all you have "
-                    + "so far. The overall Total/Letter/Points only appear once every required "
-                    + "component exists and you press \"Submit and Lock\".");
+            boolean hasLab = !rows.isEmpty() && rows.get(0).isHasLab();
+            int pairsWithheld = gradeService.publishComponents(sectionId, rows, actingUserId());
+            if (pairsWithheld > 0) {
+                String guidance = hasLab
+                        ? "Please add the Final mark before publishing Lab + Final."
+                        : "Please enter both Coursework and Final marks before publishing.";
+                AlertUtil.warn("Some marks were withheld",
+                        "Every other mark that was ready has been released. " + pairsWithheld
+                        + " student(s) still need both halves of their " + (hasLab ? "Lab + Final" : "Coursework + Final")
+                        + " pair -- that pair is never released alone.\n\n" + guidance);
+            } else {
+                AlertUtil.success("Marks published",
+                        "Every mark currently entered has been released to its student — even a "
+                        + "single component such as Midterm, if that is all you have so far. "
+                        + (hasLab ? "Lab and Final" : "Coursework and Final") + " always release together. "
+                        + "The overall Total/Letter/Points only appear once every required component "
+                        + "exists and you press \"Submit and Lock\".");
+            }
             refresh();
         } catch (ValidationException e) {
             AlertUtil.error("Cannot publish", e.getMessage());
@@ -454,10 +472,6 @@ public class InstructorGradesController {
     @FXML
     private void handleSubmit() {
         if (!requireSection()) {
-            return;
-        }
-        if (adminMode) {
-            applyCorrection();
             return;
         }
         boolean confirmed = AlertUtil.confirm("Submit and lock",
@@ -482,44 +496,27 @@ public class InstructorGradesController {
         }
     }
 
-    /** Rule G5 — the registrar's correction of a submitted grade, with a mandatory reason. */
-    private void applyCorrection() {
-        GradeSheetRow row = gradeTable.getSelectionModel().getSelectedItem();
-        if (row == null) {
-            AlertUtil.error("Select a student", "Select the row you want to correct.");
+    /** Admin-only: reopens a Submit-&amp;-Locked section so the instructor can edit it normally
+     *  again. The only registrar action on this screen. */
+    @FXML
+    private void handleUnlock() {
+        if (!requireSection()) {
             return;
         }
-        if (!AlertUtil.confirm("Apply correction",
-                "Change the grade for " + row.getStudentName() + "?\n\n"
-                + "The student's GPA will be recalculated, the student will be notified, and the "
-                + "change will be written to the audit log.")) {
+        if (!AlertUtil.confirm("Unlock grades",
+                "Unlock " + sectionTitle + " for editing?\n\n"
+                + "The instructor will be able to change every grade in this section again, and "
+                + "must press \"Submit and Lock\" once more when the corrections are finished.")) {
             return;
         }
-
-        TextInputDialog dialog = new TextInputDialog();
-        dialog.setTitle("Reason for the correction");
-        dialog.setHeaderText("Correcting " + row.getStudentName() + " — " + sectionTitle);
-        dialog.setContentText("Reason (required):");
-        var css = getClass().getResource("/css/app.css");
-        if (css != null) {
-            dialog.getDialogPane().getStylesheets().add(css.toExternalForm());
-        }
-        String reason = dialog.showAndWait().orElse(null);
-        if (reason == null) {
-            return;
-        }
-
         try {
-            gradeService.adminOverride(row.getEnrollmentId(), row.getCourseworkMark(),
-                    row.getMidtermMark(), row.getLabMark(), row.getFinalMark(), actingUserId(), reason);
-            AlertUtil.success("Grade corrected",
-                    "The grade was changed, the GPA was recalculated, the student was notified, and "
-                    + "the change was written to the audit log by the database trigger.");
+            gradeService.unlockSection(sectionId, actingUserId());
+            AlertUtil.success("Section unlocked", "The instructor can now edit this section's grades again.");
             refresh();
         } catch (ValidationException e) {
-            AlertUtil.error("Cannot correct", e.getMessage());
+            AlertUtil.error("Cannot unlock", e.getMessage());
         } catch (ServiceException e) {
-            AlertUtil.error("Cannot correct", "The grade could not be corrected. Please try again.", e);
+            AlertUtil.error("Cannot unlock", "The section could not be unlocked. Please try again.", e);
         }
     }
 
@@ -601,7 +598,7 @@ public class InstructorGradesController {
                 if (!isEditable()
                         || !getTableView().isEditable()
                         || !getTableColumn().isEditable()
-                        || (row != null && row.isSubmitted() && !adminMode && !gradeWindowOpen)) {
+                        || (row != null && row.isSubmitted())) {
                     return;
                 }
 
@@ -681,6 +678,7 @@ public class InstructorGradesController {
     }
 
 }
+
 
 
 

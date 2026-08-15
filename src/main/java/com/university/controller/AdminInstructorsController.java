@@ -96,6 +96,18 @@ public class AdminInstructorsController {
         });
 
         instructorTable.setItems(rows);
+
+        // Deactivated instructors are highlighted across the whole row.
+        instructorTable.setRowFactory(view -> new TableRow<>() {
+            @Override
+            protected void updateItem(Instructor item, boolean empty) {
+                super.updateItem(item, empty);
+                getStyleClass().remove("row-deactivated");
+                if (!empty && item != null && !item.isActive()) {
+                    getStyleClass().add("row-deactivated");
+                }
+            }
+        });
         instructorTable.setPlaceholder(new Label("No instructors match your filters."));
 
         departments = courseService.listDepartments(false);
@@ -424,3 +436,4 @@ public class AdminInstructorsController {
         }
     }
 }
+
