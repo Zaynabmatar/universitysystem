@@ -40,6 +40,9 @@ public class ReportService {
         public String currentSemester = "No current semester";
         public int enrollmentsThisSemester;
         public int studentsOnProbation;
+        /** Average {@code cumulative_gpa} across ACTIVE students with completed_credits > 0 (same
+         *  population as {@link #topStudentsByGpa}); null when nobody qualifies yet. */
+        public BigDecimal averageGpa;
     }
 
     /** One bar, one slice or one point: a label and a number. */

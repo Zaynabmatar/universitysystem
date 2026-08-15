@@ -1,5 +1,6 @@
 package com.university.service;
 
+import com.university.dao.AbstractDAO;
 import com.university.dao.CourseDAO;
 import com.university.dao.CoursePrerequisiteDAO;
 import com.university.dao.DepartmentDAO;
@@ -14,6 +15,8 @@ import com.university.model.Program;
 import com.university.model.ProgramRequirement;
 
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,6 +44,11 @@ public class CourseService {
     private final CoursePrerequisiteDAO coursePrerequisiteDao = new CoursePrerequisiteDAO();
     private final ProgramRequirementDAO programRequirementDao = new ProgramRequirementDAO();
     private final SectionDAO sectionDao = new SectionDAO();
+    private final GradeService gradeService = new GradeService();
+
+    /** Gives access to the connection helpers without exposing a whole data access object. */
+    private final AbstractDAO transactions = new AbstractDAO() {
+    };
 
     // ------------------------------------------------------------ departments
 
@@ -167,6 +175,7 @@ public class CourseService {
     public int createCourse(Course course) {
         normalizeCode(course);
         requireUniqueCourseCode(course.getCourseCode(), null);
+        assertGradingConfigValid(course);
         course.setActive(true);
         return courseDao.insert(course);
     }
@@ -174,7 +183,43 @@ public class CourseService {
     public void updateCourse(Course course) {
         normalizeCode(course);
         requireUniqueCourseCode(course.getCourseCode(), course.getCourseId());
-        courseDao.update(course);
+        assertGradingConfigValid(course);
+
+        Course oldCourse = courseDao.findById(course.getCourseId())
+                .orElseThrow(() -> new ServiceException("That course no longer exists."));
+
+        Connection connection = transactions.beginTransaction();
+        try {
+            courseDao.update(connection, course);
+            // Keeps every already-stored mark valid under the new max instead of it silently
+            // failing rule G3 the next time the sheet is opened.
+            gradeService.rescaleMarksForMaxMarkChange(connection, oldCourse, course);
+            connection.commit();
+        } catch (SQLException e) {
+            transactions.rollbackQuietly(connection);
+            throw new ServiceException("The course could not be saved.", e);
+        } catch (RuntimeException e) {
+            transactions.rollbackQuietly(connection);
+            throw e;
+        } finally {
+            transactions.closeQuietly(connection);
+        }
+    }
+
+    /** Weights must total 100%; each component's max mark must be greater than 0. */
+    private void assertGradingConfigValid(Course course) {
+        BigDecimal weightSum = course.getCourseworkWeight().add(course.getMidtermWeight()).add(course.getFinalWeight());
+        if (weightSum.compareTo(new BigDecimal("100")) != 0) {
+            throw new ValidationException("Coursework/Lab, Midterm and Final weights must total 100%.");
+        }
+        if (!isPositive(course.getCourseworkMaxMark()) || !isPositive(course.getMidtermMaxMark())
+                || !isPositive(course.getFinalMaxMark())) {
+            throw new ValidationException("Each component's max mark must be greater than 0.");
+        }
+    }
+
+    private boolean isPositive(BigDecimal value) {
+        return value != null && value.compareTo(BigDecimal.ZERO) > 0;
     }
 
     /**

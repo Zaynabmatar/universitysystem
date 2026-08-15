@@ -24,6 +24,7 @@ import com.university.service.SectionService;
 import com.university.service.SemesterService;
 import com.university.service.Session;
 import com.university.util.AlertUtil;
+import com.university.util.Async;
 import com.university.util.SceneManager;
 
 import javafx.application.Platform;
@@ -271,127 +272,132 @@ public class StudentDashboardController {
         table.maxHeightProperty().bind(height);
     }
 
+    /** Everything {@link #reload()} needs from the database, fetched together off the FX thread. */
+    private record StudentData(Semester currentSemester, List<ClassRow> classRows, List<ExamRow> examRows,
+                                List<TodayRow> todayRows, Set<Integer> sectionIds) {
+    }
+
     private void reload() {
+        Async.run(this::fetchStudentData, this::applyReload,
+                error -> AlertUtil.error("Dashboard", "Your dashboard could not be loaded.", error));
+    }
+
+    /**
+     * Runs entirely off the FX thread. Sections and their weekly meetings are each fetched once
+     * for the whole semester ({@link SectionService#listForStudent} /
+     * {@link SectionService#listMeetingsForStudent}) and reused for the registered-courses table,
+     * the exams table and today's schedule, instead of one query per section per table.
+     */
+    private StudentData fetchStudentData() {
         courses = courseService.listCourses(false);
         instructors = instructorService.listActive();
         campuses = sectionService.listCampuses();
 
-        loadRegisteredCourses();
-        loadExams();
-        loadTodaysSchedule();
-    }
-
-    private void loadRegisteredCourses() {
-        currentSectionIds.clear();
-
         Semester currentSemester = semesterService.getCurrentSemester();
         if (currentSemester == null) {
+            return new StudentData(null, List.of(), List.of(), List.of(), Set.of());
+        }
+
+        Map<Integer, StudentGradeRow> gradeByEnrollment =
+                academicService.gradeRows(studentId, currentSemester.getSemesterId()).stream()
+                        .collect(Collectors.toMap(StudentGradeRow::getEnrollmentId, r -> r, (a, b) -> a));
+
+        List<Enrollment> enrollments =
+                registrationService.myClassesForSemester(studentId, currentSemester.getSemesterId());
+
+        Map<Integer, Section> sectionsById = sectionService.listForStudent(studentId, currentSemester.getSemesterId())
+                .stream().collect(Collectors.toMap(Section::getSectionId, s -> s, (a, b) -> a));
+        Map<Integer, List<SectionSchedule>> meetingsBySection =
+                sectionService.listMeetingsForStudent(studentId, currentSemester.getSemesterId());
+        Set<Integer> sectionIds = new HashSet<>(sectionsById.keySet());
+
+        List<ClassRow> classRows = new ArrayList<>();
+        for (Enrollment enrollment : enrollments) {
+            Section section = sectionsById.get(enrollment.getSectionId());
+            if (section == null) {
+                continue;
+            }
+
+            Course course = courseOf(section.getCourseId());
+            StudentGradeRow gradeRow = gradeByEnrollment.get(enrollment.getEnrollmentId());
+
+            boolean evaluationSubmitted =
+                    evaluationService.hasSubmitted(enrollment.getEnrollmentId());
+
+            String grade = (evaluationSubmitted
+                    && gradeRow != null
+                    && gradeRow.getLetterGrade() != null)
+                    ? gradeRow.getLetterGrade().getLabel()
+                    : "--";
+
+            classRows.add(new ClassRow(
+                    enrollment.getEnrollmentId(),
+                    course == null ? "—" : course.getCourseCode(),
+                    course == null ? "—" : course.getCourseTitle(),
+                    section.getSectionNumber(),
+                    campusNameOf(section.getCampusId()),
+                    instructorNameOf(section.getInstructorId()),
+                    String.valueOf(section.getSectionId()),
+                    scheduleTextOf(meetingsBySection, section.getSectionId()),
+                    section.getRoom() == null || section.getRoom().isBlank() ? "—" : section.getRoom(),
+                    grade,
+                    attendanceService.countAbsencesForEnrollment(enrollment.getEnrollmentId()),
+                    enrollment.getStatus(),
+                    course == null ? 0 : course.getCredits()));
+        }
+
+        List<Exam> mine = examService.examsForStudent(studentId);
+        List<ExamRow> examRowsBuilt = mine.stream()
+                .filter(exam -> sectionIds.contains(exam.getSectionId()))
+                .map(exam -> toExamRow(exam, sectionsById))
+                .toList();
+
+        DayOfWeekCode today = DayOfWeekCode.fromJavaDayOfWeek(LocalDate.now().getDayOfWeek());
+        List<TodayRow> todayRowsBuilt = new ArrayList<>();
+        for (int sectionId : sectionIds) {
+            Section section = sectionsById.get(sectionId);
+            Course course = courseOf(section.getCourseId());
+            for (SectionSchedule meeting : meetingsBySection.getOrDefault(sectionId, List.of())) {
+                if (meeting.getDayOfWeek() != today) {
+                    continue;
+                }
+                todayRowsBuilt.add(new TodayRow(
+                        meeting.getStartTime(),
+                        HM.format(meeting.getStartTime()) + " - " + HM.format(meeting.getEndTime()),
+                        course == null ? "—" : course.getCourseCode() + " — " + course.getCourseTitle(),
+                        instructorNameOf(section.getInstructorId()),
+                        section.getRoom() == null || section.getRoom().isBlank() ? "—" : section.getRoom()));
+            }
+        }
+        todayRowsBuilt.sort(Comparator.comparing(r -> r.startTime));
+
+        return new StudentData(currentSemester, classRows, examRowsBuilt, todayRowsBuilt, sectionIds);
+    }
+
+    private void applyReload(StudentData data) {
+        currentSectionIds.clear();
+        currentSectionIds.addAll(data.sectionIds());
+
+        if (data.currentSemester() == null) {
             semesterBannerLabel.setText("No current semester is set.");
             rows.clear();
+            examRows.clear();
+            todayRows.clear();
             updateTotals();
             return;
         }
-        semesterBannerLabel.setText("Semester: " + currentSemester.getSemesterName());
-
-        try {
-            Map<Integer, StudentGradeRow> gradeByEnrollment =
-                    academicService.gradeRows(studentId, currentSemester.getSemesterId()).stream()
-                            .collect(Collectors.toMap(StudentGradeRow::getEnrollmentId, r -> r, (a, b) -> a));
-
-            List<Enrollment> enrollments =
-                    registrationService.myClassesForSemester(studentId, currentSemester.getSemesterId());
-
-            List<ClassRow> built = new ArrayList<>();
-            for (Enrollment enrollment : enrollments) {
-                Section section = sectionService.findById(enrollment.getSectionId());
-                if (section == null) {
-                    continue;
-                }
-                currentSectionIds.add(section.getSectionId());
-
-                Course course = courseOf(section.getCourseId());
-                StudentGradeRow gradeRow = gradeByEnrollment.get(enrollment.getEnrollmentId());
-
-                boolean evaluationSubmitted =
-                        evaluationService.hasSubmitted(enrollment.getEnrollmentId());
-
-                String grade = (evaluationSubmitted
-                        && gradeRow != null
-                        && gradeRow.getLetterGrade() != null)
-                        ? gradeRow.getLetterGrade().getLabel()
-                        : "--";
-
-                built.add(new ClassRow(
-                        enrollment.getEnrollmentId(),
-                        course == null ? "—" : course.getCourseCode(),
-                        course == null ? "—" : course.getCourseTitle(),
-                        section.getSectionNumber(),
-                        campusNameOf(section.getCampusId()),
-                        instructorNameOf(section.getInstructorId()),
-                        String.valueOf(section.getSectionId()),
-                        scheduleTextOf(section.getSectionId()),
-                        section.getRoom() == null || section.getRoom().isBlank() ? "—" : section.getRoom(),
-                        grade,
-                        attendanceService.countAbsencesForEnrollment(enrollment.getEnrollmentId()),
-                        enrollment.getStatus(),
-                        course == null ? 0 : course.getCredits()));
-            }
-            rows.setAll(built);
-        } catch (RuntimeException e) {
-            AlertUtil.error("Classes", "Your registered courses could not be loaded.", e);
-        }
+        semesterBannerLabel.setText("Semester: " + data.currentSemester().getSemesterName());
+        rows.setAll(data.classRows());
+        examRows.setAll(data.examRows());
+        todayRows.setAll(data.todayRows());
         updateTotals();
     }
 
-    private void loadExams() {
-        try {
-            List<Exam> mine = examService.examsForStudent(studentId);
-            List<ExamRow> built = mine.stream()
-                    .filter(exam -> currentSectionIds.contains(exam.getSectionId()))
-                    .map(this::toExamRow)
-                    .toList();
-            examRows.setAll(built);
-        } catch (RuntimeException e) {
-            examRows.clear();
+    private ExamRow toExamRow(Exam exam, Map<Integer, Section> sectionsById) {
+        Section section = sectionsById.get(exam.getSectionId());
+        if (section == null) {
+            section = sectionService.findById(exam.getSectionId());
         }
-    }
-
-    /**
-     * The student's real classes meeting today, built from the same registered sections as
-     * {@link #loadRegisteredCourses()} — never a hardcoded sample — filtered to whichever meetings
-     * fall on today's weekday and sorted by start time.
-     */
-    private void loadTodaysSchedule() {
-        try {
-            DayOfWeekCode today = DayOfWeekCode.fromJavaDayOfWeek(LocalDate.now().getDayOfWeek());
-            List<TodayRow> built = new ArrayList<>();
-            for (int sectionId : currentSectionIds) {
-                Section section = sectionService.findById(sectionId);
-                if (section == null) {
-                    continue;
-                }
-                Course course = courseOf(section.getCourseId());
-                for (SectionSchedule meeting : sectionService.listMeetings(sectionId)) {
-                    if (meeting.getDayOfWeek() != today) {
-                        continue;
-                    }
-                    built.add(new TodayRow(
-                            meeting.getStartTime(),
-                            HM.format(meeting.getStartTime()) + " - " + HM.format(meeting.getEndTime()),
-                            course == null ? "—" : course.getCourseCode() + " — " + course.getCourseTitle(),
-                            instructorNameOf(section.getInstructorId()),
-                            section.getRoom() == null || section.getRoom().isBlank() ? "—" : section.getRoom()));
-                }
-            }
-            built.sort(Comparator.comparing(r -> r.startTime));
-            todayRows.setAll(built);
-        } catch (RuntimeException e) {
-            todayRows.clear();
-        }
-    }
-
-    private ExamRow toExamRow(Exam exam) {
-        Section section = sectionService.findById(exam.getSectionId());
         Course course = section == null ? null : courseOf(section.getCourseId());
         String day = DayOfWeekCode.fromJavaDayOfWeek(exam.getExamDate().getDayOfWeek()).getLabel();
         int endMinutes = exam.getDurationMinutes();
@@ -436,8 +442,8 @@ public class StudentDashboardController {
                 .map(Campus::getCampusName).orElse("—");
     }
 
-    private String scheduleTextOf(int sectionId) {
-        List<SectionSchedule> meetings = sectionService.listMeetings(sectionId);
+    private String scheduleTextOf(Map<Integer, List<SectionSchedule>> meetingsBySection, int sectionId) {
+        List<SectionSchedule> meetings = meetingsBySection.getOrDefault(sectionId, List.of());
         if (meetings.isEmpty()) {
             return "No meetings set";
         }
@@ -453,7 +459,7 @@ public class StudentDashboardController {
 
         try {
             if (!evaluationService.isAvailable(row.enrollmentId)) {
-                loadRegisteredCourses();
+                reload();
                 return;
             }
 
@@ -471,7 +477,7 @@ public class StudentDashboardController {
             evaluationService.submit(row.enrollmentId, result.get());
 
             // Re-read the real database state so the empty star becomes a filled star.
-            loadRegisteredCourses();
+            reload();
 
         } catch (RuntimeException e) {
             AlertUtil.error(
@@ -511,7 +517,8 @@ public class StudentDashboardController {
         TableColumn<ExamRow, String> room = new TableColumn<>("Room");
         room.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().room));
         table.getColumns().setAll(List.of(code, name, date, day, time, duration, room));
-        table.setItems(FXCollections.observableArrayList(all.stream().map(this::toExamRow).toList()));
+        table.setItems(FXCollections.observableArrayList(
+                all.stream().map(exam -> toExamRow(exam, Map.of())).toList()));
         table.setPlaceholder(new Label("You have no exams scheduled."));
         table.setPrefSize(640, 360);
         table.setMaxWidth(Double.MAX_VALUE);

@@ -43,7 +43,9 @@ public class ReportDAO extends AbstractDAO {
               + "     JOIN dbo.semesters sem ON sem.semester_id = s.semester_id AND sem.is_current = 1 "
               + "    WHERE e.status = N'ENROLLED')                                  AS enrollments_now, "
               + "  (SELECT COUNT(*) FROM dbo.students WHERE academic_standing = N'PROBATION') AS on_probation, "
-              + "  (SELECT TOP 1 semester_name FROM dbo.semesters WHERE is_current = 1)       AS current_semester";
+              + "  (SELECT TOP 1 semester_name FROM dbo.semesters WHERE is_current = 1)       AS current_semester, "
+              + "  (SELECT AVG(cumulative_gpa) FROM dbo.students "
+              + "    WHERE status = N'ACTIVE' AND completed_credits > 0)                      AS avg_gpa";
 
         return queryOne(sql, resultSet -> {
             Kpis k = new Kpis();
@@ -53,6 +55,7 @@ public class ReportDAO extends AbstractDAO {
             k.activeSections = resultSet.getInt("active_sections");
             k.enrollmentsThisSemester = resultSet.getInt("enrollments_now");
             k.studentsOnProbation = resultSet.getInt("on_probation");
+            k.averageGpa = resultSet.getBigDecimal("avg_gpa");
             String currentSemester = resultSet.getNString("current_semester");
             if (currentSemester != null) {
                 k.currentSemester = currentSemester;

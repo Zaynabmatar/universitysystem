@@ -84,6 +84,29 @@ public class SectionService {
         return meetings;
     }
 
+    /** Every section a student is enrolled in for one semester, in a single round trip. */
+    public List<Section> listForStudent(int studentId, int semesterId) {
+        return sectionDao.findByStudentAndSemester(studentId, semesterId);
+    }
+
+    /**
+     * The weekly meetings of every section a student is enrolled in for one semester, grouped by
+     * section id — one round trip instead of one {@link #listMeetings} call per section.
+     */
+    public java.util.Map<Integer, List<SectionSchedule>> listMeetingsForStudent(int studentId, int semesterId) {
+        return scheduleDao.findByStudentAndSemester(studentId, semesterId).stream()
+                .collect(java.util.stream.Collectors.groupingBy(SectionSchedule::getSectionId));
+    }
+
+    /**
+     * The weekly meetings of every section one instructor teaches in one semester, grouped by
+     * section id — one round trip instead of one {@link #listMeetings} call per section.
+     */
+    public java.util.Map<Integer, List<SectionSchedule>> listMeetingsForInstructor(int instructorId, int semesterId) {
+        return scheduleDao.findByInstructorAndSemester(instructorId, semesterId).stream()
+                .collect(java.util.stream.Collectors.groupingBy(SectionSchedule::getSectionId));
+    }
+
     public int countEnrollments(int sectionId) {
         return enrollmentDao.findBySection(sectionId).size();
     }

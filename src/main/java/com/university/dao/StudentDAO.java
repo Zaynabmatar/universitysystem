@@ -111,6 +111,18 @@ public class StudentDAO extends AbstractDAO implements GenericDAO<Student> {
     }
 
     /**
+     * The average {@code cumulative_gpa} across every student who has actually completed credits.
+     * {@code completed_credits > 0} matches {@link #findByAcademicStanding}'s top/bottom-10
+     * queries: a brand-new student's 0.00 default would otherwise drag the university average down.
+     *
+     * @return the average, or null if no student has completed any credits yet
+     */
+    public BigDecimal averageCumulativeGpa() {
+        return queryOne("SELECT AVG(cumulative_gpa) FROM dbo.students WHERE completed_credits > 0",
+                rs -> rs.getBigDecimal(1)).orElse(null);
+    }
+
+    /**
      * Searches on Student ID, first name, last name or email.
      *
      * <p>The Student ID is {@code users.user_id}, an integer, so it is cast to

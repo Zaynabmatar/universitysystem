@@ -52,6 +52,10 @@
                 <Label fx:id="kpiGradeWindow" text="—" styleClass="kpi-value"/>
                 <Label text="Grade entry window" styleClass="kpi-label"/>
             </VBox>
+            <VBox styleClass="kpi-card" spacing="2">
+                <Label fx:id="kpiUniversityGpa" text="—" styleClass="kpi-value"/>
+                <Label text="University Average GPA" styleClass="kpi-label"/>
+            </VBox>
         </HBox>
 
         <Label text="Today's classes" styleClass="section-title"/>

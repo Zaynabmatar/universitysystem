@@ -4,6 +4,7 @@ import com.university.enums.UserRole;
 import com.university.service.ReportService;
 import com.university.service.Session;
 import com.university.util.AlertUtil;
+import com.university.util.Async;
 import com.university.util.SceneManager;
 import javafx.fxml.FXML;
 import javafx.scene.chart.BarChart;
@@ -20,9 +21,9 @@ import java.util.List;
  * complete set of seven reports lives on {@code admin_reports.fxml}; this is the landing page
  * an administrator sees immediately after logging in.
  *
- * <p>Everything is loaded synchronously. This screen is a handful of small queries against a
- * database with a few hundred rows; a background {@code Task} would add a class of threading
- * bugs ("Not on FX application thread") for no visible gain (context/CHART_RULES.md).</p>
+ * <p>The KPI/chart queries run on a background thread ({@link Async}) so this screen's own FXML
+ * (shell, empty charts) paints immediately after login instead of blocking on SQL Server; the
+ * fetched data is applied back on the FX thread once it arrives.</p>
  */
 public class AdminDashboardController {
 
@@ -32,6 +33,7 @@ public class AdminDashboardController {
     @FXML private Label kpiInstructors;
     @FXML private Label kpiCourses;
     @FXML private Label kpiSections;
+    @FXML private Label kpiAvgGpa;
     @FXML private BarChart<String, Number> deptChart;
     @FXML private PieChart gradeChart;
     @FXML private LineChart<String, Number> trendChart;
@@ -82,23 +84,33 @@ public class AdminDashboardController {
         aiAssistantToggleButton.setManaged(!expand);
     }
 
-    private void load() {
-        try {
-            ReportService.Kpis k = reportService.getKpis();
-            kpiStudents.setText(String.valueOf(k.totalStudents));
-            kpiInstructors.setText(String.valueOf(k.totalInstructors));
-            kpiCourses.setText(String.valueOf(k.totalCourses));
-            kpiSections.setText(String.valueOf(k.activeSections));
-            semesterLabel.setText("Current semester: " + k.currentSemester);
-            secondaryLabel.setText(k.enrollmentsThisSemester + " enrollments this semester   •   "
-                    + k.studentsOnProbation + " students on probation");
+    /** Everything {@link #load()} needs from the database, fetched together off the FX thread. */
+    private record DashboardData(ReportService.Kpis kpis, List<ReportService.Slice> byDept,
+                                  List<ReportService.Slice> byGrade, List<ReportService.Slice> trend) {
+    }
 
-            ChartUtil.fillBar(deptChart, deptEmpty, reportService.enrollmentPerDepartment(), "Enrollments");
-            ChartUtil.fillPie(gradeChart, gradeEmpty, reportService.gradeDistribution());
-            ChartUtil.fillLine(trendChart, trendEmpty, reportService.enrollmentTrend(), "Enrollments");
-        } catch (RuntimeException e) {
-            AlertUtil.error("Dashboard",
-                    "The dashboard could not be loaded. Check that SQL Server is running, then press Refresh.");
-        }
+    private void load() {
+        Async.run(
+                () -> new DashboardData(reportService.getKpis(), reportService.enrollmentPerDepartment(),
+                        reportService.gradeDistribution(), reportService.enrollmentTrend()),
+                this::applyDashboardData,
+                error -> AlertUtil.error("Dashboard",
+                        "The dashboard could not be loaded. Check that SQL Server is running, then press Refresh."));
+    }
+
+    private void applyDashboardData(DashboardData data) {
+        ReportService.Kpis k = data.kpis();
+        kpiStudents.setText(String.valueOf(k.totalStudents));
+        kpiInstructors.setText(String.valueOf(k.totalInstructors));
+        kpiCourses.setText(String.valueOf(k.totalCourses));
+        kpiSections.setText(String.valueOf(k.activeSections));
+        kpiAvgGpa.setText(k.averageGpa == null ? "—" : String.format("%.2f", k.averageGpa));
+        semesterLabel.setText("Current semester: " + k.currentSemester);
+        secondaryLabel.setText(k.enrollmentsThisSemester + " enrollments this semester   •   "
+                + k.studentsOnProbation + " students on probation");
+
+        ChartUtil.fillBar(deptChart, deptEmpty, data.byDept(), "Enrollments");
+        ChartUtil.fillPie(gradeChart, gradeEmpty, data.byGrade());
+        ChartUtil.fillLine(trendChart, trendEmpty, data.trend(), "Enrollments");
     }
 }

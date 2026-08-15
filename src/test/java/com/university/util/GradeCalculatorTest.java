@@ -24,10 +24,30 @@ class GradeCalculatorTest {
     // ---- Section 5.1 : the weighted total ------------------------------
 
     @Test
-    @DisplayName("Section 5.1 — total = 0.30*coursework + 0.30*midterm + 0.40*final")
+    @DisplayName("Section 5.1 — total = course-configured weights, e.g. 0.30*coursework + 0.30*midterm + 0.40*final")
     void weightedTotalMatchesTheSpecFormula() {
-        // 0.30*80 + 0.30*90 + 0.40*95 = 24.00 + 27.00 + 38.00 = 89.00
+        // 80/100*30 + 90/100*30 + 95/100*40 = 24.00 + 27.00 + 38.00 = 89.00
         assertEquals(new BigDecimal("89.00"), GradeCalculator.totalMark(
+                new BigDecimal("80"), new BigDecimal("90"), null, new BigDecimal("95"), false,
+                new BigDecimal("30"), new BigDecimal("30"), new BigDecimal("40"),
+                new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100")));
+    }
+
+    @Test
+    @DisplayName("Section 5.1 — total = mark / max * weight, summed across components")
+    void totalUsesMarkOverMaxTimesWeight() {
+        // coursework 18/20*20 + midterm 45/50*30 + final 80/100*50 = 18.00 + 27.00 + 40.00 = 85.00
+        assertEquals(new BigDecimal("85.00"), GradeCalculator.totalMark(
+                new BigDecimal("18"), new BigDecimal("45"), null, new BigDecimal("80"), false,
+                new BigDecimal("20"), new BigDecimal("30"), new BigDecimal("50"),
+                new BigDecimal("20"), new BigDecimal("50"), new BigDecimal("100")));
+    }
+
+    @Test
+    @DisplayName("The no-weight convenience overload uses the default 20/30/50 split")
+    void defaultWeightOverloadUsesTwentyThirtyFifty() {
+        // 0.20*80 + 0.30*90 + 0.50*95 = 16.00 + 27.00 + 47.50 = 90.50
+        assertEquals(new BigDecimal("90.50"), GradeCalculator.totalMark(
                 new BigDecimal("80"), new BigDecimal("90"), new BigDecimal("95")));
     }
 
@@ -118,6 +138,15 @@ class GradeCalculatorTest {
         assertFalse(GradeCalculator.isValidMark(new BigDecimal("150")));
         assertFalse(GradeCalculator.isValidMark(new BigDecimal("-5")));
         assertFalse(GradeCalculator.isValidMark(null));
+    }
+
+    @Test
+    @DisplayName("Rule G3 — a mark is legal only between 0 and the component's own max mark")
+    void marksOutsideZeroToMaxAreRejected() {
+        assertTrue(GradeCalculator.isValidMark(new BigDecimal("20"), new BigDecimal("20")));
+        assertTrue(GradeCalculator.isValidMark(new BigDecimal("0"), new BigDecimal("20")));
+        assertFalse(GradeCalculator.isValidMark(new BigDecimal("21"), new BigDecimal("20")));
+        assertFalse(GradeCalculator.isValidMark(new BigDecimal("-1"), new BigDecimal("20")));
     }
 
     // ---- Section 5.3 : THE WORKED EXAMPLE. This must print 3.24. -------

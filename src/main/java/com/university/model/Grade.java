@@ -27,6 +27,10 @@ public class Grade {
     private BigDecimal gradePoints;
     private ResultStatus resultStatus;
     private boolean submitted;
+    private boolean courseworkPublished;
+    private boolean midtermPublished;
+    private boolean labPublished;
+    private boolean finalPublished;
     private Integer submittedBy;
     private LocalDateTime submittedAt;
     private Integer lastModifiedBy;
@@ -146,6 +150,40 @@ public class Grade {
 
     public void setSubmitted(boolean submitted) {
         this.submitted = submitted;
+    }
+
+    /** True once the Coursework/Lab-replacement mark has been released to the student on its own,
+     *  ahead of the whole row being submitted. */
+    public boolean isCourseworkPublished() {
+        return courseworkPublished;
+    }
+
+    public void setCourseworkPublished(boolean courseworkPublished) {
+        this.courseworkPublished = courseworkPublished;
+    }
+
+    public boolean isMidtermPublished() {
+        return midtermPublished;
+    }
+
+    public void setMidtermPublished(boolean midtermPublished) {
+        this.midtermPublished = midtermPublished;
+    }
+
+    public boolean isLabPublished() {
+        return labPublished;
+    }
+
+    public void setLabPublished(boolean labPublished) {
+        this.labPublished = labPublished;
+    }
+
+    public boolean isFinalPublished() {
+        return finalPublished;
+    }
+
+    public void setFinalPublished(boolean finalPublished) {
+        this.finalPublished = finalPublished;
     }
 
     /** Null until the grade is submitted. */

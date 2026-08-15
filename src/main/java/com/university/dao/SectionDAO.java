@@ -80,6 +80,16 @@ public class SectionDAO extends AbstractDAO implements GenericDAO<Section> {
                 + "ORDER BY course_id, section_number", MAPPER, instructorId, semesterId);
     }
 
+    /** What one student is enrolled in for one semester, in a single round trip. */
+    public List<Section> findByStudentAndSemester(int studentId, int semesterId) {
+        return queryList("SELECT s.section_id, s.course_id, s.semester_id, s.instructor_id, "
+                + "s.campus_id, s.section_number, s.capacity, s.enrolled_count, s.room, s.status "
+                + "FROM dbo.sections s "
+                + "INNER JOIN dbo.enrollments e ON e.section_id = s.section_id "
+                + "WHERE e.student_id = ? AND s.semester_id = ? AND e.status = 'ENROLLED' "
+                + "ORDER BY s.course_id, s.section_number", MAPPER, studentId, semesterId);
+    }
+
     /** Everything one instructor has ever taught. */
     public List<Section> findByInstructor(int instructorId) {
         return queryList(SELECT + " WHERE instructor_id = ? ORDER BY semester_id DESC",

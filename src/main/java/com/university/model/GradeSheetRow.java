@@ -30,8 +30,24 @@ public class GradeSheetRow {
     private LetterGrade letterGrade;
     private BigDecimal gradePoints;
     private boolean submitted;
+    /** True once this component has been released to the student on its own, ahead of the whole
+     *  row being submitted -- see {@link com.university.service.GradeService#publishComponents}. */
+    private boolean courseworkPublished;
+    private boolean midtermPublished;
+    private boolean labPublished;
+    private boolean finalPublished;
     /** True when this row's course has a lab component ({@code courses.has_lab}). */
     private boolean hasLab;
+    /** True once a submitted row has been edited in memory and needs to be re-saved. */
+    private boolean editedAfterSubmit;
+    /** The course's own weights ({@code dbo.courses}), used to compute {@link #totalMark}. */
+    private BigDecimal courseworkWeight;
+    private BigDecimal midtermWeight;
+    private BigDecimal finalWeight;
+    /** The course's own max marks ({@code dbo.courses}), used to validate marks and compute {@link #totalMark}. */
+    private BigDecimal courseworkMaxMark;
+    private BigDecimal midtermMaxMark;
+    private BigDecimal finalMaxMark;
 
     public int getEnrollmentId() {
         return enrollmentId;
@@ -139,9 +155,137 @@ public class GradeSheetRow {
         this.submitted = submitted;
     }
 
-    /** Recomputes total/letter/points from the three marks — Section 5.1 and 5.2. */
+    /** True once a submitted row has been edited in memory and needs to be re-saved. */
+    public boolean isEditedAfterSubmit() {
+        return editedAfterSubmit;
+    }
+
+    public void setEditedAfterSubmit(boolean editedAfterSubmit) {
+        this.editedAfterSubmit = editedAfterSubmit;
+    }
+
+    public boolean isCourseworkPublished() {
+        return courseworkPublished;
+    }
+
+    public void setCourseworkPublished(boolean courseworkPublished) {
+        this.courseworkPublished = courseworkPublished;
+    }
+
+    public boolean isMidtermPublished() {
+        return midtermPublished;
+    }
+
+    public void setMidtermPublished(boolean midtermPublished) {
+        this.midtermPublished = midtermPublished;
+    }
+
+    public boolean isLabPublished() {
+        return labPublished;
+    }
+
+    public void setLabPublished(boolean labPublished) {
+        this.labPublished = labPublished;
+    }
+
+    public boolean isFinalPublished() {
+        return finalPublished;
+    }
+
+    public void setFinalPublished(boolean finalPublished) {
+        this.finalPublished = finalPublished;
+    }
+
+    /** Weight (%) of the Coursework mark (no lab) or the Lab mark (has lab). */
+    public BigDecimal getCourseworkWeight() {
+        return courseworkWeight;
+    }
+
+    public void setCourseworkWeight(BigDecimal courseworkWeight) {
+        this.courseworkWeight = courseworkWeight;
+    }
+
+    public BigDecimal getMidtermWeight() {
+        return midtermWeight;
+    }
+
+    public void setMidtermWeight(BigDecimal midtermWeight) {
+        this.midtermWeight = midtermWeight;
+    }
+
+    public BigDecimal getFinalWeight() {
+        return finalWeight;
+    }
+
+    public void setFinalWeight(BigDecimal finalWeight) {
+        this.finalWeight = finalWeight;
+    }
+
+    /** Max mark of the Coursework mark (no lab) or the Lab mark (has lab). */
+    public BigDecimal getCourseworkMaxMark() {
+        return courseworkMaxMark;
+    }
+
+    public void setCourseworkMaxMark(BigDecimal courseworkMaxMark) {
+        this.courseworkMaxMark = courseworkMaxMark;
+    }
+
+    public BigDecimal getMidtermMaxMark() {
+        return midtermMaxMark;
+    }
+
+    public void setMidtermMaxMark(BigDecimal midtermMaxMark) {
+        this.midtermMaxMark = midtermMaxMark;
+    }
+
+    public BigDecimal getFinalMaxMark() {
+        return finalMaxMark;
+    }
+
+    public void setFinalMaxMark(BigDecimal finalMaxMark) {
+        this.finalMaxMark = finalMaxMark;
+    }
+
+    /** True when a stored mark now exceeds its component's configured max — e.g. an admin lowered
+     *  the max mark after this mark was entered. Never auto-corrected; the instructor must re-enter it. */
+    public boolean isCourseworkMarkInvalid() {
+        return courseworkMark != null && !GradeCalculator.isValidMark(courseworkMark, courseworkMaxMark);
+    }
+
+    public boolean isMidtermMarkInvalid() {
+        return midtermMark != null && !GradeCalculator.isValidMark(midtermMark, midtermMaxMark);
+    }
+
+    public boolean isLabMarkInvalid() {
+        return labMark != null && !GradeCalculator.isValidMark(labMark, courseworkMaxMark);
+    }
+
+    public boolean isFinalMarkInvalid() {
+        return finalMark != null && !GradeCalculator.isValidMark(finalMark, finalMaxMark);
+    }
+
+    /** True when any mark on this row needs the instructor's correction before it can be saved/submitted. */
+    public boolean hasInvalidMark() {
+        return isCourseworkMarkInvalid() || isMidtermMarkInvalid() || isLabMarkInvalid() || isFinalMarkInvalid();
+    }
+
+    /**
+     * Recomputes total/letter/points from the three marks — Section 5.1 and 5.2.
+     *
+     * <p>A row with a mark above its component's max ({@link #hasInvalidMark()}) shows no
+     * total/letter/points at all until the instructor corrects it — never a value computed from
+     * the out-of-range mark, and never a silently clamped one.</p>
+     */
     public void recompute() {
-        this.totalMark = GradeCalculator.totalMark(courseworkMark, midtermMark, labMark, finalMark, hasLab);
+        if (hasInvalidMark()) {
+            this.totalMark = null;
+            this.letterGrade = null;
+            this.gradePoints = null;
+            return;
+        }
+        this.totalMark = GradeCalculator.totalMark(courseworkMark, midtermMark, labMark, finalMark, hasLab,
+                courseworkWeight, midtermWeight, finalWeight,
+                courseworkMaxMark, midtermMaxMark, finalMaxMark);
         this.letterGrade = GradeCalculator.letterGrade(totalMark);
         this.gradePoints = letterGrade == null ? null : letterGrade.getGradePoints();
     }
