@@ -5,6 +5,7 @@ import com.university.dao.StudentDAO;
 import com.university.enums.DayOfWeekCode;
 import com.university.model.Semester;
 import com.university.model.Student;
+import com.university.service.TranscriptService.RequirementRow;
 import com.university.util.GradeCalculator;
 
 import java.math.BigDecimal;
@@ -26,7 +27,7 @@ import java.util.TreeSet;
  * THE AI ENGINE — project_details.md Section 9.
  *
  * <pre>
- *   LAYER 1  rule-based expert system        -> eligibility filter (rules R3, R4, R5, R6, R7)
+ *   LAYER 1  rule-based expert system        -> eligibility filter (rules R3, R4, R5, R6, R7, R8)
  *   LAYER 2  content-based scoring           -> baseScore           0 .. 100
  *   LAYER 3  item-based k-NN, Jaccard, k=10  -> collaborativeBonus  0 .. +15
  *
@@ -87,6 +88,12 @@ public class RecommendationService {
     private final RecommendationDAO dao = new RecommendationDAO();
     private final StudentDAO studentDao = new StudentDAO();
     private final RegistrationService registrationService = new RegistrationService();
+    /** The single source of truth for "the student's current planned semester" — Phase 12's
+     *  Study Plan (Degree Progress' own stage/eligibility logic), not a second estimate. */
+    private final TranscriptService transcriptService = new TranscriptService();
+    /** Reused for the same FINANCIAL_HOLD gate {@link RegistrationService#registerStudent}
+     *  enforces — a course is not "recommendable" if pressing Register would fail on it. */
+    private final TuitionService tuitionService = new TuitionService();
 
     /* =====================================================================
        1. WHAT THE UI RECEIVES
@@ -157,10 +164,14 @@ public class RecommendationService {
         public int finalScore;
 
         /**
-         * The PRIMARY sort key — the student's own Plan of Study, not the score. 2 = required and
-         * already due or overdue, 1 = required but not yet due, 0 = elective. A required,
-         * overdue course always outranks an elective, however the 0..115 score compares; the
-         * score only breaks ties inside one tier.
+         * The PRIMARY sort key — the student's own Plan of Study, not the score.
+         * 3 = required repeat/overdue (an earlier-semester requirement, e.g. a previously failed
+         * course, not yet satisfied) — highest priority, exactly as project_details.md's
+         * recommendation ordering demands. 2 = required by the student's CURRENT study-plan
+         * semester. 1 = required by a FUTURE semester, not yet due. 0 = elective / not part of
+         * the plan. A required, overdue course always outranks a current-semester one, and a
+         * current-semester one always outranks an elective, however the 0..115 score compares;
+         * the score only breaks ties inside one tier.
          */
         public int planPriorityTier;
 
@@ -209,6 +220,14 @@ public class RecommendationService {
         public int           creditLimit;
         public String        programName = "";
         public LocalDateTime generatedAt = LocalDateTime.now();
+
+        /**
+         * One line per Study Plan course that is currently due (this semester or an earlier one,
+         * not yet passed or in progress) but could not be recommended — why it was skipped
+         * instead of a silent omission. E.g. "CS301 is in your Semester 4 plan but is not
+         * currently available."
+         */
+        public final List<String> warnings = new ArrayList<>();
 
         public boolean isBlocked() { return blockedReason != null; }
     }
@@ -286,6 +305,9 @@ public class RecommendationService {
         public String room = "";
         public String scheduleText = "";
         public final List<Reason> eligibility = new ArrayList<>();
+        /** Set by whichever eligibility rule first rejects this candidate; null if it survived.
+         *  Read by {@link #buildPlanWarnings} to explain a Study Plan course that was skipped. */
+        public String blockedReason;
     }
 
     public static class Attempt {
@@ -331,7 +353,22 @@ public class RecommendationService {
 
         StudentProfile me = dao.findProfile(studentId)
                 .orElseThrow(() -> new ServiceException("That student record was not found."));
-        me.currentSemester = currentSemesterOf(me.completedCredits, me.creditsRequired);
+
+        /* ---------- the student's actual Study Plan — Degree Progress' own logic, read
+           here rather than re-derived from raw credit counts ---------- */
+        TranscriptService.DegreeProgress studyPlan = transcriptService.getDegreeProgress(studentId);
+        me.currentSemester = studyPlan.currentStage;
+
+        Map<Integer, PlanEntry>     plan     = new LinkedHashMap<>();
+        Map<Integer, RequirementRow> planRows = new LinkedHashMap<>();
+        for (RequirementRow row : studyPlan.requirements) {
+            planRows.put(row.courseId, row);
+            PlanEntry entry = new PlanEntry();
+            entry.courseId            = row.courseId;
+            entry.isMandatory         = row.isMandatory;
+            entry.recommendedSemester = row.recommendedSemester;
+            plan.put(row.courseId, entry);
+        }
 
         /* ---------- load everything ONCE (no N+1 queries) ---------- */
         Map<Integer, List<Prereq>>  prereqs     = dao.loadAllPrerequisites();
@@ -341,7 +378,6 @@ public class RecommendationService {
         me.creditLimit    = creditLimitFor(studentId);
 
         List<Meeting>               myMeetings    = dao.loadMyMeetings(studentId);
-        Map<Integer, PlanEntry>     plan          = dao.loadProgramRequirements(me.programId);
         Map<Integer, CourseStats>   stats         = dao.loadCourseStatistics();
         Map<Integer, List<String>>  unlockedCodes = dao.loadUnlockedCourseCodes();
         List<Attempt>               attempts      = dao.loadAllGradedAttempts();
@@ -353,18 +389,31 @@ public class RecommendationService {
                     sectionMeet.getOrDefault(candidate.sectionId, List.of()));
         }
 
+        Map<Integer, List<Candidate>> candidatesByCourse = new HashMap<>();
+        for (Candidate candidate : candidates) {
+            candidatesByCourse.computeIfAbsent(candidate.courseId, key -> new ArrayList<>())
+                               .add(candidate);
+        }
+
         out.sectionsConsidered = candidates.size();
         int maxUnlocks = maxUnlocksInCatalogue(stats);
 
-        /* ---------- LAYER 1 : eligibility filter (R3, R4, R5, R6, R7) ---------- */
+        /* ---------- LAYER 1 : eligibility filter (R3, R4, R5, R6, R7, R8) ---------- */
         List<Candidate> eligible = new ArrayList<>();
         for (Candidate candidate : candidates) {
-            if (isEligible(candidate, me, prereqs, myPassed, enrolledNow, myMeetings, sectionMeet)) {
+            if (isEligible(candidate, me, prereqs, myPassed, enrolledNow, myMeetings, sectionMeet,
+                    planRows)) {
                 eligible.add(candidate);
             }
         }
         eligible = keepBestSectionPerCourse(eligible);
         out.sectionsSurviving = eligible.size();
+
+        Set<Integer> eligibleCourseIds = new HashSet<>();
+        for (Candidate candidate : eligible) {
+            eligibleCourseIds.add(candidate.courseId);
+        }
+        buildPlanWarnings(out, me, planRows, candidatesByCourse, eligibleCourseIds);
 
         /* ---------- LAYER 3 preparation : neighbours, once for the whole run ---------- */
         Map<Integer, Set<Integer>> passedSets = buildPassedCourseSets(attempts);
@@ -434,6 +483,14 @@ public class RecommendationService {
             return "Registration for " + semester.getSemesterName()
                  + " closed on " + semester.getRegistrationEnd().toLocalDate() + ".";
         }
+
+        // FINANCIAL_HOLD — the same balance check registerStudent() enforces. Not a per-course
+        // rule, so it gates the whole screen exactly like R1/R2 rather than being silently
+        // re-derived per candidate.
+        if (tuitionService.hasUnpaidPreviousBalance(studentId, semester)) {
+            return "You have an unpaid balance from a previous semester. "
+                 + "Please settle it before registering for a new semester.";
+        }
         return null;
     }
 
@@ -455,22 +512,41 @@ public class RecommendationService {
     }
 
     /* =====================================================================
-       LAYER 1 — THE ELIGIBILITY FILTER (rules R3, R4, R5, R6, R7)
+       LAYER 1 — THE ELIGIBILITY FILTER (rules R3, R4, R5, R6, R7, R8)
        Every rule is its own method so it can be pointed at during the demo.
        ===================================================================== */
 
-    private boolean isEligible(Candidate candidate, StudentProfile me,
+    boolean isEligible(Candidate candidate, StudentProfile me,
                                Map<Integer, List<Prereq>> prereqs,
                                Map<Integer, PassedCourse> myPassed,
                                Set<Integer> enrolledNow,
                                List<Meeting> myMeetings,
-                               Map<Integer, List<Meeting>> sectionMeet) {
+                               Map<Integer, List<Meeting>> sectionMeet,
+                               Map<Integer, RequirementRow> planRows) {
         candidate.eligibility.clear();
+        candidate.blockedReason = null;
         return passesR4_notAlreadyTaken(candidate, myPassed, enrolledNow)
+            && passesSectionScheduled(candidate, sectionMeet)
             && passesR3_prerequisitesMet(candidate, prereqs, myPassed)
+            && passesR8_creditThresholdMet(candidate, planRows, me)
             && passesR5_seatAvailable(candidate)
             && passesR6_noTimetableConflict(candidate, myMeetings, sectionMeet)
             && passesR7_withinCreditLimit(candidate, me);
+    }
+
+    /**
+     * SECTION_NOT_SCHEDULED — the same check {@link RegistrationService#registerStudent} runs
+     * before letting anyone in: a section with no meeting time at all is an incomplete offering
+     * (Admin has not finished configuring it), so pressing Register on it would fail even though
+     * the section is "OPEN". {@code sectionMeet} is the same map R6 already reads, so this costs
+     * no extra query.
+     */
+    private boolean passesSectionScheduled(Candidate candidate, Map<Integer, List<Meeting>> sectionMeet) {
+        if (sectionMeet.getOrDefault(candidate.sectionId, List.of()).isEmpty()) {
+            candidate.blockedReason = "it has not been scheduled yet and cannot be registered for";
+            return false;
+        }
+        return true;
     }
 
     /** R4 — never recommend something already passed or already being taken. */
@@ -478,6 +554,7 @@ public class RecommendationService {
                                              Map<Integer, PassedCourse> myPassed,
                                              Set<Integer> enrolledNow) {
         if (myPassed.containsKey(candidate.courseId) || enrolledNow.contains(candidate.courseId)) {
+            candidate.blockedReason = "you have already passed or are currently enrolled in it";
             return false;
         }
         candidate.eligibility.add(Reason.check("You have not taken this course before"));
@@ -497,6 +574,7 @@ public class RecommendationService {
         for (Prereq prereq : required) {
             PassedCourse got = myPassed.get(prereq.prerequisiteCourseId);
             if (got == null || got.points.compareTo(prereq.minPoints) < 0) {
+                candidate.blockedReason = "its prerequisites are not yet met";
                 return false;
             }
             met.add(prereq.prerequisiteCode + " (" + got.letterGrade + ")");
@@ -506,9 +584,33 @@ public class RecommendationService {
         return true;
     }
 
+    /**
+     * R8 — a program_requirements row may carry a {@code min_completed_credits} floor (Final
+     * Project / Internship-style courses) on top of ordinary course prerequisites. Not part of
+     * {@code course_prerequisites}, so R3 cannot see it; unmet, it is exactly the same kind of
+     * block as a missing prerequisite course.
+     */
+    private boolean passesR8_creditThresholdMet(Candidate candidate,
+                                                Map<Integer, RequirementRow> planRows,
+                                                StudentProfile me) {
+        RequirementRow row = planRows.get(candidate.courseId);
+        if (row == null || row.minCompletedCredits == null) {
+            return true;
+        }
+        if (me.completedCredits < row.minCompletedCredits) {
+            candidate.blockedReason = "you have not yet reached the required "
+                    + row.minCompletedCredits + " completed credits";
+            return false;
+        }
+        candidate.eligibility.add(Reason.check("Meets the " + row.minCompletedCredits
+                + " completed-credit requirement for this course"));
+        return true;
+    }
+
     /** R5 — a seat must be free. */
     private boolean passesR5_seatAvailable(Candidate candidate) {
         if (candidate.enrolledCount >= candidate.capacity) {
+            candidate.blockedReason = "all of its open sections are currently full";
             return false;
         }
         int free = candidate.capacity - candidate.enrolledCount;
@@ -523,6 +625,7 @@ public class RecommendationService {
         for (Meeting theirs : sectionMeet.getOrDefault(candidate.sectionId, List.of())) {
             for (Meeting mine : myMeetings) {
                 if (theirs.overlaps(mine)) {
+                    candidate.blockedReason = "it conflicts with your current class schedule";
                     return false;
                 }
             }
@@ -535,6 +638,7 @@ public class RecommendationService {
     private boolean passesR7_withinCreditLimit(Candidate candidate, StudentProfile me) {
         int total = me.currentCredits + candidate.credits;
         if (total > me.creditLimit) {
+            candidate.blockedReason = "registering would exceed your credit limit this semester";
             return false;
         }
         candidate.eligibility.add(Reason.check("Credit load would be " + me.currentCredits + " + "
@@ -557,6 +661,49 @@ public class RecommendationService {
             }
         }
         return new ArrayList<>(best.values());
+    }
+
+    /**
+     * Requirement 8's "clear reason instead of a silent omission": every Study Plan course that
+     * is currently due (this semester or an earlier one) but not already passed, not already in
+     * progress, and did not survive Layer 1 gets one line explaining why — never left for the
+     * student to wonder whether it was simply forgotten.
+     *
+     * <p>Restricted to courses due now or overdue ({@code recommendedSemester <= currentSemester})
+     * on purpose: a future course the student has not reached yet is not "missing", it is simply
+     * not due, and warning about it would be noise.</p>
+     */
+    private void buildPlanWarnings(RecommendationResult out, StudentProfile me,
+                                   Map<Integer, RequirementRow> planRows,
+                                   Map<Integer, List<Candidate>> candidatesByCourse,
+                                   Set<Integer> eligibleCourseIds) {
+        List<RequirementRow> due = new ArrayList<>();
+        for (RequirementRow row : planRows.values()) {
+            if (row.recommendedSemester == null || row.recommendedSemester > me.currentSemester) {
+                continue;
+            }
+            if (row.isPassed() || row.isInProgress()) {
+                continue;
+            }
+            if (eligibleCourseIds.contains(row.courseId)) {
+                continue;
+            }
+            due.add(row);
+        }
+        due.sort(Comparator.comparingInt((RequirementRow r) -> r.recommendedSemester)
+                           .thenComparing(r -> r.courseCode));
+
+        for (RequirementRow row : due) {
+            String reason = "is not currently available";
+            for (Candidate section : candidatesByCourse.getOrDefault(row.courseId, List.of())) {
+                if (section.blockedReason != null) {
+                    reason = section.blockedReason;
+                    break;
+                }
+            }
+            out.warnings.add(row.courseCode + " is in your Semester " + row.recommendedSemester
+                    + " plan but " + reason + ".");
+        }
     }
 
     /* =====================================================================
@@ -629,19 +776,36 @@ public class RecommendationService {
     }
 
     /**
-     * The Plan of Study tier (the primary sort key) — same {@code program_requirements} data as
-     * factor 1/2 below, read once here instead of a second computation. A course failed and not
-     * yet retaken has no passed attempt, so it is still {@code plan.get(courseId)}'s mandatory
-     * entry and, once the student's current semester has passed its recommended one, lands in the
-     * top tier exactly like any other overdue requirement — no separate "failed" case needed.
+     * The Plan of Study tier (the primary sort key), driven entirely by where a course sits in
+     * the student's Study Plan relative to {@code me.currentSemester} — the actual stage
+     * {@link TranscriptService#getDegreeProgress} computed, not a score:
+     *
+     * <pre>
+     *   3 = assigned to an EARLIER planned semester, still unfinished/failed/missed  (highest —
+     *       "required repeat / old course": a previously failed or skipped requirement)
+     *   2 = assigned to the student's CURRENT planned semester
+     *   1 = assigned to a FUTURE planned semester (only reachable once tiers 2-3 are exhausted)
+     *   0 = not part of the plan (a free/general elective)
+     * </pre>
+     *
+     * <p>A course failed and not yet retaken has no passed attempt, so it is still
+     * {@code plan.get(courseId)}'s entry and, once due, lands in tier 2 or 3 exactly like any
+     * other unfinished requirement — no separate "failed" case needed. The 0..115 score only
+     * breaks ties inside one tier; it never lets a future elective outrank a due requirement, and
+     * it never lets a current-semester requirement outrank an overdue repeat.</p>
      */
-    private int planPriorityTier(PlanEntry entry, StudentProfile me) {
-        if (entry == null || !entry.isMandatory) {
+    int planPriorityTier(PlanEntry entry, StudentProfile me) {
+        if (entry == null || entry.recommendedSemester == null) {
             return 0;
         }
-        boolean dueOrOverdue = entry.recommendedSemester != null
-                && me.currentSemester - entry.recommendedSemester >= 0;
-        return dueOrOverdue ? 2 : 1;
+        int recommended = entry.recommendedSemester;
+        if (recommended < me.currentSemester) {
+            return 3;
+        }
+        if (recommended == me.currentSemester) {
+            return 2;
+        }
+        return 1;
     }
 
     /**

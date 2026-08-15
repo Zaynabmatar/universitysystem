@@ -41,12 +41,16 @@ import java.util.Optional;
  *   G1  only the instructor assigned to a section may enter its grades
  *   G2  only between the semester's grade_entry_start and grade_entry_end
  *   G3  marks must be 0..the component's own max mark    (GradeCalculator.isValidMark)
- *   G4  once is_submitted = 1 the instructor can no longer edit, UNLESS the grade window (G2) is
- *       still open, in which case the same row may be corrected in place (see submitSection)
+ *   G4  once is_submitted = 1 the instructor can no longer edit that section at all — only an
+ *       ADMIN correction (adminOverride) or an ADMIN unlock (unlockSection) reopens it
  *   G5  only ADMIN may change a submitted grade, and the change is audited (by trg_Grade_Audit —
  *       this class never writes to audit_log itself)
  *   G6  on submission: enrollment -&gt; COMPLETED, then the academic record is recalculated
  * </pre>
+ *
+ * <p>{@link #submitSection} locks a WHOLE section at once: every actively enrolled student must
+ * have all their required marks or nothing is submitted for anyone (Section 6.6's "Submit and
+ * Lock" is an all-or-nothing action, not a per-student one).</p>
  *
  * <p>Every rule is enforced here, not only in the UI — a rule that only exists in the UI is a
  * suggestion, not a rule.</p>
@@ -131,23 +135,6 @@ public class GradeService {
     }
 
     /**
-     * The same G2 rule as {@link #assertGradeWindowOpen}, without throwing — lets the grade sheet
-     * decide, before any edit, whether a submitted row may still be corrected in place.
-     */
-    public boolean isGradeWindowOpen(int sectionId) {
-        Section section = sectionDao.findById(sectionId).orElse(null);
-        if (section == null) {
-            return false;
-        }
-        try {
-            assertGradeWindowOpen(section);
-            return true;
-        } catch (ServiceException e) {
-            return false;
-        }
-    }
-
-    /**
      * G3 — every mark actually being written must be 0..the component's own max mark.
      *
      * <p>Skips a submitted row that is not being corrected in this call: it is locked (G4) and
@@ -158,8 +145,8 @@ public class GradeService {
      */
     private void assertMarksValid(List<GradeSheetRow> rows) {
         for (GradeSheetRow row : rows) {
-            if (row.isSubmitted() && !row.isEditedAfterSubmit()) {
-                continue;
+            if (row.isSubmitted()) {
+                continue; // locked (G4) -- only Admin Unlock reopens a submitted row
             }
             checkOne(row, row.getCourseworkMark(), "Coursework", row.getCourseworkMaxMark());
             checkOne(row, row.getMidtermMark(), "Midterm", row.getMidtermMaxMark());
@@ -182,11 +169,15 @@ public class GradeService {
 
     /**
      * Writes the marks WITHOUT submitting. For a never-submitted row {@code is_submitted} stays
-     * 0, the enrollment stays ENROLLED, no GPA is recalculated. For a row already submitted and
-     * corrected in place while the grade window is open ({@link GradeSheetRow#isEditedAfterSubmit()}),
-     * the corrected marks are written immediately so they are never lost on the next refresh —
-     * {@code submitted}/{@code editedAfterSubmit} stay as they were; only {@link #submitSection}
-     * finalizes the correction (GPA recalculated, student notified, flag cleared).
+     * 0, the enrollment stays ENROLLED, no GPA is recalculated. A row that is already submitted
+     * (its section is locked) is skipped entirely — G4 — until an Admin Unlock
+     * ({@link #unlockSection}) reopens it for editing.
+     *
+     * <p>Always writes the instructor's current values, including for a component that was
+     * already published — the instructor's edit must never come back as the old value on the
+     * next reload. What a student actually sees does not move: that stays frozen at whatever was
+     * last released by {@link #publishComponents}/{@link #submitSection} until one of those runs
+     * again, so this never leaks an in-progress edit early, and never sends a notification.</p>
      */
     public void saveDraft(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
         Section section = requireSection(sectionId);
@@ -198,16 +189,48 @@ public class GradeService {
         try {
             for (GradeSheetRow row : rows) {
                 if (row.isSubmitted()) {
-                    if (row.isEditedAfterSubmit()) {
-                        // Persist the in-place correction now instead of losing it on refresh —
-                        // "Submit and Lock" still does the GPA recalc/notification/flag reset.
-                        row.recompute();
-                        resubmitGrade(connection, row, actingUserId);
-                    }
-                    continue; // G4 — never touch a locked row otherwise
+                    continue; // G4 — locked; only Admin Unlock reopens a submitted row
                 }
                 row.recompute();
-                upsertGrade(connection, row, actingUserId, false);
+
+                if (row.getGradeId() == null) {
+                    upsertGrade(connection, row, actingUserId, false);
+                } else {
+                    Grade grade = new Grade();
+                    grade.setGradeId(row.getGradeId());
+                    grade.setCourseworkMark(row.getCourseworkMark());
+                    grade.setMidtermMark(row.getMidtermMark());
+                    grade.setLabMark(row.isHasLab() ? row.getLabMark() : null);
+                    grade.setFinalMark(row.getFinalMark());
+
+                    // Total/Letter/Points are only hidden from the student by the SQL gate while
+                    // one of the required final-stage components is not yet published; once every
+                    // one of them already is, that gate is already open, so writing the freshly
+                    // recomputed values here would leak the in-progress edit before Publish. Keep
+                    // the previously stored (published) result in that case; only Publish is
+                    // allowed to move it forward.
+                    Grade existing = gradeDao.findById(row.getGradeId()).orElse(null);
+                    boolean fullyPublished = existing != null && existing.isMidtermPublished()
+                            && existing.isFinalPublished()
+                            && (row.isHasLab() ? existing.isLabPublished() : existing.isCourseworkPublished());
+                    if (fullyPublished) {
+                        grade.setTotalMark(existing.getTotalMark());
+                        grade.setLetterGrade(existing.getLetterGrade());
+                        grade.setGradePoints(existing.getGradePoints());
+                        grade.setResultStatus(existing.getResultStatus());
+                    } else {
+                        grade.setTotalMark(row.getTotalMark());
+                        grade.setLetterGrade(row.getLetterGrade());
+                        grade.setGradePoints(row.getGradePoints());
+                        grade.setResultStatus(row.getLetterGrade() == null
+                                ? null
+                                : row.getLetterGrade().toResultStatus());
+                    }
+                    grade.setLastModifiedBy(actingUserId);
+                    grade.setLastModifiedAt(LocalDateTime.now());
+
+                    gradeDao.updateDraft(connection, grade);
+                }
             }
             connection.commit();
         } catch (SQLException e) {
@@ -236,38 +259,114 @@ public class GradeService {
      * <p>The Total/Letter/Points the student sees still only appear once the row is fully
      * submitted (rule G6) -- publishing components here never finalizes them, since they are not
      * meaningful until every required component exists.</p>
+     *
+     * <p><b>Lab/Coursework and Final are only ever released as a pair.</b> Midterm may always
+     * publish by itself, but the course's other component -- Lab for a course with a lab,
+     * Coursework otherwise -- and Final only publish together: each needs the other either ready
+     * to publish in this same call, or already published from an earlier call. A row where only
+     * one of the two is ready simply keeps both unpublished; the instructor can press this again
+     * once the second mark is entered.</p>
+     *
+     * <p>Sends the student a notification the moment anything of theirs becomes visible for the
+     * first time (a plain {@link NotificationType#GRADE} message), and a separate
+     * {@link NotificationType#WARNING} message instead whenever a mark that was <em>already</em>
+     * published is edited and released again — the red "a published grade changed" case.</p>
+     *
+     * @return how many rows had one of the paired marks (Lab/Coursework or Final) ready but could
+     *         not be released yet because its companion has not been published
      */
-    public void publishComponents(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
+    public int publishComponents(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
         Section section = requireSection(sectionId);
         assertOwnsSection(section, actingUserId);
         assertGradeWindowOpen(section);
         assertMarksValid(rows);
 
+        int pairsWithheld = 0;
         Connection connection = transactions.beginTransaction();
         try {
             for (GradeSheetRow row : rows) {
                 if (row.isSubmitted()) {
                     continue; // already fully visible; nothing left to publish
                 }
+
+                Grade existing = row.getGradeId() == null ? null : gradeDao.findById(row.getGradeId()).orElse(null);
+                boolean courseworkAlreadyPublished = row.isCourseworkPublished();
+                boolean midtermAlreadyPublished = row.isMidtermPublished();
+                boolean labAlreadyPublished = row.isLabPublished();
+                boolean finalAlreadyPublished = row.isFinalPublished();
+
                 row.recompute();
                 int gradeId = upsertGrade(connection, row, actingUserId, false);
 
-                boolean publishCoursework = row.getCourseworkMark() != null;
-                boolean publishMidterm = row.getMidtermMark() != null;
-                boolean publishLab = row.getLabMark() != null;
-                boolean publishFinal = row.getFinalMark() != null;
-                if (!publishCoursework && !publishMidterm && !publishLab && !publishFinal) {
+                boolean midtermMarkReady = row.getMidtermMark() != null;
+                boolean publishMidterm = midtermMarkReady;
+
+                boolean componentMarkReady = row.isHasLab()
+                        ? row.getLabMark() != null
+                        : row.getCourseworkMark() != null;
+                boolean componentAlreadyPublished = row.isHasLab() ? labAlreadyPublished : courseworkAlreadyPublished;
+                boolean finalMarkReady = row.getFinalMark() != null;
+
+                // Midterm may publish alone.
+                // Lab/Coursework + Final require Midterm to exist too.
+                boolean publishComponentNow = midtermMarkReady
+                        && componentMarkReady
+                        && !componentAlreadyPublished
+                        && (finalMarkReady || finalAlreadyPublished);
+
+                boolean publishFinal = midtermMarkReady
+                        && finalMarkReady
+                        && !finalAlreadyPublished
+                        && (componentMarkReady || componentAlreadyPublished);
+                boolean publishLab = row.isHasLab() && publishComponentNow;
+                boolean publishCoursework = !row.isHasLab() && publishComponentNow;
+
+                if ((componentMarkReady && !componentAlreadyPublished && !publishComponentNow)
+                        || (finalMarkReady && !finalAlreadyPublished && !publishFinal)) {
+                    pairsWithheld++;
+                }
+
+                boolean courseworkEdited = courseworkAlreadyPublished && existing != null
+                        && !marksEqual(existing.getCourseworkPublishedMark(), row.getCourseworkMark());
+                boolean midtermEdited = midtermAlreadyPublished && existing != null
+                        && !marksEqual(existing.getMidtermPublishedMark(), row.getMidtermMark());
+                boolean labEdited = labAlreadyPublished && existing != null
+                        && !marksEqual(existing.getLabPublishedMark(), row.getLabMark());
+                boolean finalEdited = finalAlreadyPublished && existing != null
+                        && !marksEqual(existing.getFinalPublishedMark(), row.getFinalMark());
+                boolean anyEdited = courseworkEdited || midtermEdited || labEdited || finalEdited;
+
+                boolean anyNewlyPublished = (publishMidterm && !midtermAlreadyPublished)
+                        || publishLab || publishCoursework || publishFinal;
+
+                if (!publishCoursework && !publishMidterm && !publishLab && !publishFinal && !anyEdited) {
                     continue;
                 }
 
-                gradeDao.publishComponents(connection, gradeId, publishCoursework, publishMidterm,
-                        publishLab, publishFinal);
+                // A component already published, whose value changed, is released again here too
+                // (not only a freshly-qualifying one) -- otherwise the red WARNING below would be
+                // announcing a change the student's snapshot was never actually updated to show.
+                boolean releaseCoursework = publishCoursework || courseworkEdited;
+                boolean releaseMidterm = publishMidterm || midtermEdited;
+                boolean releaseLab = publishLab || labEdited;
+                boolean releaseFinal = publishFinal || finalEdited;
+                if (releaseCoursework || releaseMidterm || releaseLab || releaseFinal) {
+                    gradeDao.publishComponents(connection, gradeId, releaseCoursework, releaseMidterm,
+                            releaseLab, releaseFinal);
+                }
                 row.setCourseworkPublished(row.isCourseworkPublished() || publishCoursework);
                 row.setMidtermPublished(row.isMidtermPublished() || publishMidterm);
                 row.setLabPublished(row.isLabPublished() || publishLab);
                 row.setFinalPublished(row.isFinalPublished() || publishFinal);
+
+                if (anyEdited) {
+                    notifyPublished(connection, section, row, gradeId, true);
+                } else if (anyNewlyPublished) {
+                    notifyPublished(connection, section, row, gradeId, false);
+                }
             }
             connection.commit();
+            return pairsWithheld;
         } catch (SQLException e) {
             transactions.rollbackQuietly(connection);
             throw new ServiceException("The marks could not be published.", e);
@@ -279,22 +378,64 @@ public class GradeService {
         }
     }
 
+    private boolean marksEqual(BigDecimal a, BigDecimal b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        return a.compareTo(b) == 0;
+    }
+
+    /** N9-style publish notification: a plain GRADE message the first time, a red WARNING when an
+     *  already-published mark was edited and released again. */
+    private void notifyPublished(Connection connection, Section section, GradeSheetRow row, int gradeId,
+                                  boolean warning) throws SQLException {
+        Course course = courseDao.findById(section.getCourseId()).orElse(null);
+        Student student = studentDao.findById(connection, row.getStudentId()).orElse(null);
+        if (course == null || student == null) {
+            return;
+        }
+        if (warning) {
+            notifications.notify(connection, student.getUserId(), NotificationType.WARNING,
+                    "A published grade was changed",
+                    "One of your already-published marks for " + course.getCourseCode() + " — "
+                            + course.getCourseTitle() + " was edited by the instructor. Check My Grades "
+                            + "for the new value.",
+                    "grades", gradeId);
+        } else {
+            notifications.notify(connection, student.getUserId(), NotificationType.GRADE,
+                    "A new grade was published",
+                    "A new mark for " + course.getCourseCode() + " — " + course.getCourseTitle()
+                            + " is now available. Check My Grades for details.",
+                    "grades", gradeId);
+        }
+    }
+
     // =====================================================================
     // Submit and Lock — G4 and G6
     // =====================================================================
 
     /**
-     * Every student in the section must have all three marks. On success, for each row:
+     * WHOLE-SECTION Submit and Lock: every actively enrolled student must have all their required
+     * marks (Midterm + Final + Lab for a lab course, Midterm + Final + Coursework otherwise) or
+     * the entire section is refused — nothing is submitted for anyone, and the exception message
+     * names who is still missing marks. Only once every row qualifies does this run: for each row,
      * {@code grades.is_submitted = 1} (G4), {@code enrollments.status = COMPLETED} and the
-     * student's academic record is recalculated (G6), and the student is notified (N9). All of
-     * it happens in ONE transaction.
+     * student's academic record is recalculated (G6), and the student is notified (N9). All of it
+     * happens in ONE transaction.
      *
-     * <p>A row that was already submitted and has since been edited in the sheet (see
-     * {@link GradeSheetRow#isEditedAfterSubmit()}) is corrected in place instead of being
-     * skipped — this is how the instructor fixes a mistake while the grade window (G2) is still
-     * open, distinct from {@link #adminOverride}, which needs no open window but does need
-     * ADMIN. Same grade row, same {@code submitted_by}/{@code submitted_at}; only the marks,
-     * total/letter/points and {@code last_modified_by}/{@code last_modified_at} change.</p>
+     * <p>Once locked this way, only {@link #adminOverride} (a single student, with a reason) or
+     * {@link #unlockSection} (the whole section, reopened for normal editing) can touch these
+     * rows again — G4.</p>
+     *
+     * <p>Same red-vs-blue notification rule as {@link #publishComponents}: for a component that
+     * was already published before this call, the value the student was actually last shown
+     * ({@code *_published_mark}, not the instructor's raw working mark, which Save Draft may have
+     * moved on without ever publishing it) is compared against what is about to be written: a
+     * genuine change to a mark the student had already seen sends {@link NotificationType#WARNING}
+     * instead of the normal {@link NotificationType#GRADE}. Comparing against that freshly-read
+     * snapshot (not some earlier baseline) is also what keeps this from firing twice for the same
+     * edit — if that value was already re-published (and so the snapshot already matches what is
+     * about to be submitted), submitting it again is not a further change.</p>
      */
     public void submitSection(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
         Section section = requireSection(sectionId);
@@ -302,63 +443,99 @@ public class GradeService {
         assertGradeWindowOpen(section);
         assertMarksValid(rows);
 
-        boolean hasCompleteUnsubmittedRow = false;
-        boolean hasEditedSubmittedRow = false;
-        for (GradeSheetRow row : rows) {
-            if (row.isSubmitted()) {
-                hasEditedSubmittedRow = hasEditedSubmittedRow || row.isEditedAfterSubmit();
-                continue;
-            }
+        if (rows.isEmpty()) {
+            throw new ValidationException("There are no students enrolled in this section.");
+        }
 
-            boolean completeCore = row.getMidtermMark() != null
-                    && row.getFinalMark() != null;
+        List<GradeSheetRow> unsubmitted = rows.stream().filter(row -> !row.isSubmitted()).toList();
+        if (unsubmitted.isEmpty()) {
+            throw new ValidationException("This section has already been submitted and locked.");
+        }
+
+        List<String> incomplete = new ArrayList<>();
+        for (GradeSheetRow row : unsubmitted) {
+            boolean completeCore = row.getMidtermMark() != null && row.getFinalMark() != null;
             boolean completeComponent = row.isHasLab()
                     ? row.getLabMark() != null
                     : row.getCourseworkMark() != null;
-
-            if (completeCore && completeComponent) {
-                hasCompleteUnsubmittedRow = true;
+            if (!completeCore || !completeComponent) {
+                incomplete.add(row.getStudentName());
             }
         }
-
-        if (!hasCompleteUnsubmittedRow && !hasEditedSubmittedRow) {
-            throw new ValidationException("There are no fully marked students ready to submit.");
+        if (!incomplete.isEmpty()) {
+            throw new ValidationException(incomplete.size() + " of " + unsubmitted.size()
+                    + " student(s) are still missing required marks and must be completed before "
+                    + "Submit and Lock: " + String.join(", ", incomplete) + ".");
         }
 
         Connection connection = transactions.beginTransaction();
         try {
-            for (GradeSheetRow row : rows) {
-                if (row.isSubmitted()) {
-                    if (row.isEditedAfterSubmit()) {
-                        row.recompute();
-                        resubmitGrade(connection, row, actingUserId);
-                        academicService.refreshAcademicRecord(connection, row.getStudentId());
-                        notifySubmitted(connection, section, row, row.getGradeId());
-                        row.setEditedAfterSubmit(false);
-                    }
-                    continue;
-                }
-                boolean completeCore = row.getMidtermMark() != null
-                        && row.getFinalMark() != null;
-                boolean completeComponent = row.isHasLab()
-                        ? row.getLabMark() != null
-                        : row.getCourseworkMark() != null;
-
-                if (!completeCore || !completeComponent) {
-                    continue;
-                }
+            for (GradeSheetRow row : unsubmitted) {
+                Grade existing = row.getGradeId() == null ? null : gradeDao.findById(row.getGradeId()).orElse(null);
+                boolean courseworkAlreadyPublished = row.isCourseworkPublished();
+                boolean midtermAlreadyPublished = row.isMidtermPublished();
+                boolean labAlreadyPublished = row.isLabPublished();
+                boolean finalAlreadyPublished = row.isFinalPublished();
 
                 row.recompute();
                 int gradeId = upsertGrade(connection, row, actingUserId, true);
                 enrollmentDao.setStatus(connection, row.getEnrollmentId(), EnrollmentStatus.COMPLETED);
                 academicService.refreshAcademicRecord(connection, row.getStudentId());
-                notifySubmitted(connection, section, row, gradeId);
+
+                boolean courseworkEdited = courseworkAlreadyPublished && existing != null
+                        && !marksEqual(existing.getCourseworkPublishedMark(), row.getCourseworkMark());
+                boolean midtermEdited = midtermAlreadyPublished && existing != null
+                        && !marksEqual(existing.getMidtermPublishedMark(), row.getMidtermMark());
+                boolean labEdited = labAlreadyPublished && existing != null
+                        && !marksEqual(existing.getLabPublishedMark(), row.getLabMark());
+                boolean finalEdited = finalAlreadyPublished && existing != null
+                        && !marksEqual(existing.getFinalPublishedMark(), row.getFinalMark());
+                boolean anyEdited = courseworkEdited || midtermEdited || labEdited || finalEdited;
+
+                // Submission always makes every component visible (G6) -- stamp the snapshot the
+                // same way publishComponents does, so a later Admin Unlock + re-edit compares
+                // against what the student actually saw here, not a stale pre-submission value.
+                gradeDao.publishComponents(connection, gradeId, !row.isHasLab(), true, row.isHasLab(), true);
+
+                notifySubmitted(connection, section, row, gradeId, anyEdited);
                 row.setSubmitted(true);
             }
             connection.commit();
         } catch (SQLException e) {
             transactions.rollbackQuietly(connection);
             throw new ServiceException("The grades could not be submitted.", e);
+        } catch (RuntimeException e) {
+            transactions.rollbackQuietly(connection);
+            throw e;
+        } finally {
+            transactions.closeQuietly(connection);
+        }
+    }
+
+    // =====================================================================
+    // Admin Unlock — reopens a Submit-&-Locked section for normal instructor editing
+    // =====================================================================
+
+    /**
+     * The registrar's way to undo a whole-section Submit and Lock: every submitted grade in the
+     * section goes back to {@code is_submitted = 0}, exactly the pre-submit state (marks and
+     * publish flags are untouched — nothing is cleared). The instructor can then edit normally
+     * again and must press "Submit and Lock" once more when finished.
+     */
+    public void unlockSection(int sectionId, int adminUserId) {
+        assertIsAdmin(adminUserId);
+        requireSection(sectionId);
+
+        Connection connection = transactions.beginTransaction();
+        try {
+            int unlocked = gradeDao.unlockSection(connection, sectionId);
+            if (unlocked == 0) {
+                throw new ValidationException("This section has not been submitted, so there is nothing to unlock.");
+            }
+            connection.commit();
+        } catch (SQLException e) {
+            transactions.rollbackQuietly(connection);
+            throw new ServiceException("The section could not be unlocked.", e);
         } catch (RuntimeException e) {
             transactions.rollbackQuietly(connection);
             throw e;
@@ -504,43 +681,30 @@ public class GradeService {
         return gradeId;
     }
 
-    /**
-     * Corrects an already-submitted row in place while the grade window is still open (called
-     * from {@link #submitSection} for a row with {@link GradeSheetRow#isEditedAfterSubmit()}).
-     * Reuses {@link GradeDAO#overrideSubmitted}, the same write G5's {@link #adminOverride} uses,
-     * so {@code submitted_by}/{@code submitted_at} are preserved and only
-     * {@code last_modified_by}/{@code last_modified_at} change — {@code trg_Grade_Audit} picks up
-     * the correction the same way either time.
-     */
-    private void resubmitGrade(Connection connection, GradeSheetRow row, int actingUserId) throws SQLException {
-        Grade grade = new Grade();
-        grade.setGradeId(row.getGradeId());
-        grade.setCourseworkMark(row.getCourseworkMark());
-        grade.setMidtermMark(row.getMidtermMark());
-        grade.setLabMark(row.isHasLab() ? row.getLabMark() : null);
-        grade.setFinalMark(row.getFinalMark());
-        grade.setTotalMark(row.getTotalMark());
-        grade.setLetterGrade(row.getLetterGrade());
-        grade.setGradePoints(row.getGradePoints());
-        grade.setResultStatus(row.getLetterGrade() == null ? null : row.getLetterGrade().toResultStatus());
-        grade.setLastModifiedBy(actingUserId);
-        grade.setLastModifiedAt(LocalDateTime.now());
-        gradeDao.overrideSubmitted(connection, grade);
-    }
-
-    /** Notification N9 — phase-10 context/NOTIFICATION_MESSAGES.md. */
-    private void notifySubmitted(Connection connection, Section section, GradeSheetRow row, int gradeId)
-            throws SQLException {
+    /** Notification N9 — phase-10 context/NOTIFICATION_MESSAGES.md. {@code warning} is the same
+     *  red "a published mark changed" case {@link #notifyPublished} sends, for a component that
+     *  was already visible to the student and is only now being submitted with a different value. */
+    private void notifySubmitted(Connection connection, Section section, GradeSheetRow row, int gradeId,
+                                  boolean warning) throws SQLException {
         Course course = courseDao.findById(section.getCourseId()).orElse(null);
         Student student = studentDao.findById(connection, row.getStudentId()).orElse(null);
         if (course == null || student == null) {
             return;
         }
-        notifications.notify(connection, student.getUserId(), NotificationType.GRADE,
-                "Your grade for " + course.getCourseCode() + " is available",
-                "Your final grade for " + course.getCourseCode() + " — " + course.getCourseTitle()
-                        + " is " + row.getLetterGrade().getLabel() + ". Your GPA has been updated.",
-                "grades", gradeId);
+        if (warning) {
+            notifications.notify(connection, student.getUserId(), NotificationType.WARNING,
+                    "A published grade was changed",
+                    "Your final grade for " + course.getCourseCode() + " — " + course.getCourseTitle()
+                            + " has changed to " + row.getLetterGrade().getLabel() + " following a "
+                            + "correction by the instructor. Your GPA has been updated.",
+                    "grades", gradeId);
+        } else {
+            notifications.notify(connection, student.getUserId(), NotificationType.GRADE,
+                    "Your grade for " + course.getCourseCode() + " is available",
+                    "Your final grade for " + course.getCourseCode() + " — " + course.getCourseTitle()
+                            + " is " + row.getLetterGrade().getLabel() + ". Your GPA has been updated.",
+                    "grades", gradeId);
+        }
     }
 
     /** Notification N10. */
@@ -599,6 +763,18 @@ public class GradeService {
             grade.setFinalMark(rescaleMark(grade.getFinalMark(),
                     oldCourse.getFinalMaxMark(), newCourse.getFinalMaxMark()));
 
+            // The snapshot a student may currently be seeing has to follow the same ruler change,
+            // or a published 95/100 would keep reading "95" after the course moves to a 20-point
+            // scale, while the instructor's own (correctly rescaled) working value shows 19.
+            grade.setCourseworkPublishedMark(rescaleMark(grade.getCourseworkPublishedMark(),
+                    oldCourse.getCourseworkMaxMark(), newCourse.getCourseworkMaxMark()));
+            grade.setLabPublishedMark(rescaleMark(grade.getLabPublishedMark(),
+                    oldCourse.getCourseworkMaxMark(), newCourse.getCourseworkMaxMark()));
+            grade.setMidtermPublishedMark(rescaleMark(grade.getMidtermPublishedMark(),
+                    oldCourse.getMidtermMaxMark(), newCourse.getMidtermMaxMark()));
+            grade.setFinalPublishedMark(rescaleMark(grade.getFinalPublishedMark(),
+                    oldCourse.getFinalMaxMark(), newCourse.getFinalMaxMark()));
+
             BigDecimal total = GradeCalculator.totalMark(grade.getCourseworkMark(), grade.getMidtermMark(),
                     grade.getLabMark(), grade.getFinalMark(), newCourse.isHasLab(),
                     newCourse.getCourseworkWeight(), newCourse.getMidtermWeight(), newCourse.getFinalWeight(),
@@ -628,5 +804,7 @@ public class GradeService {
         return mark.multiply(newMax).divide(oldMax, 2, java.math.RoundingMode.HALF_UP);
     }
 }
+
+
 
 

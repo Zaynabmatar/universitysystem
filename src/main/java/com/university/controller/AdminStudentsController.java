@@ -87,6 +87,18 @@ public class AdminStudentsController {
         colCredits .setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getCompletedCredits())));
 
         studentTable.setItems(rows);
+
+        // Deactivated (WITHDRAWN) students are highlighted across the whole row.
+        studentTable.setRowFactory(view -> new TableRow<>() {
+            @Override
+            protected void updateItem(Student item, boolean empty) {
+                super.updateItem(item, empty);
+                getStyleClass().remove("row-deactivated");
+                if (!empty && item != null && item.getStatus() == StudentStatus.WITHDRAWN) {
+                    getStyleClass().add("row-deactivated");
+                }
+            }
+        });
         studentTable.setPlaceholder(new Label("No students match your filters."));
 
         programs = courseService.listPrograms(false);
@@ -451,3 +463,4 @@ public class AdminStudentsController {
         }
     }
 }
+

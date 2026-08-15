@@ -282,21 +282,6 @@ public class SectionService {
         sectionDao.setStatus(sectionId, SectionStatus.OPEN);
     }
 
-    /**
-     * RULE S4 — a section that has ANY enrollment row (even a dropped one) is history and may
-     * never be physically deleted. A section that has never been touched may be, because it
-     * carries nothing. {@code section_schedules} is {@code ON DELETE CASCADE}, so its rows go
-     * automatically (Section 6.8).
-     */
-    public void deleteSection(int sectionId) {
-        int enrolments = countEnrollments(sectionId);
-        if (enrolments > 0) {
-            throw new ValidationException("This section has " + enrolments + " enrolment(s) and cannot be deleted. "
-                    + "Cancel it instead — cancelling keeps the history.");
-        }
-        sectionDao.deleteById(sectionId);
-    }
-
     // ================================================================== HELPERS
 
     private Section requireSection(int sectionId) {

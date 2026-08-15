@@ -76,35 +76,25 @@ public class StudentGradesController {
         colCourseCode.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getCourseCode()));
         colCourseTitle.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getCourseTitle()));
         colCredits.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCredits()));
-        colCoursework.setCellValueFactory(c -> new SimpleObjectProperty<>(
-                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
-                        ? c.getValue().getCourseworkMark() : null));
+        // GradeDAO#findStudentGradeRows already gates every column: Midterm is released the
+        // moment it is published, independently of everything else, while Coursework/Lab/Final
+        // and Total/Letter/Points -- the final result -- also require the student to have
+        // completed this enrollment's instructor evaluation. The marks are shown exactly as the
+        // DAO returned them, with no extra gate needed here.
+        colCoursework.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCourseworkMark()));
 
-        colMidterm.setCellValueFactory(c -> new SimpleObjectProperty<>(
-                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
-                        ? c.getValue().getMidtermMark() : null));
+        colMidterm.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getMidtermMark()));
 
-        colLab.setCellValueFactory(c -> new SimpleObjectProperty<>(
-                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
-                        ? c.getValue().getLabMark() : null));
+        colLab.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getLabMark()));
 
-        colFinal.setCellValueFactory(c -> new SimpleObjectProperty<>(
-                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
-                        ? c.getValue().getFinalMark() : null));
+        colFinal.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getFinalMark()));
 
-        colTotal.setCellValueFactory(c -> new SimpleObjectProperty<>(
-                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
-                        ? c.getValue().getTotalMark() : null));
+        colTotal.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getTotalMark()));
 
-        colPoints.setCellValueFactory(c -> new SimpleObjectProperty<>(
-                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
-                        ? c.getValue().getGradePoints() : null));
+        colPoints.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getGradePoints()));
 
         colLetter.setCellValueFactory(c -> new SimpleStringProperty(
-                evaluationService.hasSubmitted(c.getValue().getEnrollmentId())
-                        && c.getValue().getLetterGrade() != null
-                        ? c.getValue().getLetterGrade().getLabel()
-                        : null));
+                c.getValue().getLetterGrade() != null ? c.getValue().getLetterGrade().getLabel() : null));
         colStatus.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().statusLabel()));
 
         colEvaluation.setCellValueFactory(c -> {

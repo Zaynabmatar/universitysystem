@@ -77,6 +77,17 @@ public class AdminProgramsController {
         deptColActive.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isActive() ? "Active" : "Deactivated"));
 
         departmentTable.setItems(departmentRows);
+
+        departmentTable.setRowFactory(view -> new TableRow<>() {
+            @Override
+            protected void updateItem(Department item, boolean empty) {
+                super.updateItem(item, empty);
+                getStyleClass().remove("row-deactivated");
+                if (!empty && item != null && !item.isActive()) {
+                    getStyleClass().add("row-deactivated");
+                }
+            }
+        });
         departmentTable.setPlaceholder(new Label("No departments yet."));
 
         var selected = departmentTable.getSelectionModel().selectedItemProperty();
@@ -187,6 +198,17 @@ public class AdminProgramsController {
         progColActive.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isActive() ? "Active" : "Deactivated"));
 
         programTable.setItems(programRows);
+
+        programTable.setRowFactory(view -> new TableRow<>() {
+            @Override
+            protected void updateItem(Program item, boolean empty) {
+                super.updateItem(item, empty);
+                getStyleClass().remove("row-deactivated");
+                if (!empty && item != null && !item.isActive()) {
+                    getStyleClass().add("row-deactivated");
+                }
+            }
+        });
         programTable.setPlaceholder(new Label("No programs yet."));
 
         var selected = programTable.getSelectionModel().selectedItemProperty();
@@ -294,3 +316,4 @@ public class AdminProgramsController {
         }
     }
 }
+

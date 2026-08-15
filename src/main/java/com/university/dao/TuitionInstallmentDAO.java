@@ -105,6 +105,19 @@ public class TuitionInstallmentDAO extends AbstractDAO {
                 + "  AND due_date < CAST(GETDATE() AS DATE)",
                 semesterId);
     }
+    /**
+     * Wipes one student's installment schedule for one semester, so {@link
+     * com.university.service.TuitionService#billFor} can regenerate it from the student's current
+     * (post-drop) charges. Only ever called after the caller has confirmed none of these rows carry
+     * a real payment ({@code payment_date IS NOT NULL}) -- an unpaid, not-yet-billed schedule is a
+     * computed projection, not a historical record, so replacing it is safe; money actually
+     * received never is.
+     */
+    public int deleteByStudentAndSemester(int studentId, int semesterId) {
+        return executeUpdate("DELETE FROM dbo.student_tuition_installments "
+                + "WHERE student_id = ? AND semester_id = ?", studentId, semesterId);
+    }
+
     public int insert(Connection connection, TuitionInstallment installment) {
         return insertAndReturnKey(connection, INSERT,
                 installment.getStudentId(),

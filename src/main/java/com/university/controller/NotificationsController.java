@@ -1,5 +1,6 @@
 package com.university.controller;
 
+import com.university.enums.NotificationType;
 import com.university.model.Notification;
 import com.university.service.NotificationService;
 import com.university.service.Session;
@@ -62,7 +63,7 @@ public class NotificationsController {
                 VBox box = new VBox(3, title, body, meta);
                 box.getStyleClass().add(n.isRead() ? "notif-cell-read" : "notif-cell-unread");
 
-                if ("High Absence Warning".equals(n.getTitle()) || "Payment Overdue".equals(n.getTitle())) {
+                if (n.getType() == NotificationType.WARNING) {
                     box.getStyleClass().add("notif-high-absence");
                     title.getStyleClass().add("notif-high-absence-title");
                 }
@@ -124,5 +125,8 @@ public class NotificationsController {
         ((Stage) closeButton.getScene().getWindow()).close();
     }
 }
+
+
+
 
 

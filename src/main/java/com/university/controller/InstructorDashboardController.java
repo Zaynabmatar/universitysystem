@@ -3,10 +3,12 @@ package com.university.controller;
 import com.university.enums.DayOfWeekCode;
 import com.university.enums.UserRole;
 import com.university.model.Course;
+import com.university.model.Exam;
 import com.university.model.Section;
 import com.university.model.SectionSchedule;
 import com.university.model.Semester;
 import com.university.service.CourseService;
+import com.university.service.ExamService;
 import com.university.service.GradeService;
 import com.university.service.SectionService;
 import com.university.service.SemesterService;
@@ -65,6 +67,7 @@ public class InstructorDashboardController {
     private final CourseService courseService = new CourseService();
     private final GradeService gradeService = new GradeService();
     private final StudentService studentService = new StudentService();
+    private final ExamService examService = new ExamService();
 
     private final ObservableList<TodayClass> todaysClasses = FXCollections.observableArrayList();
 
@@ -123,7 +126,8 @@ public class InstructorDashboardController {
     /** Everything {@link #reload()} needs from the database, fetched together off the FX thread. */
     private record InstructorData(Semester current, BigDecimal universityGpa, List<Section> mine,
                                    Set<Integer> submittedSectionIds, Map<Integer, Course> coursesById,
-                                   Map<Integer, List<SectionSchedule>> meetingsBySection) {
+                                   Map<Integer, List<SectionSchedule>> meetingsBySection,
+                                   List<Exam> examsToday) {
     }
 
     private void reload() {
@@ -133,7 +137,8 @@ public class InstructorDashboardController {
                     Semester current = semesterService.getCurrentSemester();
                     BigDecimal universityGpa = studentService.universityAverageGpa();
                     if (current == null) {
-                        return new InstructorData(null, universityGpa, List.of(), Set.of(), Map.of(), Map.of());
+                        return new InstructorData(null, universityGpa, List.of(), Set.of(), Map.of(), Map.of(),
+                                List.of());
                     }
                     List<Section> mine = sectionService.searchSections(
                             current.getSemesterId(), null, instructorId, null);
@@ -142,7 +147,13 @@ public class InstructorDashboardController {
                             .collect(Collectors.toMap(c -> c.getCourseId(), c -> c, (a, b) -> a));
                     Map<Integer, List<SectionSchedule>> meetingsBySection =
                             sectionService.listMeetingsForInstructor(instructorId, current.getSemesterId());
-                    return new InstructorData(current, universityGpa, mine, submitted, coursesById, meetingsBySection);
+                    LocalDate today = LocalDate.now();
+                    List<Exam> examsToday = mine.stream()
+                            .flatMap(section -> examService.examsForSection(section.getSectionId()).stream())
+                            .filter(exam -> today.equals(exam.getExamDate()))
+                            .toList();
+                    return new InstructorData(current, universityGpa, mine, submitted, coursesById, meetingsBySection,
+                            examsToday);
                 },
                 this::applyReload,
                 error -> AlertUtil.error("Dashboard", "Your dashboard could not be loaded.", error));
@@ -165,7 +176,7 @@ public class InstructorDashboardController {
                 .count();
 
         showFigures(data.mine().size(), students, (int) pending, gradeWindowText(data.current()));
-        fillTodaysClasses(data.mine(), data.coursesById(), data.meetingsBySection());
+        fillTodaysClasses(data.mine(), data.coursesById(), data.meetingsBySection(), data.examsToday());
     }
 
     private void showFigures(int sections, int students, int pending, String window) {
@@ -201,27 +212,45 @@ public class InstructorDashboardController {
     }
 
     private void fillTodaysClasses(List<Section> sections, Map<Integer, Course> coursesById,
-                                    Map<Integer, List<SectionSchedule>> meetingsBySection) {
-        DayOfWeekCode today = todayCode();
-        if (today == null) {
-            return;
-        }
-
+                                    Map<Integer, List<SectionSchedule>> meetingsBySection, List<Exam> examsToday) {
         List<TodayClass> found = new ArrayList<>();
-        for (Section section : sections) {
-            for (SectionSchedule meeting : meetingsBySection.getOrDefault(section.getSectionId(), List.of())) {
-                if (meeting.getDayOfWeek() != today) {
-                    continue;
+
+        DayOfWeekCode today = todayCode();
+        if (today != null) {
+            for (Section section : sections) {
+                for (SectionSchedule meeting : meetingsBySection.getOrDefault(section.getSectionId(), List.of())) {
+                    if (meeting.getDayOfWeek() != today) {
+                        continue;
+                    }
+                    Course course = coursesById.get(section.getCourseId());
+                    found.add(new TodayClass(
+                            HM.format(meeting.getStartTime()) + " - " + HM.format(meeting.getEndTime()),
+                            (course == null ? "Course " + section.getCourseId() : course.getCourseCode()
+                                    + " — " + course.getCourseTitle()) + "  (Sec. " + section.getSectionNumber() + ")",
+                            section.getRoom() == null ? "—" : section.getRoom()));
                 }
-                Course course = coursesById.get(section.getCourseId());
-                found.add(new TodayClass(
-                        HM.format(meeting.getStartTime()) + " - " + HM.format(meeting.getEndTime()),
-                        (course == null ? "Course " + section.getCourseId() : course.getCourseCode()
-                                + " — " + course.getCourseTitle()) + "  (Sec. " + section.getSectionNumber() + ")",
-                        section.getRoom() == null ? "—" : section.getRoom()));
             }
         }
-        found.sort(Comparator.comparing((TodayClass tc) -> tc.time()));
+
+        // An exam may fall during the normal class time for its own section — that overlap is
+        // expected (the exam simply replaces that meeting) and never excludes the exam below.
+        Map<Integer, Section> sectionsById = sections.stream()
+                .collect(Collectors.toMap(Section::getSectionId, s -> s, (a, b) -> a));
+        for (Exam exam : examsToday) {
+            Section section = sectionsById.get(exam.getSectionId());
+            if (section == null || exam.getStartTime() == null) {
+                continue;
+            }
+            Course course = coursesById.get(section.getCourseId());
+            String label = "EXAM: " + (course == null ? "Course " + section.getCourseId() : course.getCourseCode()
+                    + " — " + course.getCourseTitle()) + "  (Sec. " + section.getSectionNumber() + ")";
+            found.add(new TodayClass(
+                    HM.format(exam.getStartTime()),
+                    label,
+                    exam.getRoom() == null ? "—" : exam.getRoom()));
+        }
+
+        found.sort(Comparator.comparing(TodayClass::time));
         todaysClasses.setAll(found);
     }
 

@@ -38,9 +38,13 @@ import java.util.List;
  * separately.</p>
  *
  * <p>Installments are generated once per student per semester, the first
- * time this class is asked for them, and never rewritten after that — see
- * {@link #billFor}. That is what keeps a bank reference, a due date and a
- * status stable across page loads.</p>
+ * time this class is asked for them, and normally never rewritten after
+ * that — see {@link #billFor}. That is what keeps a bank reference, a due
+ * date and a status stable across page loads. The one exception is a
+ * schedule nothing has been paid against yet whose total has gone stale
+ * (typically a dropped course) — {@link #scheduleIsStale} — which is
+ * regenerated from the student's current charges so a dropped course is
+ * never still billed or payable.</p>
  */
 public class TuitionService {
 
@@ -160,6 +164,16 @@ public class TuitionService {
         List<TuitionInstallment> stored = installmentDao.findByStudentAndSemester(studentId, semester.getSemesterId());
         if (stored.isEmpty() && !rawCharges.isEmpty()) {
             stored = generateInstallments(studentId, semester, rate, totalUsd, totalLbp);
+        } else if (!stored.isEmpty() && scheduleIsStale(stored, totalUsd, totalLbp)) {
+            // The student dropped (or the registrar added) a course after this schedule was first
+            // generated, so what is stored no longer matches their real active enrollments -- most
+            // commonly a dropped course whose cost must stop being charged/payable. Nothing here
+            // has actually been paid yet (checked below), so the projection can simply be
+            // regenerated from the current, correct total; a real payment is never discarded.
+            installmentDao.deleteByStudentAndSemester(studentId, semester.getSemesterId());
+            stored = rawCharges.isEmpty()
+                    ? List.of()
+                    : generateInstallments(studentId, semester, rate, totalUsd, totalLbp);
         }
 
         sendPaymentNotifications(studentId, stored);
@@ -187,6 +201,33 @@ public class TuitionService {
 
         return new Bill(semester, charges, totalUsd, totalLbp, remainingUsd, remainingLbp,
                 usdInstallments, lbpInstallments);
+    }
+
+    /**
+     * True when the stored schedule's own totals no longer match what the student's current
+     * (non-dropped) enrollments actually cost, AND nothing on it has been paid — the only case
+     * where it is safe to throw the schedule away and regenerate it. A stray rounding difference
+     * never trips this: the same {@code divide(..., scale, HALF_UP)} split
+     * {@link #buildAndInsert} used to generate the stored rows is exact to the currency's own
+     * scale, so a genuine drop/add changes the total by whole currency units, not by a fraction of
+     * one.
+     */
+    private boolean scheduleIsStale(List<TuitionInstallment> stored, BigDecimal totalUsd, BigDecimal totalLbp) {
+        boolean anyPaid = stored.stream()
+                .anyMatch(i -> i.getPaymentDate() != null || i.getStatus() == InvoiceStatus.PAID);
+        if (anyPaid) {
+            return false;
+        }
+        BigDecimal storedUsd = sumAmount(stored, Currency.USD);
+        BigDecimal storedLbp = sumAmount(stored, Currency.LBP);
+        return storedUsd.compareTo(totalUsd) != 0 || storedLbp.compareTo(totalLbp) != 0;
+    }
+
+    private static BigDecimal sumAmount(List<TuitionInstallment> installments, Currency currency) {
+        return installments.stream()
+                .filter(i -> i.getCurrency() == currency)
+                .map(TuitionInstallment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private static BigDecimal remainingPrincipal(List<TuitionInstallment> installments) {

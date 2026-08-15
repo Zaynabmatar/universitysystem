@@ -38,8 +38,6 @@ public class GradeSheetRow {
     private boolean finalPublished;
     /** True when this row's course has a lab component ({@code courses.has_lab}). */
     private boolean hasLab;
-    /** True once a submitted row has been edited in memory and needs to be re-saved. */
-    private boolean editedAfterSubmit;
     /** The course's own weights ({@code dbo.courses}), used to compute {@link #totalMark}. */
     private BigDecimal courseworkWeight;
     private BigDecimal midtermWeight;
@@ -153,15 +151,6 @@ public class GradeSheetRow {
 
     public void setSubmitted(boolean submitted) {
         this.submitted = submitted;
-    }
-
-    /** True once a submitted row has been edited in memory and needs to be re-saved. */
-    public boolean isEditedAfterSubmit() {
-        return editedAfterSubmit;
-    }
-
-    public void setEditedAfterSubmit(boolean editedAfterSubmit) {
-        this.editedAfterSubmit = editedAfterSubmit;
     }
 
     public boolean isCourseworkPublished() {

@@ -49,6 +49,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -346,9 +347,14 @@ public class StudentDashboardController {
                     course == null ? 0 : course.getCredits()));
         }
 
+        // The main dashboard table is "what's coming up" -- an exam whose date/time has already
+        // passed belongs only in "View All Exams" (handleViewAllExams, built unfiltered), never
+        // here, and never deleted from dbo.exams either.
+        LocalDateTime now = LocalDateTime.now();
         List<Exam> mine = examService.examsForStudent(studentId);
         List<ExamRow> examRowsBuilt = mine.stream()
                 .filter(exam -> sectionIds.contains(exam.getSectionId()))
+                .filter(exam -> !LocalDateTime.of(exam.getExamDate(), exam.getStartTime()).isBefore(now))
                 .map(exam -> toExamRow(exam, sectionsById))
                 .toList();
 

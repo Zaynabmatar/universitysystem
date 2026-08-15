@@ -89,4 +89,17 @@ public class ExamDAO extends AbstractDAO {
         return insertAndReturnKey(INSERT, exam.getSectionId(), exam.getExamDate(),
                 exam.getStartTime(), exam.getDurationMinutes(), exam.getRoom(), exam.getCreatedBy());
     }
+
+    public boolean update(Exam exam) {
+        return executeUpdate(
+                "UPDATE dbo.exams SET exam_date = ?, start_time = ?, duration_minutes = ?, room = ? "
+                        + "WHERE exam_id = ?",
+                exam.getExamDate(),
+                exam.getStartTime(),
+                exam.getDurationMinutes(),
+                exam.getRoom(),
+                exam.getExamId()
+        ) > 0;
+    }
 }
+

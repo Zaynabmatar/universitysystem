@@ -31,6 +31,14 @@ public class Grade {
     private boolean midtermPublished;
     private boolean labPublished;
     private boolean finalPublished;
+    /** The value of each component last actually released to the student (frozen at Publish/Submit
+     *  time) -- null until that component has been published at least once. Distinct from the
+     *  working mark above so an instructor's Save Draft edit to an already-published component
+     *  never leaks to the student before the next Publish. */
+    private BigDecimal courseworkPublishedMark;
+    private BigDecimal midtermPublishedMark;
+    private BigDecimal labPublishedMark;
+    private BigDecimal finalPublishedMark;
     private Integer submittedBy;
     private LocalDateTime submittedAt;
     private Integer lastModifiedBy;
@@ -184,6 +192,38 @@ public class Grade {
 
     public void setFinalPublished(boolean finalPublished) {
         this.finalPublished = finalPublished;
+    }
+
+    public BigDecimal getCourseworkPublishedMark() {
+        return courseworkPublishedMark;
+    }
+
+    public void setCourseworkPublishedMark(BigDecimal courseworkPublishedMark) {
+        this.courseworkPublishedMark = courseworkPublishedMark;
+    }
+
+    public BigDecimal getMidtermPublishedMark() {
+        return midtermPublishedMark;
+    }
+
+    public void setMidtermPublishedMark(BigDecimal midtermPublishedMark) {
+        this.midtermPublishedMark = midtermPublishedMark;
+    }
+
+    public BigDecimal getLabPublishedMark() {
+        return labPublishedMark;
+    }
+
+    public void setLabPublishedMark(BigDecimal labPublishedMark) {
+        this.labPublishedMark = labPublishedMark;
+    }
+
+    public BigDecimal getFinalPublishedMark() {
+        return finalPublishedMark;
+    }
+
+    public void setFinalPublishedMark(BigDecimal finalPublishedMark) {
+        this.finalPublishedMark = finalPublishedMark;
     }
 
     /** Null until the grade is submitted. */
