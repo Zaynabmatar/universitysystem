@@ -201,6 +201,19 @@ public class StudentService {
         }
     }
 
+    // ------------------------------------------------------------------ lockout
+
+    /**
+     * Undoes an automatic lockout (AuthService.login, after 5 consecutive
+     * failed sign-ins): {@code failed_login_attempts} back to 0,
+     * {@code is_locked} back to 0, {@code locked_at} back to {@code NULL}.
+     * Does not touch the password.
+     */
+    public void unlock(int studentId) {
+        Student student = requireStudent(studentId);
+        userDao.unlock(student.getUserId());
+    }
+
     // ------------------------------------------------------------------ password reset
 
     /**

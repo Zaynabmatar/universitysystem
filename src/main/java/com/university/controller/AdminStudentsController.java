@@ -1,12 +1,14 @@
 package com.university.controller;
 
 import com.university.controller.dialog.StudentFormDialog;
+import com.university.dao.UserDAO;
 import com.university.enums.NotificationType;
 import com.university.enums.StudentStatus;
 import com.university.enums.UserRole;
 import com.university.model.Department;
 import com.university.model.Program;
 import com.university.model.Student;
+import com.university.model.User;
 import com.university.service.AccountService;
 import com.university.service.CourseService;
 import com.university.service.NotificationService;
@@ -25,6 +27,8 @@ import javafx.scene.layout.HBox;
 import javafx.util.StringConverter;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /** The admin's "Manage Students" screen: search/filter table plus add, edit, deactivate, reset-password and notification actions. */
 public class AdminStudentsController {
@@ -43,10 +47,12 @@ public class AdminStudentsController {
     @FXML private TableColumn<Student, String> colStanding;
     @FXML private TableColumn<Student, String> colGpa;
     @FXML private TableColumn<Student, String> colCredits;
+    @FXML private TableColumn<Student, String> colAccountStatus;
     @FXML private Button editButton;
     @FXML private Button deactivateButton;
     @FXML private Button reactivateButton;
     @FXML private Button resetPwdButton;
+    @FXML private Button unlockButton;
 
     // ------------------------------------------------------------ notification section
     @FXML private RadioButton notifyAllRadio;
@@ -65,10 +71,13 @@ public class AdminStudentsController {
     private final StudentService studentService = new StudentService();
     private final CourseService courseService = new CourseService();
     private final NotificationService notificationService = new NotificationService();
+    private final UserDAO userDao = new UserDAO();
 
     private final ObservableList<Student> rows = FXCollections.observableArrayList();
     private List<Program> programs = List.of();
     private List<Department> departments = List.of();
+    /** Student ID (users.user_id) -> is_locked, refreshed on every {@link #reload()}. */
+    private Map<Integer, Boolean> lockedByUserId = Map.of();
 
     @FXML
     private void initialize() {
@@ -85,6 +94,8 @@ public class AdminStudentsController {
         colStanding.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getAcademicStanding().toString()));
         colGpa     .setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getCumulativeGpa().toPlainString()));
         colCredits .setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getCompletedCredits())));
+        colAccountStatus.setCellValueFactory(c ->
+                new SimpleStringProperty(isLocked(c.getValue().getUserId()) ? "Locked" : "Active"));
 
         studentTable.setItems(rows);
 
@@ -132,6 +143,8 @@ public class AdminStudentsController {
                 () -> selected.get() == null || selected.get().getStatus() == StudentStatus.WITHDRAWN, selected));
         reactivateButton.disableProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(
                 () -> selected.get() == null || selected.get().getStatus() != StudentStatus.WITHDRAWN, selected));
+        unlockButton.disableProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(
+                () -> selected.get() == null || !isLocked(selected.get().getUserId()), selected));
 
         reload();
         initNotificationSection();
@@ -144,6 +157,9 @@ public class AdminStudentsController {
             Program program = programFilter.getValue();
             StudentStatus status = statusFilter.getValue();
 
+            lockedByUserId = userDao.findByRole(UserRole.STUDENT).stream()
+                    .collect(Collectors.toMap(User::getUserId, User::isLocked));
+
             List<Student> result = studentService.search(searchField.getText()).stream()
                     .filter(s -> program == null || s.getProgramId() == program.getProgramId())
                     .filter(s -> status == null || s.getStatus() == status)
@@ -155,6 +171,11 @@ public class AdminStudentsController {
         } catch (Exception e) {
             AlertUtil.error("Could not load students", "The student list could not be loaded.", e);
         }
+    }
+
+    /** Is this Student ID's login account currently locked (5 consecutive failed sign-ins)? */
+    private boolean isLocked(int userId) {
+        return lockedByUserId.getOrDefault(userId, false);
     }
 
     private String programCodeFor(int programId) {
@@ -278,6 +299,25 @@ public class AdminStudentsController {
                     + "\n\nTell the student to change it after signing in.");
         } catch (Exception e) {
             AlertUtil.error("Could not reset password", "The password could not be reset.", e);
+        }
+    }
+
+    @FXML
+    private void handleUnlock() {
+        Student selected = studentTable.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        if (!AlertUtil.confirm("Unlock account",
+                "Unlock the account for " + selected.getFullName() + " (Student ID " + selected.getUserId()
+                + ")? They will be able to sign in again with their existing password.")) {
+            return;
+        }
+        try {
+            studentService.unlock(selected.getStudentId());
+            AlertUtil.success("Account unlocked", selected.getFullName() + " can sign in again.");
+            reload();
+        } catch (Exception e) {
+            AlertUtil.error("Could not unlock", "The account could not be unlocked.", e);
         }
     }
 

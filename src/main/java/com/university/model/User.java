@@ -34,6 +34,9 @@ public class User {
     private LocalDateTime createdAt;
     private String email;
     private String address;
+    private int failedLoginAttempts;
+    private boolean locked;
+    private LocalDateTime lockedAt;
 
     public User() {
     }
@@ -121,6 +124,33 @@ public class User {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    /** Consecutive failed sign-in attempts. STUDENT/INSTRUCTOR only; reset to 0 on a successful sign-in. */
+    public int getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
+    public void setFailedLoginAttempts(int failedLoginAttempts) {
+        this.failedLoginAttempts = failedLoginAttempts;
+    }
+
+    /** True once 5 consecutive failed attempts have locked this account. Never true for ADMIN. */
+    public boolean isLocked() {
+        return locked;
+    }
+
+    public void setLocked(boolean locked) {
+        this.locked = locked;
+    }
+
+    /** When the account was locked. Null while unlocked. */
+    public LocalDateTime getLockedAt() {
+        return lockedAt;
+    }
+
+    public void setLockedAt(LocalDateTime lockedAt) {
+        this.lockedAt = lockedAt;
     }
 
     /** The password hash is deliberately left out of this text. */

@@ -43,6 +43,7 @@
             <TableColumn fx:id="colHireDate"   text="Hire Date"    prefWidth="100"/>
             <TableColumn fx:id="colActive"         text="Account"          prefWidth="100"/>
             <TableColumn fx:id="colEvaluationRate" text="Evaluation Rate" prefWidth="125"/>
+            <TableColumn fx:id="colAccountStatus" text="Account Status" prefWidth="120"/>
         </columns>
     </TableView>
 
@@ -52,6 +53,7 @@
         <Button fx:id="deactivateButton" text="Deactivate"      onAction="#handleDeactivate"/>
         <Button fx:id="reactivateButton" text="Reactivate"      onAction="#handleReactivate"/>
         <Button fx:id="resetPwdButton"   text="Reset Password"  onAction="#handleResetPassword"/>
+        <Button fx:id="unlockButton"     text="Unlock Account"  onAction="#handleUnlock"/>
         <Region HBox.hgrow="ALWAYS"/>
         <Button text="Refresh" onAction="#handleRefresh"/>
     </HBox>

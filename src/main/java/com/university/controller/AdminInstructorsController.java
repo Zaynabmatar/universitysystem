@@ -1,11 +1,13 @@
 package com.university.controller;
 
 import com.university.controller.dialog.InstructorFormDialog;
+import com.university.dao.UserDAO;
 import com.university.enums.AcademicRank;
 import com.university.enums.NotificationType;
 import com.university.enums.UserRole;
 import com.university.model.Department;
 import com.university.model.Instructor;
+import com.university.model.User;
 import com.university.service.CourseService;
 import com.university.service.EvaluationService;
 import com.university.service.InstructorService;
@@ -26,6 +28,8 @@ import javafx.scene.layout.HBox;
 import javafx.util.StringConverter;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /** The admin's "Manage Instructors" screen: search/filter table plus add, edit, deactivate, reset-password and notification actions. */
 public class AdminInstructorsController {
@@ -44,10 +48,12 @@ public class AdminInstructorsController {
     @FXML private TableColumn<Instructor, String> colHireDate;
     @FXML private TableColumn<Instructor, String> colActive;
     @FXML private TableColumn<Instructor, String> colEvaluationRate;
+    @FXML private TableColumn<Instructor, String> colAccountStatus;
     @FXML private Button editButton;
     @FXML private Button deactivateButton;
     @FXML private Button reactivateButton;
     @FXML private Button resetPwdButton;
+    @FXML private Button unlockButton;
 
     // ------------------------------------------------------------ notification section
     @FXML private RadioButton notifyAllRadio;
@@ -66,9 +72,12 @@ public class AdminInstructorsController {
     private final EvaluationService evaluationService = new EvaluationService();
     private final CourseService courseService = new CourseService();
     private final NotificationService notificationService = new NotificationService();
+    private final UserDAO userDao = new UserDAO();
 
     private final ObservableList<Instructor> rows = FXCollections.observableArrayList();
     private List<Department> departments = List.of();
+    /** Instructor ID (users.user_id) -> is_locked, refreshed on every {@link #reload()}. */
+    private Map<Integer, Boolean> lockedByUserId = Map.of();
 
     @FXML
     private void initialize() {
@@ -94,6 +103,8 @@ public class AdminInstructorsController {
                             .orElse("—")
             );
         });
+        colAccountStatus.setCellValueFactory(c ->
+                new SimpleStringProperty(isLocked(c.getValue().getUserId()) ? "Locked" : "Active"));
 
         instructorTable.setItems(rows);
 
@@ -140,6 +151,8 @@ public class AdminInstructorsController {
                 () -> selected.get() == null || !selected.get().isActive(), selected));
         reactivateButton.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> selected.get() == null || selected.get().isActive(), selected));
+        unlockButton.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> selected.get() == null || !isLocked(selected.get().getUserId()), selected));
 
         reload();
         initNotificationSection();
@@ -153,6 +166,9 @@ public class AdminInstructorsController {
             AcademicRank rank = rankFilter.getValue();
             String term = searchField.getText() == null ? "" : searchField.getText().trim().toLowerCase();
 
+            lockedByUserId = userDao.findByRole(UserRole.INSTRUCTOR).stream()
+                    .collect(Collectors.toMap(User::getUserId, User::isLocked));
+
             List<Instructor> result = instructorService.search(term).stream()
                     .filter(i -> department == null || i.getDepartmentId() == department.getDepartmentId())
                     .filter(i -> rank == null || i.getAcademicRank() == rank)
@@ -164,6 +180,11 @@ public class AdminInstructorsController {
         } catch (Exception e) {
             AlertUtil.error("Could not load instructors", "The instructor list could not be loaded.", e);
         }
+    }
+
+    /** Is this Instructor ID's login account currently locked (5 consecutive failed sign-ins)? */
+    private boolean isLocked(int userId) {
+        return lockedByUserId.getOrDefault(userId, false);
     }
 
     private String departmentCodeFor(int departmentId) {
@@ -286,6 +307,25 @@ public class AdminInstructorsController {
                     + "\n\nTell the instructor to change it after signing in.");
         } catch (Exception e) {
             AlertUtil.error("Could not reset password", "The password could not be reset.", e);
+        }
+    }
+
+    @FXML
+    private void handleUnlock() {
+        Instructor selected = instructorTable.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        if (!AlertUtil.confirm("Unlock account",
+                "Unlock the account for " + selected.getFullName() + " (Instructor ID " + selected.getUserId()
+                + ")? They will be able to sign in again with their existing password.")) {
+            return;
+        }
+        try {
+            instructorService.unlock(selected.getInstructorId());
+            AlertUtil.success("Account unlocked", selected.getFullName() + " can sign in again.");
+            reload();
+        } catch (Exception e) {
+            AlertUtil.error("Could not unlock", "The account could not be unlocked.", e);
         }
     }
 
