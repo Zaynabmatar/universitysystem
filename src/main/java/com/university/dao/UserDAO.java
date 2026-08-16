@@ -224,12 +224,14 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     }
 
     /**
-     * Assigns the mandatory initial password for a newly created account:
-     * BCrypt of {@code <user_id>@iuL}. Called once the identity column has
-     * handed out the id, inside the transaction that created the row.
+     * Assigns the mandatory initial password for a newly created account —
+     * BCrypt of the role's default ({@code <user_id>@iuL} for STUDENT,
+     * {@code <user_id>@ADm} for ADMIN, {@code <user_id>@iNS} for INSTRUCTOR).
+     * Called once the identity column has handed out the id, inside the
+     * transaction that created the row.
      */
-    public void finalizePassword(Connection connection, int userId) {
-        String defaultHash = PasswordHasher.hashDefaultPassword(userId);
+    public void finalizePassword(Connection connection, int userId, UserRole role) {
+        String defaultHash = PasswordHasher.hashDefaultPassword(userId, role);
         executeUpdate(connection, "UPDATE dbo.users SET password_hash = ? WHERE user_id = ?",
                 defaultHash, userId);
     }
