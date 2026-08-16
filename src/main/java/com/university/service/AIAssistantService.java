@@ -5,30 +5,40 @@ import com.university.dao.CoursePrerequisiteDAO;
 import com.university.dao.DepartmentDAO;
 import com.university.dao.EnrollmentDAO;
 import com.university.dao.ExamDAO;
+import com.university.dao.GradeDAO;
 import com.university.dao.InstructorDAO;
 import com.university.dao.ProgramDAO;
 import com.university.dao.SectionDAO;
 import com.university.dao.SectionScheduleDAO;
 import com.university.dao.StudentDAO;
 import com.university.enums.DayOfWeekCode;
+import com.university.enums.InvoiceStatus;
 import com.university.enums.LetterGrade;
 import com.university.enums.StudentStatus;
+import com.university.model.AttendanceRow;
 import com.university.model.Course;
 import com.university.model.Department;
 import com.university.model.Enrollment;
 import com.university.model.Exam;
+import com.university.model.GradeSheetRow;
 import com.university.model.Instructor;
+import com.university.model.Notification;
 import com.university.model.Program;
 import com.university.model.Section;
 import com.university.model.SectionSchedule;
 import com.university.model.Semester;
 import com.university.model.Student;
 import com.university.model.StudentGradeRow;
+import com.university.model.StudentInvoice;
+import com.university.service.RecommendationService.Recommendation;
+import com.university.service.RecommendationService.RecommendationResult;
 import com.university.service.TranscriptService.DegreeProgress;
 import com.university.service.TranscriptService.RequirementRow;
 import com.university.service.TranscriptService.SemesterPlan;
 import com.university.util.GradeCalculator;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -98,11 +108,21 @@ public class AIAssistantService {
     /** "semester 5", "semester #5" — a reference to a specific stage of a program's study plan. */
     private static final Pattern SEMESTER_NUMBER_PATTERN = Pattern.compile("semester\\s*#?\\s*(\\d{1,2})\\b");
 
+    /** "section 01", "section #2" — a reference to one specific section of a course. */
+    private static final Pattern SECTION_NUMBER_PATTERN =
+            Pattern.compile("section\\s*#?\\s*([A-Za-z0-9]{1,10})\\b", Pattern.CASE_INSENSITIVE);
+
     private final AcademicService academicService = new AcademicService();
     private final TranscriptService transcriptService = new TranscriptService();
     private final RegistrationService registrationService = new RegistrationService();
     private final SemesterService semesterService = new SemesterService();
     private final CourseService courseService = new CourseService();
+    private final ExamService examService = new ExamService();
+    private final NotificationService notificationService = new NotificationService();
+    private final FinanceService financeService = new FinanceService();
+    private final AttendanceService attendanceService = new AttendanceService();
+    private final AcademicCalendarService academicCalendarService = new AcademicCalendarService();
+    private final RecommendationService recommendationService = new RecommendationService();
 
     private final StudentDAO studentDao = new StudentDAO();
     private final InstructorDAO instructorDao = new InstructorDAO();
@@ -114,6 +134,7 @@ public class AIAssistantService {
     private final ProgramDAO programDao = new ProgramDAO();
     private final EnrollmentDAO enrollmentDao = new EnrollmentDAO();
     private final ExamDAO examDao = new ExamDAO();
+    private final GradeDAO gradeDao = new GradeDAO();
 
     /**
      * Phase 4's Gemini fallback, shared by all three roles: whatever question no university
@@ -141,6 +162,9 @@ public class AIAssistantService {
             String normalized = normalize(message);
             if (matches(normalized, "password", "hash")) {
                 return UNAUTHORIZED;
+            }
+            if (matches(normalized, "notification", "notifications", "my inbox", "unread message")) {
+                return notificationsAnswer(session.getUser().getUserId());
             }
             String universityAnswer = switch (session.getRole()) {
                 case STUDENT -> respondToStudent(normalized, message, session.requireStudentId());
@@ -173,6 +197,9 @@ public class AIAssistantService {
         if (matches(normalized, "regist")) {
             return registrationWindowAnswer();
         }
+        if (matches(normalized, "current semester", "what semester", "semester dates")) {
+            return currentSemesterAnswer();
+        }
         if (matches(normalized, "prerequisite", "prereq")) {
             return prerequisitesAnswer(original);
         }
@@ -187,8 +214,33 @@ public class AIAssistantService {
                 "which courses did i fail")) {
             return gradesListAnswer(studentId);
         }
+        if (matches(normalized, "midterm", "coursework mark", "coursework grade", "final mark", "lab mark",
+                "grade breakdown", "grade components", "grade component")) {
+            return gradeBreakdownAnswer(studentId, original);
+        }
         if (matches(normalized, "gpa", "grade point average", "grade", "academic standing")) {
             return gpaAnswer(studentId);
+        }
+        if (matches(normalized, "my exam", "my exams", "exam schedule", "exam date", "exam dates",
+                "upcoming exam", "when is my exam", "what exams", "exams do i have")) {
+            return studentExamsAnswer(studentId);
+        }
+        if (matches(normalized, "balance", "how much do i owe", "tuition", "invoice", "payment due",
+                "outstanding payment", "installment")) {
+            return studentTuitionAnswer(studentId);
+        }
+        if (matches(normalized, "absence", "absences", "attendance")) {
+            return studentAttendanceAnswer(studentId, original);
+        }
+        if (matches(normalized, "recommend", "what course should i take", "which course should i take",
+                "suggest a course", "course suggestion")) {
+            return recommendationsAnswer(studentId);
+        }
+        if (matches(normalized, "calendar", "holiday", "holidays", "university event", "academic calendar")) {
+            return calendarNotesAnswer(studentId);
+        }
+        if (matches(normalized, "seat", "seats", "open section", "available section")) {
+            return seatsAnswer(original);
         }
         if (matches(normalized, "next class", "next lecture", "upcoming class", "when is my next")) {
             return nextClassAnswer(studentSchedule(studentId));
@@ -482,6 +534,16 @@ public class AIAssistantService {
         if (matches(normalized, "prerequisite", "prereq")) {
             return prerequisitesAnswer(original);
         }
+        if (matches(normalized, "my exam", "my exams", "exam schedule", "exam date", "exam dates",
+                "upcoming exam", "what exams", "exams do i have", "exams for my section")) {
+            return instructorExamsAnswer(instructorId);
+        }
+        if (matches(normalized, "absence", "absences", "attendance")) {
+            return instructorAttendanceAnswer(instructorId, original);
+        }
+        if (matches(normalized, "seat", "seats", "open section", "available section")) {
+            return seatsAnswer(original);
+        }
         if (matches(normalized, "next class", "next lecture", "upcoming class")) {
             return nextClassAnswer(instructorSchedule(instructorId));
         }
@@ -491,8 +553,13 @@ public class AIAssistantService {
         if (matches(normalized, "timetable", "my schedule", "weekly schedule")) {
             return scheduleAnswer(instructorSchedule(instructorId));
         }
-        if (matches(normalized, "how many students", "number of students", "students do i have")) {
-            return instructorStudentCountAnswer(instructorId);
+        if (matches(normalized, "average grade", "grade average", "class average", "section average",
+                "average mark")) {
+            return instructorGradeAverageAnswer(instructorId, original);
+        }
+        if (matches(normalized, "how many students", "number of students", "students do i have",
+                "students are enrolled", "students enrolled")) {
+            return instructorStudentCountAnswer(instructorId, original);
         }
         if (matches(normalized, "who is in", "students in", "roster", "class list")) {
             return instructorSectionRosterAnswer(instructorId, original);
@@ -528,15 +595,73 @@ public class AIAssistantService {
         return sb.toString().trim();
     }
 
-    private String instructorStudentCountAnswer(int instructorId) {
+    /**
+     * "How many students do I have?" (own total) or "How many students are enrolled in CS101?"
+     * (own section(s) of that course only) — a course code in the message scopes the count down
+     * to it instead of the instructor's whole teaching load, and a course the instructor does not
+     * teach is refused rather than silently reporting the unscoped total.
+     */
+    private String instructorStudentCountAnswer(int instructorId, String message) {
         Semester semester = semesterService.getCurrentSemester();
         if (semester == null) {
             return "There is no current semester set up yet.";
         }
-        List<Section> sections = sectionDao.findByInstructorAndSemester(instructorId, semester.getSemesterId());
-        int total = sections.stream().mapToInt(Section::getEnrolledCount).sum();
-        return "You have " + total + " student(s) across " + sections.size() + " section(s) in "
+        List<Section> own = sectionDao.findByInstructorAndSemester(instructorId, semester.getSemesterId());
+        String courseCode = extractCourseCode(message);
+        List<Section> targets = own;
+        if (courseCode != null) {
+            Course course = courseDao.findByCode(courseCode).orElse(null);
+            if (course == null) {
+                return "I couldn't find a course with the code " + courseCode + ".";
+            }
+            final int courseId = course.getCourseId();
+            targets = own.stream().filter(s -> s.getCourseId() == courseId).toList();
+            if (targets.isEmpty()) {
+                return UNAUTHORIZED;
+            }
+        }
+        int total = targets.stream().mapToInt(Section::getEnrolledCount).sum();
+        if (courseCode != null) {
+            return "You have " + total + " student(s) enrolled in " + courseCode.toUpperCase(Locale.ROOT)
+                    + " across " + targets.size() + " section(s) in " + semester.getSemesterName() + ".";
+        }
+        return "You have " + total + " student(s) across " + targets.size() + " section(s) in "
                 + semester.getSemesterName() + ".";
+    }
+
+    /**
+     * "What is the average grade in CS101?" (instructor) — own section(s) of that course only,
+     * counting only grades that have already been submitted (a draft mark is never averaged in,
+     * matching {@link com.university.dao.GradeDAO#findStudentGradeRows}'s "no drafts" rule).
+     */
+    private String instructorGradeAverageAnswer(int instructorId, String message) {
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        String courseCode = extractCourseCode(message);
+        if (courseCode == null) {
+            return "Which course? For example, \"What is the average grade in CS101?\"";
+        }
+        Course course = courseDao.findByCode(courseCode).orElse(null);
+        if (course == null) {
+            return "I couldn't find a course with the code " + courseCode + ".";
+        }
+        List<Section> own = sectionDao.findByInstructorAndSemester(instructorId, semester.getSemesterId());
+        final int courseId = course.getCourseId();
+        List<Section> targets = own.stream().filter(s -> s.getCourseId() == courseId).toList();
+        if (targets.isEmpty()) {
+            return UNAUTHORIZED;
+        }
+        String sectionNumber = extractSectionNumber(message);
+        if (sectionNumber != null) {
+            targets = targets.stream().filter(s -> sectionNumber.equalsIgnoreCase(s.getSectionNumber())).toList();
+            if (targets.isEmpty()) {
+                return "I couldn't find " + course.getCourseCode() + " section " + sectionNumber
+                        + " among your sections.";
+            }
+        }
+        return gradeAverageText(targets, course.getCourseCode() + " - " + course.getCourseTitle());
     }
 
     /** Only ever reads sections {@code instructorId} is actually assigned to (rule G1's spirit). */
@@ -670,13 +795,51 @@ public class AIAssistantService {
         if (matches(normalized, "prerequisite", "prereq")) {
             return prerequisitesAnswer(original);
         }
+        if (matches(normalized, "section", "sections") && matches(normalized, "teach")) {
+            Instructor named = findMentionedInstructor(original);
+            if (named != null) {
+                return adminInstructorSectionsAnswer(named);
+            }
+        }
         boolean asksAboutProgram = normalized.contains("program");
         if (asksAboutProgram
                 && matches(normalized, "how many students", "number of students", "students are", "students in")) {
             return adminProgramStudentCountAnswer(original);
         }
+        if (!asksAboutProgram && extractCourseCode(original) != null
+                && matches(normalized, "how many students", "number of students", "students are", "students in",
+                        "students enrolled", "enrolled in", "enrollment")) {
+            return adminCourseEnrollmentAnswer(extractCourseCode(original), original);
+        }
+        if (matches(normalized, "average grade", "grade average", "class average", "section average",
+                "average mark")) {
+            return adminGradeAverageAnswer(original);
+        }
+        if (matches(normalized, "suspended student", "students are suspended", "how many suspended")) {
+            return "There are " + studentDao.findByStatus(StudentStatus.SUSPENDED).size() + " suspended student(s).";
+        }
+        if (matches(normalized, "graduated student", "students have graduated", "how many graduated")) {
+            return "There are " + studentDao.findByStatus(StudentStatus.GRADUATED).size() + " graduated student(s).";
+        }
+        if (matches(normalized, "withdrawn student", "students withdrew", "how many withdrawn")) {
+            return "There are " + studentDao.findByStatus(StudentStatus.WITHDRAWN).size() + " withdrawn student(s).";
+        }
         if (matches(normalized, "active student", "how many students", "number of students", "total students")) {
             return "There are " + studentDao.findByStatus(StudentStatus.ACTIVE).size() + " active student(s).";
+        }
+        if (matches(normalized, "overdue", "unpaid invoice", "unpaid invoices", "outstanding payment",
+                "outstanding invoices", "who owes")) {
+            return adminOverdueInvoicesAnswer();
+        }
+        if (matches(normalized, "how many exams", "number of exams", "exams are scheduled", "exams this semester",
+                "exam schedule")) {
+            return adminExamsAnswer();
+        }
+        if (matches(normalized, "calendar", "holiday", "holidays", "university event", "academic calendar")) {
+            return calendarNotesAnswer(null);
+        }
+        if (matches(normalized, "seat", "seats", "open section", "available section")) {
+            return seatsAnswer(original);
         }
         if (asksAboutProgram
                 && matches(normalized, "courses for", "courses in", "show courses", "list courses")) {
@@ -723,6 +886,106 @@ public class AIAssistantService {
             return adminStudentAcademicAnswer(normalized);
         }
         return NOT_SUPPORTED;
+    }
+
+    /** "What sections does Dr. Ahmad teach?" (admin) — any instructor's teaching load, current semester. */
+    private String adminInstructorSectionsAnswer(Instructor instructor) {
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        List<Section> sections = sectionDao.findByInstructorAndSemester(instructor.getInstructorId(),
+                semester.getSemesterId());
+        if (sections.isEmpty()) {
+            return instructor.getFullName() + " is not teaching any sections in " + semester.getSemesterName() + ".";
+        }
+        StringBuilder sb = new StringBuilder(
+                instructor.getFullName() + " is teaching in " + semester.getSemesterName() + ":\n");
+        for (Section s : sections) {
+            Course course = courseDao.findById(s.getCourseId()).orElse(null);
+            String label = course == null ? "Course #" + s.getCourseId()
+                    : course.getCourseCode() + " - " + course.getCourseTitle();
+            sb.append("• ").append(label).append(" (Section ").append(s.getSectionNumber()).append(", ")
+                    .append(s.getEnrolledCount()).append("/").append(s.getCapacity()).append(" students)\n");
+        }
+        return sb.toString().trim();
+    }
+
+    /**
+     * "How many students are enrolled in CS101?" (admin) — every section of that course this
+     * semester, or one specific section when the message names one (e.g. "CS101 section 2").
+     */
+    private String adminCourseEnrollmentAnswer(String courseCode, String message) {
+        Course course = courseDao.findByCode(courseCode).orElse(null);
+        if (course == null) {
+            return "I couldn't find a course with the code " + courseCode + ".";
+        }
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        List<Section> sections = sectionDao.findByCourseAndSemester(course.getCourseId(), semester.getSemesterId());
+        if (sections.isEmpty()) {
+            return course.getCourseCode() + " has no sections offered in " + semester.getSemesterName() + ".";
+        }
+        String sectionNumber = extractSectionNumber(message);
+        if (sectionNumber != null) {
+            Section match = sections.stream()
+                    .filter(s -> sectionNumber.equalsIgnoreCase(s.getSectionNumber()))
+                    .findFirst().orElse(null);
+            if (match == null) {
+                return "I couldn't find " + course.getCourseCode() + " section " + sectionNumber
+                        + " in " + semester.getSemesterName() + ".";
+            }
+            return course.getCourseCode() + " section " + match.getSectionNumber() + " has "
+                    + match.getEnrolledCount() + " student(s) enrolled (capacity " + match.getCapacity() + ").";
+        }
+        if (sections.size() == 1) {
+            Section s = sections.get(0);
+            return course.getCourseCode() + " - " + course.getCourseTitle() + " has " + s.getEnrolledCount()
+                    + " student(s) enrolled (capacity " + s.getCapacity() + ").";
+        }
+        int total = sections.stream().mapToInt(Section::getEnrolledCount).sum();
+        StringBuilder sb = new StringBuilder(course.getCourseCode() + " - " + course.getCourseTitle()
+                + " has " + total + " student(s) enrolled across " + sections.size() + " section(s) in "
+                + semester.getSemesterName() + ":\n");
+        for (Section s : sections) {
+            sb.append("• Section ").append(s.getSectionNumber()).append(": ").append(s.getEnrolledCount())
+                    .append("/").append(s.getCapacity()).append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    /**
+     * "What is the average grade in CS101?" (admin) — every section of that course this semester,
+     * or one specific section when named; counts submitted grades only.
+     */
+    private String adminGradeAverageAnswer(String message) {
+        String courseCode = extractCourseCode(message);
+        if (courseCode == null) {
+            return "Which course? For example, \"What is the average grade in CS101?\"";
+        }
+        Course course = courseDao.findByCode(courseCode).orElse(null);
+        if (course == null) {
+            return "I couldn't find a course with the code " + courseCode + ".";
+        }
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        List<Section> sections = sectionDao.findByCourseAndSemester(course.getCourseId(), semester.getSemesterId());
+        if (sections.isEmpty()) {
+            return course.getCourseCode() + " has no sections offered in " + semester.getSemesterName() + ".";
+        }
+        String sectionNumber = extractSectionNumber(message);
+        if (sectionNumber != null) {
+            sections = sections.stream().filter(s -> sectionNumber.equalsIgnoreCase(s.getSectionNumber())).toList();
+            if (sections.isEmpty()) {
+                return "I couldn't find " + course.getCourseCode() + " section " + sectionNumber
+                        + " in " + semester.getSemesterName() + ".";
+            }
+        }
+        return gradeAverageText(sections, course.getCourseCode() + " - " + course.getCourseTitle());
     }
 
     /** "Which sections are full?" — sections at or over capacity in the current semester. */
@@ -863,6 +1126,313 @@ public class AIAssistantService {
             sb.append("• ").append(d.getDepartmentName()).append(": ").append(programs)
                     .append(" program(s), ").append(courses).append(" course(s), ").append(instructors)
                     .append(" instructor(s)\n");
+        }
+        return sb.toString().trim();
+    }
+
+    // ======================================================================
+    // Shared: notifications, exams, tuition/payments, attendance, grade
+    // component breakdown, recommendations, academic calendar, seats
+    // ======================================================================
+
+    /** "Show my notifications" — the asker's own unread inbox, any role. */
+    private String notificationsAnswer(int userId) {
+        List<Notification> unread = notificationService.unread(userId);
+        if (unread.isEmpty()) {
+            return "You have no unread notifications.";
+        }
+        StringBuilder sb = new StringBuilder("You have " + unread.size() + " unread notification(s):\n");
+        int limit = Math.min(10, unread.size());
+        for (int i = 0; i < limit; i++) {
+            Notification n = unread.get(i);
+            sb.append("• ").append(n.getTitle()).append(" — ").append(n.getMessage()).append("\n");
+        }
+        if (unread.size() > limit) {
+            sb.append("… and ").append(unread.size() - limit).append(" more.\n");
+        }
+        return sb.toString().trim();
+    }
+
+    /** "When is my next exam?" — the student's own exams, current semester only. */
+    private String studentExamsAnswer(int studentId) {
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        List<Exam> exams = examService.examsForStudentInSemester(studentId, semester.getSemesterId());
+        return examsListText(exams, "You have no exams scheduled this semester.");
+    }
+
+    /** "What exams do I have scheduled?" (instructor) — every exam of every section this instructor teaches. */
+    private String instructorExamsAnswer(int instructorId) {
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        List<Section> own = sectionDao.findByInstructorAndSemester(instructorId, semester.getSemesterId());
+        List<Exam> exams = new ArrayList<>();
+        for (Section s : own) {
+            exams.addAll(examService.examsForSection(s.getSectionId()));
+        }
+        exams.sort(Comparator.comparing(Exam::getExamDate).thenComparing(Exam::getStartTime));
+        return examsListText(exams, "You have no exams scheduled for your sections this semester.");
+    }
+
+    /** "How many exams are scheduled?" (admin) — every exam in the current semester. */
+    private String adminExamsAnswer() {
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        List<Exam> exams = examService.examsForSemester(semester.getSemesterId());
+        return examsListText(exams, "No exams are scheduled in " + semester.getSemesterName() + ".");
+    }
+
+    private String examsListText(List<Exam> exams, String noneMessage) {
+        if (exams.isEmpty()) {
+            return noneMessage;
+        }
+        StringBuilder sb = new StringBuilder("Exams:\n");
+        for (Exam exam : exams) {
+            Section section = sectionDao.findById(exam.getSectionId()).orElse(null);
+            Course course = section == null ? null : courseDao.findById(section.getCourseId()).orElse(null);
+            String label = course == null ? "Section " + exam.getSectionId()
+                    : course.getCourseCode() + " - " + course.getCourseTitle();
+            sb.append("• ").append(label).append(": ").append(DATE.format(exam.getExamDate()))
+                    .append(" ").append(HM.format(exam.getStartTime()))
+                    .append(" (").append(exam.getDurationMinutes()).append(" min)");
+            if (exam.getRoom() != null && !exam.getRoom().isBlank()) {
+                sb.append(", Room ").append(exam.getRoom());
+            }
+            sb.append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    /**
+     * "What do I owe?" / "show my invoices" — the student's own bills and running balance, read
+     * straight from the finance ledger. Deliberately never calls {@link TuitionService#billFor},
+     * which lazily generates installments and notifications (a write) the first time it runs for a
+     * semester — the AI assistant is read-only, so it only ever reads what already exists.
+     */
+    private String studentTuitionAnswer(int studentId) {
+        List<StudentInvoice> invoices = financeService.invoicesOf(studentId);
+        if (invoices.isEmpty()) {
+            return "You have no invoices on file.";
+        }
+        BigDecimal balance = financeService.balanceOf(studentId);
+        StringBuilder sb = new StringBuilder("Your account balance is " + balance + ".\n");
+        List<StudentInvoice> unpaid = invoices.stream()
+                .filter(i -> i.getStatus() != InvoiceStatus.PAID)
+                .toList();
+        if (unpaid.isEmpty()) {
+            sb.append("All your invoices are fully paid.");
+        } else {
+            sb.append("Outstanding invoices:\n");
+            for (StudentInvoice invoice : unpaid) {
+                sb.append("• ").append(invoice.getInvoiceNumber()).append(": ")
+                        .append(invoice.getRemainingAmount()).append(" remaining (")
+                        .append(invoice.getStatus().getLabel()).append("), due ")
+                        .append(DATE.format(invoice.getDueDate())).append("\n");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    /** "How many absences do I have in CS101?" — one course if named, otherwise every current course. */
+    private String studentAttendanceAnswer(int studentId, String message) {
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        List<Enrollment> enrolled = registrationService.currentRegistrations(studentId, semester.getSemesterId());
+        if (enrolled.isEmpty()) {
+            return "You are not enrolled in any courses this semester.";
+        }
+        String courseCode = extractCourseCode(message);
+        if (courseCode != null) {
+            Course course = courseDao.findByCode(courseCode).orElse(null);
+            if (course == null) {
+                return "I couldn't find a course with the code " + courseCode + ".";
+            }
+            Enrollment target = enrolled.stream()
+                    .filter(e -> {
+                        Course c = courseOfSection(e.getSectionId());
+                        return c != null && c.getCourseId() == course.getCourseId();
+                    })
+                    .findFirst().orElse(null);
+            if (target == null) {
+                return "You are not enrolled in " + courseCode + " this semester.";
+            }
+            int absences = attendanceService.countAbsencesForEnrollment(target.getEnrollmentId());
+            return "You have " + absences + " recorded absence(s) in " + course.getCourseCode()
+                    + " - " + course.getCourseTitle() + " this semester.";
+        }
+        StringBuilder sb = new StringBuilder("Your absences this semester:\n");
+        for (Enrollment e : enrolled) {
+            Course course = courseOfSection(e.getSectionId());
+            if (course == null) {
+                continue;
+            }
+            int absences = attendanceService.countAbsencesForEnrollment(e.getEnrollmentId());
+            sb.append("• ").append(course.getCourseCode()).append(": ").append(absences).append(" absence(s)\n");
+        }
+        return sb.toString().trim();
+    }
+
+    /** "How many absences does CS101 have?" (instructor) — own section(s) only. */
+    private String instructorAttendanceAnswer(int instructorId, String message) {
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        String courseCode = extractCourseCode(message);
+        List<Section> own = sectionDao.findByInstructorAndSemester(instructorId, semester.getSemesterId());
+        List<Section> targets = own;
+        if (courseCode != null) {
+            Course course = courseDao.findByCode(courseCode).orElse(null);
+            if (course == null) {
+                return "I couldn't find a course with the code " + courseCode + ".";
+            }
+            final int courseId = course.getCourseId();
+            targets = own.stream().filter(s -> s.getCourseId() == courseId).toList();
+            if (targets.isEmpty()) {
+                return UNAUTHORIZED;
+            }
+        }
+        if (targets.isEmpty()) {
+            return "You are not teaching any sections in " + semester.getSemesterName() + ".";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Section s : targets) {
+            Course course = courseDao.findById(s.getCourseId()).orElse(null);
+            String label = course == null ? "Section " + s.getSectionNumber()
+                    : course.getCourseCode() + "-" + s.getSectionNumber();
+            List<AttendanceRow> summary = attendanceService.getSectionAttendanceSummary(s.getSectionId());
+            sb.append(label).append(" attendance:\n");
+            for (AttendanceRow row : summary) {
+                sb.append("  • ").append(row.getStudentName()).append(": ")
+                        .append(row.getTotalAbsences()).append(" absence(s)\n");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    /** "What is my midterm grade in CS101?" — the component marks on file, released ones only. */
+    private String gradeBreakdownAnswer(int studentId, String message) {
+        String courseCode = extractCourseCode(message);
+        if (courseCode == null) {
+            return "Which course? For example, \"What is my midterm grade in CS101?\"";
+        }
+        List<StudentGradeRow> rows = academicService.gradeRows(studentId, null);
+        StudentGradeRow row = rows.stream()
+                .filter(r -> courseCode.equalsIgnoreCase(r.getCourseCode()))
+                .findFirst().orElse(null);
+        if (row == null) {
+            return "I couldn't find " + courseCode + " on your record.";
+        }
+        StringBuilder sb = new StringBuilder(row.getCourseCode() + " - " + row.getCourseTitle() + ":\n");
+        if (row.isHasLab()) {
+            sb.append("• Lab: ").append(markText(row.getLabMark())).append("\n");
+        } else {
+            sb.append("• Coursework: ").append(markText(row.getCourseworkMark())).append("\n");
+        }
+        sb.append("• Midterm: ").append(markText(row.getMidtermMark())).append("\n");
+        sb.append("• Final: ").append(markText(row.getFinalMark())).append("\n");
+        if (row.getTotalMark() != null) {
+            sb.append("• Total: ").append(row.getTotalMark()).append(" (")
+                    .append(row.getLetterGrade() == null ? "—" : row.getLetterGrade().getLabel()).append(")\n");
+        }
+        return sb.toString().trim();
+    }
+
+    private String markText(BigDecimal mark) {
+        return mark == null ? "not released yet" : mark.stripTrailingZeros().toPlainString();
+    }
+
+    /** "What course should I take next?" — the same read-only recommendation engine the Recommendations screen uses. */
+    private String recommendationsAnswer(int studentId) {
+        RecommendationResult result = recommendationService.recommend(studentId);
+        if (result.isBlocked()) {
+            return result.blockedReason;
+        }
+        if (result.recommendations.isEmpty()) {
+            return "There are no course recommendations available for you right now.";
+        }
+        StringBuilder sb = new StringBuilder("Top course recommendations for you:\n");
+        int limit = Math.min(5, result.recommendations.size());
+        for (int i = 0; i < limit; i++) {
+            Recommendation r = result.recommendations.get(i);
+            sb.append("• ").append(r.courseCode).append(" - ").append(r.courseTitle)
+                    .append(" (Score ").append(r.finalScore).append("/")
+                    .append(RecommendationService.MAX_FINAL_SCORE).append(")\n");
+        }
+        return sb.toString().trim();
+    }
+
+    /** "What's on the academic calendar?" / "any holidays?" — {@code studentId} null for the admin-wide view. */
+    private String calendarNotesAnswer(Integer studentId) {
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        List<String> notes = academicCalendarService.notesForSemester(semester.getSemesterId(), studentId);
+        if (notes.isEmpty()) {
+            return "There is nothing on the academic calendar yet.";
+        }
+        StringBuilder sb = new StringBuilder("Academic calendar for " + semester.getSemesterName() + ":\n");
+        for (String note : notes) {
+            sb.append("• ").append(note).append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    /** "How many seats are open in CS101?" — public catalogue information, any signed-in role. */
+    private String seatsAnswer(String message) {
+        String courseCode = extractCourseCode(message);
+        if (courseCode == null) {
+            return "Which course? For example, \"How many seats are open in CS101?\"";
+        }
+        Course course = courseDao.findByCode(courseCode).orElse(null);
+        if (course == null) {
+            return "I couldn't find a course with the code " + courseCode + ".";
+        }
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return "There is no current semester set up yet.";
+        }
+        List<Section> sections = sectionDao.findByCourseAndSemester(course.getCourseId(), semester.getSemesterId());
+        if (sections.isEmpty()) {
+            return course.getCourseCode() + " has no sections offered in " + semester.getSemesterName() + ".";
+        }
+        StringBuilder sb = new StringBuilder(course.getCourseCode() + " - " + course.getCourseTitle()
+                + " sections in " + semester.getSemesterName() + ":\n");
+        for (Section s : sections) {
+            int free = s.getCapacity() - s.getEnrolledCount();
+            sb.append("• Section ").append(s.getSectionNumber()).append(": ").append(s.getEnrolledCount())
+                    .append("/").append(s.getCapacity()).append(" (").append(free).append(" seat(s) free)\n");
+        }
+        return sb.toString().trim();
+    }
+
+    /** "Which invoices are overdue?" (admin) — the finance office's own worklist. */
+    private String adminOverdueInvoicesAnswer() {
+        List<StudentInvoice> overdue = financeService.overdueInvoices();
+        if (overdue.isEmpty()) {
+            return "No invoices are currently overdue.";
+        }
+        StringBuilder sb = new StringBuilder(overdue.size() + " overdue invoice(s):\n");
+        int limit = Math.min(15, overdue.size());
+        for (int i = 0; i < limit; i++) {
+            StudentInvoice invoice = overdue.get(i);
+            Student student = studentDao.findById(invoice.getStudentId()).orElse(null);
+            String who = student == null ? "Student #" + invoice.getStudentId() : student.getFullName();
+            sb.append("• ").append(who).append(" — ").append(invoice.getInvoiceNumber()).append(": ")
+                    .append(invoice.getRemainingAmount()).append(" remaining, due ")
+                    .append(DATE.format(invoice.getDueDate())).append("\n");
+        }
+        if (overdue.size() > limit) {
+            sb.append("… and ").append(overdue.size() - limit).append(" more.\n");
         }
         return sb.toString().trim();
     }
@@ -1076,6 +1646,35 @@ public class AIAssistantService {
             return (m.group(1) + m.group(2)).toUpperCase(Locale.ROOT);
         }
         return null;
+    }
+
+    /** "section 01", "section #2" — null when the message names no specific section. */
+    private String extractSectionNumber(String message) {
+        Matcher m = SECTION_NUMBER_PATTERN.matcher(message);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /**
+     * The average of every submitted total mark across {@code sections} — a draft grade is never
+     * counted, matching the rule that a student must never see (and this average must never be
+     * skewed by) a mark the instructor has not submitted yet.
+     */
+    private String gradeAverageText(List<Section> sections, String courseLabel) {
+        List<BigDecimal> totals = new ArrayList<>();
+        for (Section s : sections) {
+            for (GradeSheetRow row : gradeDao.findSectionRoster(s.getSectionId())) {
+                if (row.isSubmitted() && row.getTotalMark() != null) {
+                    totals.add(row.getTotalMark());
+                }
+            }
+        }
+        if (totals.isEmpty()) {
+            return "No submitted grades are on file yet for " + courseLabel + ".";
+        }
+        BigDecimal sum = totals.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal average = sum.divide(BigDecimal.valueOf(totals.size()), 2, RoundingMode.HALF_UP);
+        return "The average grade in " + courseLabel + " is " + average.stripTrailingZeros().toPlainString()
+                + " across " + totals.size() + " submitted grade(s).";
     }
 
     // ======================================================================

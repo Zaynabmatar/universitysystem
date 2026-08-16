@@ -36,7 +36,7 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     // for theirs; this class never writes those columns for those two roles.
     private static final String SELECT =
             "SELECT user_id, username, password_hash, role, is_active, last_login, created_at, "
-            + "email, address FROM dbo.users";
+            + "email, address, failed_login_attempts, is_locked, locked_at FROM dbo.users";
 
     private static final String INSERT =
             "INSERT INTO dbo.users (username, password_hash, role, is_active) VALUES (?, ?, ?, ?)";
@@ -67,6 +67,9 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
         user.setCreatedAt(DaoUtils.getLocalDateTime(rs, "created_at"));
         user.setEmail(rs.getString("email"));
         user.setAddress(rs.getString("address"));
+        user.setFailedLoginAttempts(rs.getInt("failed_login_attempts"));
+        user.setLocked(rs.getBoolean("is_locked"));
+        user.setLockedAt(DaoUtils.getLocalDateTime(rs, "locked_at"));
         return user;
     }
 
@@ -190,6 +193,52 @@ public class UserDAO extends AbstractDAO implements GenericDAO<User> {
     public boolean setActive(Connection connection, int userId, boolean active) {
         return executeUpdate(connection, "UPDATE dbo.users SET is_active = ? WHERE user_id = ?",
                 active, userId) > 0;
+    }
+
+    /**
+     * Records one failed sign-in: increments {@code failed_login_attempts},
+     * and — the moment that counter reaches {@code lockThreshold} — also sets
+     * {@code is_locked = 1} and {@code locked_at = SYSDATETIME()}, all in one
+     * statement so a lock can never be split across two writes.
+     *
+     * <p>Called by {@link com.university.service.AuthService} for STUDENT and
+     * INSTRUCTOR accounts only; never for ADMIN.</p>
+     *
+     * <p>Cannot use {@code OUTPUT INSERTED.*} to read the new count back in the
+     * same statement: {@code dbo.users} carries {@code trg_User_Audit}
+     * (migration 0014), and SQL Server refuses a plain {@code OUTPUT} clause on
+     * any table with an enabled trigger — see the class comment on
+     * {@link #insert}. The counter is read back with a second, ordinary
+     * {@code SELECT} instead.</p>
+     *
+     * @return the counter's new value
+     */
+    public int registerFailedLogin(int userId, int lockThreshold) {
+        executeUpdate(
+                "UPDATE dbo.users SET "
+                + "failed_login_attempts = failed_login_attempts + 1, "
+                + "is_locked = CASE WHEN failed_login_attempts + 1 >= ? THEN 1 ELSE is_locked END, "
+                + "locked_at = CASE WHEN failed_login_attempts + 1 >= ? AND is_locked = 0 "
+                + "THEN SYSDATETIME() ELSE locked_at END "
+                + "WHERE user_id = ?",
+                lockThreshold, lockThreshold, userId);
+        return queryInt("SELECT failed_login_attempts FROM dbo.users WHERE user_id = ?", userId);
+    }
+
+    /** Resets the consecutive-failure counter after a successful sign-in. No-op if it is already 0. */
+    public boolean resetFailedLogin(int userId) {
+        return executeUpdate("UPDATE dbo.users SET failed_login_attempts = 0 "
+                + "WHERE user_id = ? AND failed_login_attempts <> 0", userId) > 0;
+    }
+
+    /**
+     * Administrator action: undoes a lockout without touching the password —
+     * {@code failed_login_attempts} back to 0, {@code is_locked} back to 0,
+     * {@code locked_at} back to {@code NULL}.
+     */
+    public boolean unlock(int userId) {
+        return executeUpdate("UPDATE dbo.users SET failed_login_attempts = 0, is_locked = 0, "
+                + "locked_at = NULL WHERE user_id = ?", userId) > 0;
     }
 
     /**

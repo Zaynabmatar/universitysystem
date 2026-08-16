@@ -43,6 +43,15 @@ public class AuthService {
     /** Deliberately vague, for the reason above. */
     public static final String SIGN_IN_FAILED = "Incorrect ID or password.";
 
+    /**
+     * Consecutive failed attempts a STUDENT or INSTRUCTOR account tolerates
+     * before it locks. ADMIN is never subject to this — see {@link #login}.
+     */
+    private static final int LOCKOUT_THRESHOLD = 5;
+
+    private static final String ACCOUNT_LOCKED_MESSAGE =
+            "Account locked. Please contact the administrator.";
+
     private final UserDAO userDao = new UserDAO();
     private final StudentDAO studentDao = new StudentDAO();
     private final InstructorDAO instructorDao = new InstructorDAO();
@@ -113,11 +122,33 @@ public class AuthService {
         });
         trace("role on account  = " + user.getRole() + ", is_active = " + user.isActive());
 
+        boolean lockable = user.getRole() == UserRole.STUDENT || user.getRole() == UserRole.INSTRUCTOR;
+
+        // A locked account is refused before the password is even checked -
+        // the correct password does not open it, only an administrator's
+        // "Unlock Account" does.
+        if (lockable && user.isLocked()) {
+            trace("refused: account is locked");
+            throw new ServiceException(ACCOUNT_LOCKED_MESSAGE);
+        }
+
         if (!PasswordHasher.verify(password, user.getPasswordHash())) {
             trace("refused: password did not verify against the stored hash");
+            if (lockable) {
+                int attempts = userDao.registerFailedLogin(user.getUserId(), LOCKOUT_THRESHOLD);
+                if (attempts >= LOCKOUT_THRESHOLD) {
+                    trace("account locked after " + attempts + " consecutive failed attempts");
+                    throw new ServiceException(ACCOUNT_LOCKED_MESSAGE);
+                }
+                throw new ServiceException(
+                        "Incorrect ID or password. Attempt " + attempts + " of " + LOCKOUT_THRESHOLD + ".");
+            }
             throw new ServiceException(SIGN_IN_FAILED);
         }
         trace("password         = verified");
+        if (lockable && user.getFailedLoginAttempts() > 0) {
+            userDao.resetFailedLogin(user.getUserId());
+        }
         // Wrong door. Checked after the password so that a stranger cannot use
         // the three buttons to learn which role an ID belongs to.
         if (selectedRole != null && user.getRole() != selectedRole) {

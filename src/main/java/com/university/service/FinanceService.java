@@ -304,6 +304,11 @@ public class FinanceService {
         return invoiceDao.findDueDatesBySemester(semesterId);
     }
 
+    /** Every unpaid invoice past its due date, for the finance office / Admin reporting. */
+    public List<StudentInvoice> overdueInvoices() {
+        return invoiceDao.findOverdue();
+    }
+
     /** The lines of one bill. */
     public List<InvoiceItem> itemsOf(int invoiceId) {
         return itemDao.findByInvoice(invoiceId);
