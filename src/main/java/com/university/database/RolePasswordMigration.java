@@ -10,9 +10,11 @@ import com.university.model.User;
 import com.university.service.PasswordHasher;
 
 /**
- * One-off migration: rehashes every account's password to the current rule,
- * BCrypt of {@code <user_id>@iuL} — the one id in the system, the same number
- * shown as Student ID or Instructor ID and typed on the sign-in screen.
+ * One-off migration: rehashes every account's password to its role's current
+ * default — {@code <user_id>@iuL} for STUDENT, {@code <user_id>@ADm} for
+ * ADMIN, {@code <user_id>@iNS} for INSTRUCTOR — the one id in the system, the
+ * same number shown as Student ID or Instructor ID and typed on the sign-in
+ * screen.
  *
  * <p>Admin accounts are read by {@code users.role = 'ADMIN'} directly —
  * {@code dbo.admins} was retired in Phase 18 as a redundant, unused identity
@@ -31,14 +33,15 @@ public final class RolePasswordMigration {
 
         int admins = 0;
         for (User admin : userDao.findByRole(UserRole.ADMIN)) {
-            userDao.updatePasswordHash(admin.getUserId(), PasswordHasher.hashDefaultPassword(admin.getUserId()));
+            userDao.updatePasswordHash(admin.getUserId(),
+                    PasswordHasher.hashDefaultPassword(admin.getUserId(), UserRole.ADMIN));
             admins++;
         }
 
         int instructors = 0;
         for (Instructor instructor : new InstructorDAO().findAll()) {
             userDao.updatePasswordHash(instructor.getUserId(),
-                    PasswordHasher.hashDefaultPassword(instructor.getUserId()));
+                    PasswordHasher.hashDefaultPassword(instructor.getUserId(), UserRole.INSTRUCTOR));
             instructors++;
         }
 
@@ -49,8 +52,9 @@ public final class RolePasswordMigration {
             students++;
         }
 
-        System.out.println("Rehashed " + admins + " admin, " + instructors
-                + " instructor and " + students + " student password(s) to <user_id>@iuL.");
+        System.out.println("Rehashed " + admins + " admin (<user_id>@ADm), " + instructors
+                + " instructor (<user_id>@iNS) and " + students
+                + " student (<user_id>@iuL) password(s).");
         DBConnection.shutdown();
     }
 }

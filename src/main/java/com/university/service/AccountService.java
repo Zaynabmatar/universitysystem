@@ -29,10 +29,11 @@ import java.util.Locale;
  *       but stored by the caller on {@code students.email} /
  *       {@code instructors.email}, the only two columns that hold one —
  *       {@code dbo.users} has no email column.</li>
- *   <li><b>The password.</b> {@code <user_id>@iuL}, hashed with BCrypt the
- *       moment the id exists. Only the hash reaches the database. The plain
- *       text is returned once, to be shown on screen, and is never logged,
- *       printed or stored.</li>
+ *   <li><b>The password.</b> The role's mandatory default (see
+ *       {@link PasswordHasher#defaultPasswordFor(int, UserRole)}), hashed
+ *       with BCrypt the moment the id exists. Only the hash reaches the
+ *       database. The plain text is returned once, to be shown on screen,
+ *       and is never logged, printed or stored.</li>
  * </ul>
  *
  * <p>Every method that writes takes the caller's {@link Connection}, so account
@@ -73,7 +74,7 @@ public class AccountService {
      *
      * @param userId            the id SQL Server assigned — the Student ID or Instructor ID
      * @param email             the generated university address
-     * @param temporaryPassword the plain-text {@code <userId>@iuL}, to be shown
+     * @param temporaryPassword the plain-text role default, to be shown
      *                          on screen once and then forgotten
      */
     public record NewAccount(int userId, String email, String temporaryPassword) {
@@ -108,9 +109,9 @@ public class AccountService {
         // SQL Server assigns user_id here; nothing below ever second-guesses it.
         int userId = userDao.insert(connection, account);
 
-        userDao.finalizePassword(connection, userId);
+        userDao.finalizePassword(connection, userId, role);
 
-        return new NewAccount(userId, email, PasswordHasher.defaultPasswordFor(userId));
+        return new NewAccount(userId, email, PasswordHasher.defaultPasswordFor(userId, role));
     }
 
     /**
@@ -249,17 +250,19 @@ public class AccountService {
     // ============================================================== password
 
     /**
-     * Puts an account's password back to the mandatory {@code <user_id>@iuL}.
+     * Puts an account's password back to its role's mandatory default
+     * ({@code <user_id>@iuL} for STUDENT, {@code <user_id>@ADm} for ADMIN,
+     * {@code <user_id>@iNS} for INSTRUCTOR).
      *
      * <p>The account keeps its id, its address and its role — only the hash in
      * {@code password_hash} changes.</p>
      *
      * @return the plain-text password, to show the administrator once
      */
-    public String resetPasswordToDefault(int userId) {
+    public String resetPasswordToDefault(int userId, UserRole role) {
         ValidationException.requireId(userId, "User");
-        userDao.updatePasswordHash(userId, PasswordHasher.hashDefaultPassword(userId));
-        return PasswordHasher.defaultPasswordFor(userId);
+        userDao.updatePasswordHash(userId, PasswordHasher.hashDefaultPassword(userId, role));
+        return PasswordHasher.defaultPasswordFor(userId, role);
     }
 
     // =============================================================== helpers

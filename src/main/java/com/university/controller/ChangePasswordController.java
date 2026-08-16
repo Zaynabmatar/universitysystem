@@ -107,7 +107,7 @@ public class ChangePasswordController implements ReturnNavigable {
             return;
         }
         if (!updated.equals(confirm)) {
-            showError("The new passwords do not match.");
+            showError("New password and confirmation password do not match.");
             return;
         }
 

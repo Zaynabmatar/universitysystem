@@ -212,7 +212,7 @@ public class StudentService {
      */
     public String resetPasswordToDefault(int studentId) {
         Student student = requireStudent(studentId);
-        return accounts.resetPasswordToDefault(student.getUserId());
+        return accounts.resetPasswordToDefault(student.getUserId(), UserRole.STUDENT);
     }
 
     // ------------------------------------------------------------------ uniqueness

@@ -4,6 +4,7 @@ import com.university.dao.CourseDAO;
 import com.university.dao.CoursePrerequisiteDAO;
 import com.university.dao.DepartmentDAO;
 import com.university.dao.EnrollmentDAO;
+import com.university.dao.ExamDAO;
 import com.university.dao.InstructorDAO;
 import com.university.dao.ProgramDAO;
 import com.university.dao.SectionDAO;
@@ -15,6 +16,7 @@ import com.university.enums.StudentStatus;
 import com.university.model.Course;
 import com.university.model.Department;
 import com.university.model.Enrollment;
+import com.university.model.Exam;
 import com.university.model.Instructor;
 import com.university.model.Program;
 import com.university.model.Section;
@@ -111,6 +113,7 @@ public class AIAssistantService {
     private final DepartmentDAO departmentDao = new DepartmentDAO();
     private final ProgramDAO programDao = new ProgramDAO();
     private final EnrollmentDAO enrollmentDao = new EnrollmentDAO();
+    private final ExamDAO examDao = new ExamDAO();
 
     /**
      * Phase 4's Gemini fallback, shared by all three roles: whatever question no university
@@ -1096,3 +1099,4 @@ public class AIAssistantService {
         return Pattern.compile("\\b" + Pattern.quote(word) + "\\b").matcher(text).find();
     }
 }
+

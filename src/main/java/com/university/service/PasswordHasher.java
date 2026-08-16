@@ -1,5 +1,6 @@
 package com.university.service;
 
+import com.university.enums.UserRole;
 import org.mindrot.jbcrypt.BCrypt;
 
 /**
@@ -63,6 +64,27 @@ public final class PasswordHasher {
      */
     public static String hashDefaultPassword(int userId) {
         return BCrypt.hashpw(defaultPasswordFor(userId), BCrypt.gensalt(COST));
+    }
+
+    /**
+     * The mandatory initial password for a given User ID and role.
+     *
+     * <p>STUDENT keeps the original {@link #defaultPasswordFor(int)} format
+     * ({@code <userId>@iuL}), unchanged. ADMIN ({@code <userId>@ADm}) and
+     * INSTRUCTOR ({@code <userId>@iNS}) each get their own fixed suffix, so
+     * knowing one role's default does not hand you another role's.</p>
+     */
+    public static String defaultPasswordFor(int userId, UserRole role) {
+        return switch (role) {
+            case ADMIN -> userId + "@ADm";
+            case INSTRUCTOR -> userId + "@iNS";
+            case STUDENT -> defaultPasswordFor(userId);
+        };
+    }
+
+    /** Hashes the mandatory initial password for a User ID and role. */
+    public static String hashDefaultPassword(int userId, UserRole role) {
+        return BCrypt.hashpw(defaultPasswordFor(userId, role), BCrypt.gensalt(COST));
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.university.database;
 
+import com.university.enums.UserRole;
 import com.university.service.PasswordHasher;
 
 import java.sql.Connection;
@@ -14,7 +15,8 @@ import java.util.Map;
 
 /**
  * Checks — and on request repairs — the rule that every account's password is
- * BCrypt of {@code <user_id>@iuL}.
+ * BCrypt of its role's default: {@code <user_id>@iuL} for STUDENT,
+ * {@code <user_id>@ADm} for ADMIN, {@code <user_id>@iNS} for INSTRUCTOR.
  *
  * <p>Reads {@code dbo.users} itself rather than going through the three role
  * data access objects, which is the one thing {@link RolePasswordMigration}
@@ -24,12 +26,12 @@ import java.util.Map;
  * row in it is covered whatever its role.</p>
  *
  * <p>No user id is written into this class. Each row's expected password is
- * derived from the id that row already carries, so a database restored with a
- * different set of ids needs no edit here.</p>
+ * derived from the id and role that row already carries, so a database
+ * restored with a different set of ids needs no edit here.</p>
  *
  * <p>Nothing is ever stored in plain text: the column receives
- * {@link PasswordHasher#hashDefaultPassword(int)} and the plain form exists
- * only as the argument to BCrypt.</p>
+ * {@link PasswordHasher#hashDefaultPassword(int, UserRole)} and the plain form
+ * exists only as the argument to BCrypt.</p>
  *
  * <pre>
  *   (no arguments)   report only — reads, changes nothing
@@ -40,6 +42,11 @@ import java.util.Map;
  * hash is skipped, so a second run reports zero repairs. It is also safe to
  * interrupt — the rewrite runs in one transaction and either commits whole or
  * rolls back whole.</p>
+ *
+ * <p><b>STUDENT accounts are never rewritten by {@code --apply}</b>, even one
+ * whose hash does not match {@code <user_id>@iuL}. The report still counts a
+ * mismatched STUDENT row so it is visible, but only ADMIN and INSTRUCTOR rows
+ * are ever passed to {@link #repair}.</p>
  */
 public final class DefaultPasswordMigration {
 
@@ -48,7 +55,9 @@ public final class DefaultPasswordMigration {
 
         /** Does the stored hash accept this account's mandatory password? */
         boolean matchesDefault() {
-            return PasswordHasher.verify(PasswordHasher.defaultPasswordFor(userId), passwordHash);
+            UserRole roleEnum = UserRole.fromDb(role);
+            return roleEnum != null
+                    && PasswordHasher.verify(PasswordHasher.defaultPasswordFor(userId, roleEnum), passwordHash);
         }
     }
 
@@ -79,16 +88,34 @@ public final class DefaultPasswordMigration {
             report(accounts.size(), perRole, broken);
 
             if (broken.isEmpty()) {
-                System.out.println("\nEvery account already accepts <user_id>@iuL. Nothing to do.");
+                System.out.println("\nEvery account already accepts its role's default password. Nothing to do.");
+                return;
+            }
+
+            List<Account> repairable = new ArrayList<>();
+            int studentsSkipped = 0;
+            for (Account account : broken) {
+                if ("STUDENT".equalsIgnoreCase(account.role())) {
+                    studentsSkipped++;
+                } else {
+                    repairable.add(account);
+                }
+            }
+            if (studentsSkipped > 0) {
+                System.out.println("\n" + studentsSkipped + " STUDENT account(s) do not match <user_id>@iuL"
+                        + " but are never rewritten by this tool and will be left exactly as they are.");
+            }
+            if (repairable.isEmpty()) {
+                System.out.println("\nNo ADMIN or INSTRUCTOR accounts need repair. Nothing to do.");
                 return;
             }
             if (!apply) {
                 System.out.println("\nReport only - nothing was written."
-                        + "\nRe-run with --apply to rehash the " + broken.size()
-                        + " account(s) counted above.");
+                        + "\nRe-run with --apply to rehash the " + repairable.size()
+                        + " ADMIN/INSTRUCTOR account(s) counted above.");
                 return;
             }
-            repair(connection, broken);
+            repair(connection, repairable);
 
         } catch (SQLException e) {
             System.out.println("The audit could not run — full stack trace follows:");
@@ -125,7 +152,7 @@ public final class DefaultPasswordMigration {
         if (broken.isEmpty()) {
             return;
         }
-        System.out.println("\nAccounts whose hash does not accept <user_id>@iuL"
+        System.out.println("\nAccounts whose hash does not accept their role's default password"
                 + " (first " + Math.min(broken.size(), SAMPLE_SIZE) + " of " + broken.size() + "):");
         for (Account account : broken.subList(0, Math.min(broken.size(), SAMPLE_SIZE))) {
             // The hash is shown truncated, and the password never at all.
@@ -157,7 +184,8 @@ public final class DefaultPasswordMigration {
                 "UPDATE dbo.users SET password_hash = ? WHERE user_id = ?")) {
 
             for (Account account : broken) {
-                statement.setString(1, PasswordHasher.hashDefaultPassword(account.userId()));
+                UserRole roleEnum = UserRole.fromDb(account.role());
+                statement.setString(1, PasswordHasher.hashDefaultPassword(account.userId(), roleEnum));
                 statement.setInt(2, account.userId());
                 statement.addBatch();
             }
@@ -168,7 +196,7 @@ public final class DefaultPasswordMigration {
             for (int result : results) {
                 rows += Math.max(result, 0);
             }
-            System.out.println("\nRehashed " + rows + " account(s) to BCrypt of <user_id>@iuL.");
+            System.out.println("\nRehashed " + rows + " account(s) to BCrypt of their role's default password.");
 
         } catch (SQLException e) {
             connection.rollback();

@@ -35,8 +35,9 @@ public final class ValidationUtil {
     public static boolean maxLength(String s, int max) { return s == null || s.trim().length() <= max; }
 
     /**
-     * Minimum strength for a password the user chooses themselves:
-     * at least 8 characters, at least one letter and at least one digit.
+     * Minimum strength for a password the user chooses themselves: at least 8
+     * characters, with at least one uppercase letter, one lowercase letter,
+     * one digit and one special (non-alphanumeric) character.
      *
      * <p>The spec puts this on {@code PasswordUtil}; this project already hashes
      * through {@code service.PasswordHasher}, so the rule lives here with the
@@ -44,13 +45,17 @@ public final class ValidationUtil {
      */
     public static boolean isStrongPassword(String rawPassword) {
         if (rawPassword == null || rawPassword.length() < 8) return false;
-        boolean hasLetter = false;
+        boolean hasUpper = false;
+        boolean hasLower = false;
         boolean hasDigit = false;
+        boolean hasSpecial = false;
         for (char c : rawPassword.toCharArray()) {
-            if (Character.isLetter(c)) hasLetter = true;
+            if (Character.isUpperCase(c)) hasUpper = true;
+            else if (Character.isLowerCase(c)) hasLower = true;
             else if (Character.isDigit(c)) hasDigit = true;
+            else hasSpecial = true;
         }
-        return hasLetter && hasDigit;
+        return hasUpper && hasLower && hasDigit && hasSpecial;
     }
 
     /** Parses an integer, returning null instead of throwing. */

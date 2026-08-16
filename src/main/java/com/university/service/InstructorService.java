@@ -188,7 +188,7 @@ public class InstructorService {
 
     /**
      * Resets the instructor's password back to the mandatory
-     * {@code <Instructor ID>@iuL} default. The account keeps its Instructor ID
+     * {@code <Instructor ID>@iNS} default. The account keeps its Instructor ID
      * and its email address.
      *
      * @return the plain-text password to show once to the admin; it is not
@@ -196,7 +196,7 @@ public class InstructorService {
      */
     public String resetPasswordToDefault(int instructorId) {
         Instructor instructor = requireInstructor(instructorId);
-        return accounts.resetPasswordToDefault(instructor.getUserId());
+        return accounts.resetPasswordToDefault(instructor.getUserId(), UserRole.INSTRUCTOR);
     }
 
     // ------------------------------------------------------------------ uniqueness

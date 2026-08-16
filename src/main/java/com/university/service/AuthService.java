@@ -8,6 +8,7 @@ import com.university.enums.UserRole;
 import com.university.model.Instructor;
 import com.university.model.Student;
 import com.university.model.User;
+import com.university.util.ValidationUtil;
 
 import java.time.LocalDateTime;
 
@@ -197,8 +198,13 @@ public class AuthService {
     /**
      * Changes a password after checking the old one.
      *
-     * @throws ServiceException if the current password is wrong or the new one
-     *                          repeats it
+     * <p>Applies the same {@link ValidationUtil#isStrongPassword} policy for
+     * every role — Student, Instructor and Admin all go through this one
+     * method, so there is nowhere for a role-specific rule to drift in.</p>
+     *
+     * @throws ServiceException if the current password is wrong, the new one
+     *                          does not meet the password policy, or it
+     *                          repeats the current password
      */
     public void changePassword(int userId, String currentPassword, String newPassword) {
         ValidationException.requireId(userId, "User");
@@ -211,8 +217,12 @@ public class AuthService {
         if (!PasswordHasher.verify(currentPassword, user.getPasswordHash())) {
             throw new ServiceException("Your current password is not correct.");
         }
+        if (!ValidationUtil.isStrongPassword(newPassword)) {
+            throw new ValidationException("Password must contain at least 8 characters, including an "
+                    + "uppercase letter, lowercase letter, number, and special character.");
+        }
         if (currentPassword.equals(newPassword)) {
-            throw new ValidationException("The new password must differ from the old one.");
+            throw new ValidationException("New password must be different from the current password.");
         }
 
         userDao.updatePasswordHash(userId, PasswordHasher.hash(newPassword));
