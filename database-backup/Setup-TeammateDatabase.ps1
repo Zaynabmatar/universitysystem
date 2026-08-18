@@ -2,7 +2,7 @@
     One-click teammate setup for the University System project.
 
     What it does:
-      1. Restores universitymanagementDB_handoff_2026-08-15.bak to a database
+      1. Restores the .bak file found next to this script to a database
          named universitymanagementDB on YOUR SQL Server instance.
       2. Leaves your personal DB credentials/config alone -- it never writes to
          ~/.universitysystem/db.properties. If that file does not exist yet, it
@@ -36,12 +36,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$backupFile = Join-Path $PSScriptRoot "universitymanagementDB_handoff_2026-08-15.bak"
-$projectRoot = Split-Path $PSScriptRoot -Parent
-
-if (-not (Test-Path $backupFile)) {
-    throw "Backup file not found at $backupFile. Make sure it shipped alongside this script."
+$backupCandidates = @(Get-ChildItem -Path $PSScriptRoot -Filter *.bak -File)
+if ($backupCandidates.Count -eq 0) {
+    throw "No .bak file found in $PSScriptRoot. Make sure the database backup shipped alongside this script."
 }
+if ($backupCandidates.Count -gt 1) {
+    throw "Multiple .bak files found in $PSScriptRoot ($(($backupCandidates | ForEach-Object Name) -join ', ')). Keep exactly one so the correct backup is unambiguous."
+}
+$backupFile = $backupCandidates[0].FullName
+$projectRoot = Split-Path $PSScriptRoot -Parent
 
 # Auth args shared by every sqlcmd call below: SQL auth if -SqlUser was given, else Windows auth.
 $AuthArgs = if ($SqlUser) { @("-U", $SqlUser, "-P", $SqlPassword) } else { @("-E") }

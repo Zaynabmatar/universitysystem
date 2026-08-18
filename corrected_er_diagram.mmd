@@ -1,0 +1,417 @@
+erDiagram
+    %% ============================================================
+    %% University Registration System — Corrected ER Diagram
+    %% Reflects the verified current schema. ADMIN has no profile
+    %% table (dropped by phase18_retire_admin_identity_table.sql):
+    %% an admin is purely a USERS row with role = 'ADMIN'.
+    %% ============================================================
+
+    DEPARTMENTS {
+        int dept_id PK
+        string dept_code UK
+        string dept_name
+        boolean is_active
+    }
+
+    CAMPUSES {
+        int campus_id PK
+        string campus_name UK
+        string location
+        boolean is_active
+    }
+
+    PROGRAMS {
+        int program_id PK
+        int dept_id FK
+        string program_code UK
+        string program_name
+        string degree_type
+        int total_credits_required
+        boolean is_active
+    }
+
+    PROGRAM_REQUIREMENTS {
+        int requirement_id PK
+        int program_id FK
+        int course_id FK
+        boolean is_mandatory
+        int recommended_semester
+        string requirement_type
+        int min_completed_credits
+    }
+
+    USERS {
+        int user_id PK
+        string username UK
+        string email UK
+        string address
+        string password_hash
+        string role
+        boolean is_active
+        datetime last_login
+        int failed_login_attempts
+        boolean is_locked
+        datetime locked_at
+        datetime created_at
+    }
+
+    STUDENTS {
+        int student_id PK
+        int user_id "FK, UK"
+        string student_number UK
+        string first_name
+        string last_name
+        string email UK
+        string phone
+        date date_of_birth
+        string gender
+        string address
+        int program_id FK
+        date admission_date
+        string status
+        string academic_standing
+        decimal cumulative_gpa
+        int completed_credits
+        int probation_count
+    }
+
+    INSTRUCTORS {
+        int instructor_id PK
+        int user_id "FK, UK"
+        string employee_number UK
+        string first_name
+        string last_name
+        string email UK
+        string phone
+        string address
+        int dept_id FK
+        string academic_rank
+        date hire_date
+        boolean is_active
+    }
+
+    COURSES {
+        int course_id PK
+        string course_code UK
+        string course_title
+        string description
+        int credits
+        int dept_id FK
+        int level_year
+        boolean is_active
+        boolean has_lab
+        decimal coursework_weight
+        decimal midterm_weight
+        decimal final_weight
+        decimal coursework_max_mark
+        decimal midterm_max_mark
+        decimal final_max_mark
+    }
+
+    COURSE_PREREQUISITES {
+        int prereq_id PK
+        int course_id FK
+        int prerequisite_course_id FK
+        decimal min_grade_points
+    }
+
+    SEMESTERS {
+        int semester_id PK
+        string semester_name UK
+        string academic_year
+        string term
+        date start_date
+        date end_date
+        datetime registration_start
+        datetime registration_end
+        date drop_deadline
+        date withdraw_deadline
+        date grade_entry_start
+        date grade_entry_end
+        boolean is_current
+        datetime evaluation_start
+        datetime evaluation_end
+    }
+
+    SECTIONS {
+        int section_id PK
+        int course_id FK
+        int semester_id FK
+        int instructor_id FK
+        int campus_id FK
+        string section_number
+        int capacity
+        int enrolled_count
+        string room
+        string status
+    }
+
+    SECTION_SCHEDULES {
+        int schedule_id PK
+        int section_id FK
+        string day_of_week
+        time start_time
+        time end_time
+    }
+
+    ENROLLMENTS {
+        int enrollment_id PK
+        int student_id FK
+        int section_id FK
+        datetime enrollment_date
+        string status
+        boolean is_repeat
+        boolean counts_in_gpa
+    }
+
+    GRADES {
+        int grade_id PK
+        int enrollment_id "FK, UK"
+        decimal coursework_mark
+        decimal midterm_mark
+        decimal lab_mark
+        decimal final_mark
+        decimal total_mark
+        string letter_grade
+        decimal grade_points
+        string result_status
+        boolean is_submitted
+        int submitted_by FK
+        datetime submitted_at
+        int last_modified_by FK
+        datetime last_modified_at
+        boolean coursework_published
+        boolean midterm_published
+        boolean lab_published
+        boolean final_published
+        decimal coursework_published_mark
+        decimal midterm_published_mark
+        decimal lab_published_mark
+        decimal final_published_mark
+    }
+
+    EXAMS {
+        int exam_id PK
+        int section_id FK
+        date exam_date
+        time start_time
+        int duration_minutes
+        string room
+        int created_by FK
+        datetime created_at
+    }
+
+    ATTENDANCE_RECORDS {
+        int attendance_id PK
+        int enrollment_id FK
+        int section_id FK
+        date class_date
+        string status
+        int recorded_by FK
+        datetime recorded_at
+    }
+
+    INSTRUCTOR_EVALUATIONS {
+        int evaluation_id PK
+        int enrollment_id "FK, UK"
+        datetime submitted_at
+    }
+
+    EVALUATION_QUESTIONS {
+        int question_id PK
+        string question_text
+        int display_order UK
+        boolean is_active
+    }
+
+    EVALUATION_ANSWERS {
+        int evaluation_id PK_FK
+        int question_id PK_FK
+        int rating
+    }
+
+    CALENDAR_EVENTS {
+        int event_id PK
+        int semester_id FK
+        string title
+        string event_type
+        date start_date
+        date end_date
+        string description
+        boolean is_active
+        int created_by FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    FEE_TYPES {
+        int fee_type_id PK
+        string fee_name UK
+        string description
+        boolean is_active
+    }
+
+    STUDENT_INVOICES {
+        int invoice_id PK
+        int student_id FK
+        int semester_id FK
+        string invoice_number UK
+        date issue_date
+        date due_date
+        decimal original_amount
+        decimal discount_amount
+        decimal scholarship_amount
+        decimal late_fee_amount
+        decimal total_amount
+        decimal paid_amount
+        decimal remaining_amount
+        string status
+        datetime created_at
+        datetime updated_at
+    }
+
+    INVOICE_ITEMS {
+        int invoice_item_id PK
+        int invoice_id FK
+        int fee_type_id FK
+        string description
+        decimal amount
+    }
+
+    PAYMENTS {
+        int payment_id PK
+        int invoice_id FK
+        int student_id FK
+        datetime payment_date
+        decimal amount
+        string payment_method
+        string receipt_number UK
+        string reference_number
+        string payment_status
+        string notes
+        int recorded_by FK
+        datetime created_at
+    }
+
+    FINANCIAL_TRANSACTIONS {
+        int transaction_id PK
+        int student_id FK
+        int invoice_id FK
+        int payment_id FK
+        string transaction_type
+        decimal amount
+        datetime transaction_date
+        string description
+        int created_by FK
+        datetime created_at
+    }
+
+    TUITION_RATES {
+        int semester_id PK_FK
+        decimal usd_rate_per_credit
+        decimal lbp_rate_per_credit
+        int installment_count
+        decimal late_penalty_usd
+        decimal late_penalty_lbp
+        datetime created_at
+    }
+
+    STUDENT_TUITION_INSTALLMENTS {
+        int installment_id PK
+        int student_id FK
+        int semester_id FK
+        string currency
+        int installment_no
+        string bank_reference UK
+        decimal amount
+        date due_date
+        date payment_date
+        decimal penalty
+        string status
+        datetime created_at
+    }
+
+    NOTIFICATIONS {
+        int notification_id PK
+        int user_id FK
+        string title
+        string message
+        string type
+        boolean is_read
+        string related_entity_type
+        int related_entity_id "soft reference, no FK"
+        datetime created_at
+    }
+
+    AUDIT_LOG {
+        int log_id PK
+        int user_id FK
+        string action_type
+        string table_name
+        int record_id
+        string old_value
+        string new_value
+        string description
+        datetime created_at
+    }
+
+    %% ============================================================
+    %% Relationships
+    %% ============================================================
+
+    DEPARTMENTS   ||--o{ PROGRAMS               : offers
+    DEPARTMENTS   ||--o{ COURSES                 : offers
+    DEPARTMENTS   ||--o{ INSTRUCTORS             : employs
+
+    PROGRAMS      ||--o{ STUDENTS                : enrolls
+    PROGRAMS      ||--o{ PROGRAM_REQUIREMENTS    : specifies
+    COURSES       ||--o{ PROGRAM_REQUIREMENTS    : required_by
+
+    COURSES       ||--o{ COURSE_PREREQUISITES    : has_prerequisite_entry
+    COURSES       ||--o{ COURSE_PREREQUISITES    : is_prerequisite_for
+
+    USERS         ||--o| STUDENTS                : has_profile
+    USERS         ||--o| INSTRUCTORS             : has_profile
+
+    CAMPUSES      ||--o{ SECTIONS                : hosts
+    COURSES       ||--o{ SECTIONS                : offered_as
+    SEMESTERS     ||--o{ SECTIONS                : scheduled_in
+    INSTRUCTORS   o|--o{ SECTIONS                : teaches
+
+    SECTIONS      ||--o{ SECTION_SCHEDULES       : meets_at
+    SECTIONS      ||--o{ ENROLLMENTS             : fills
+    SECTIONS      ||--o{ EXAMS                   : has_exam
+    SECTIONS      ||--o{ ATTENDANCE_RECORDS      : has_attendance
+
+    STUDENTS      ||--o{ ENROLLMENTS             : makes
+    ENROLLMENTS   ||--o| GRADES                  : produces
+    ENROLLMENTS   ||--o{ ATTENDANCE_RECORDS      : tracked_by
+    ENROLLMENTS   ||--o| INSTRUCTOR_EVALUATIONS  : may_submit
+
+    INSTRUCTOR_EVALUATIONS ||--o{ EVALUATION_ANSWERS : contains
+    EVALUATION_QUESTIONS   ||--o{ EVALUATION_ANSWERS : answered_by
+
+    SEMESTERS     ||--o{ CALENDAR_EVENTS         : has_event
+    SEMESTERS     ||--o| TUITION_RATES           : priced_by
+    SEMESTERS     ||--o{ STUDENT_TUITION_INSTALLMENTS : due_in
+    SEMESTERS     ||--o{ STUDENT_INVOICES        : billed_for
+
+    STUDENTS      ||--o{ STUDENT_TUITION_INSTALLMENTS : owes
+    STUDENTS      ||--o{ STUDENT_INVOICES        : billed
+    STUDENTS      ||--o{ PAYMENTS                : pays
+    STUDENTS      ||--o{ FINANCIAL_TRANSACTIONS  : has_ledger_entry
+
+    FEE_TYPES        ||--o{ INVOICE_ITEMS        : categorizes
+    STUDENT_INVOICES ||--o{ INVOICE_ITEMS        : line_items
+    STUDENT_INVOICES ||--o{ PAYMENTS             : paid_by
+    STUDENT_INVOICES o|--o{ FINANCIAL_TRANSACTIONS : generates
+    PAYMENTS         o|--o{ FINANCIAL_TRANSACTIONS : generates
+
+    USERS  ||--o{ NOTIFICATIONS         : receives
+    USERS  o|--o{ AUDIT_LOG             : performs
+    USERS  o|--o{ GRADES                : submits
+    USERS  o|--o{ PAYMENTS              : records
+    USERS  o|--o{ FINANCIAL_TRANSACTIONS : creates
+    USERS  ||--o{ ATTENDANCE_RECORDS    : records
+    USERS  o|--o{ CALENDAR_EVENTS       : creates
+    USERS  o|--o{ EXAMS                 : creates
