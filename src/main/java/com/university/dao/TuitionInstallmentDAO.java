@@ -179,6 +179,16 @@ public class TuitionInstallmentDAO extends AbstractDAO {
                 + "WHERE student_id = ? AND semester_id = ?", studentId, semesterId);
     }
 
+
+    public int updateUnpaidAmount(int installmentId, java.math.BigDecimal amount) {
+        return executeUpdate(
+                "UPDATE dbo.student_tuition_installments " +
+                "SET amount = ? " +
+                "WHERE installment_id = ? " +
+                "AND status IN ('UNPAID','PARTIALLY_PAID','OVERDUE') " +
+                "AND payment_date IS NULL",
+                amount, installmentId);
+    }
     public int insert(Connection connection, TuitionInstallment installment) {
         return insertAndReturnKey(connection, INSERT,
                 installment.getStudentId(),
@@ -193,6 +203,7 @@ public class TuitionInstallmentDAO extends AbstractDAO {
                 installment.getStatus());
     }
 }
+
 
 
 

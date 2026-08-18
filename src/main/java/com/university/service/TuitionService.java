@@ -32,17 +32,17 @@ import java.util.List;
  * costs in USD and in LBP, and the stable installment schedule for each.
  *
  * <p>USD and LBP are two independent obligations, never a currency
- * conversion of one another — every total is a straight sum of that
+ * conversion of one another â€” every total is a straight sum of that
  * currency's own course charges (credits &times; {@link TuitionRate}), and the
  * two installment schedules are generated, stored and read back
  * separately.</p>
  *
  * <p>Installments are generated once per student per semester, the first
  * time this class is asked for them, and normally never rewritten after
- * that — see {@link #billFor}. That is what keeps a bank reference, a due
+ * that â€” see {@link #billFor}. That is what keeps a bank reference, a due
  * date and a status stable across page loads. The one exception is a
  * schedule nothing has been paid against yet whose total has gone stale
- * (typically a dropped course) — {@link #scheduleIsStale} — which is
+ * (typically a dropped course) â€” {@link #scheduleIsStale} â€” which is
  * regenerated from the student's current charges so a dropped course is
  * never still billed or payable.</p>
  */
@@ -180,16 +180,19 @@ public class TuitionService {
         List<TuitionInstallment> stored = installmentDao.findByStudentAndSemester(studentId, semester.getSemesterId());
         if (stored.isEmpty() && !rawCharges.isEmpty()) {
             stored = generateInstallments(studentId, semester, rate, totalUsd, totalLbp);
-        } else if (!stored.isEmpty() && scheduleIsStale(stored, totalUsd, totalLbp)) {
-            // The student dropped (or the registrar added) a course after this schedule was first
-            // generated, so what is stored no longer matches their real active enrollments -- most
-            // commonly a dropped course whose cost must stop being charged/payable. Nothing here
-            // has actually been paid yet (checked below), so the projection can simply be
-            // regenerated from the current, correct total; a real payment is never discarded.
-            installmentDao.deleteByStudentAndSemester(studentId, semester.getSemesterId());
-            stored = rawCharges.isEmpty()
-                    ? List.of()
-                    : generateInstallments(studentId, semester, rate, totalUsd, totalLbp);
+        } else if (!stored.isEmpty() && scheduleTotalsDiffer(stored, totalUsd, totalLbp)) {
+            boolean anyPaid = stored.stream()
+                    .anyMatch(i -> i.getPaymentDate() != null || i.getStatus() == InvoiceStatus.PAID);
+
+            if (!anyPaid) {
+                installmentDao.deleteByStudentAndSemester(studentId, semester.getSemesterId());
+                stored = rawCharges.isEmpty()
+                        ? List.of()
+                        : generateInstallments(studentId, semester, rate, totalUsd, totalLbp);
+            } else {
+                rebalanceUnpaidInstallments(stored, totalUsd, totalLbp);
+                stored = installmentDao.findByStudentAndSemester(studentId, semester.getSemesterId());
+            }
         }
 
         sendPaymentNotifications(studentId, stored);
@@ -221,22 +224,57 @@ public class TuitionService {
 
     /**
      * True when the stored schedule's own totals no longer match what the student's current
-     * (non-dropped) enrollments actually cost, AND nothing on it has been paid — the only case
+     * (non-dropped) enrollments actually cost, AND nothing on it has been paid â€” the only case
      * where it is safe to throw the schedule away and regenerate it. A stray rounding difference
      * never trips this: the same {@code divide(..., scale, HALF_UP)} split
      * {@link #buildAndInsert} used to generate the stored rows is exact to the currency's own
      * scale, so a genuine drop/add changes the total by whole currency units, not by a fraction of
      * one.
      */
-    private boolean scheduleIsStale(List<TuitionInstallment> stored, BigDecimal totalUsd, BigDecimal totalLbp) {
-        boolean anyPaid = stored.stream()
-                .anyMatch(i -> i.getPaymentDate() != null || i.getStatus() == InvoiceStatus.PAID);
-        if (anyPaid) {
-            return false;
-        }
+    private boolean scheduleTotalsDiffer(List<TuitionInstallment> stored, BigDecimal totalUsd, BigDecimal totalLbp) {
         BigDecimal storedUsd = sumAmount(stored, Currency.USD);
         BigDecimal storedLbp = sumAmount(stored, Currency.LBP);
         return storedUsd.compareTo(totalUsd) != 0 || storedLbp.compareTo(totalLbp) != 0;
+    }
+
+    private void rebalanceUnpaidInstallments(List<TuitionInstallment> stored,
+                                             BigDecimal totalUsd, BigDecimal totalLbp) {
+        rebalanceCurrency(stored, Currency.USD, totalUsd, 2);
+        rebalanceCurrency(stored, Currency.LBP, totalLbp, 0);
+    }
+
+    private void rebalanceCurrency(List<TuitionInstallment> stored, Currency currency,
+                                   BigDecimal newTotal, int scale) {
+        List<TuitionInstallment> rows = stored.stream()
+                .filter(i -> i.getCurrency() == currency)
+                .toList();
+
+        BigDecimal paid = rows.stream()
+                .filter(i -> i.getPaymentDate() != null || i.getStatus() == InvoiceStatus.PAID)
+                .map(TuitionInstallment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<TuitionInstallment> unpaid = rows.stream()
+                .filter(i -> i.getPaymentDate() == null && i.getStatus() != InvoiceStatus.PAID)
+                .toList();
+
+        if (unpaid.isEmpty()) {
+            return;
+        }
+
+        BigDecimal remaining = newTotal.subtract(paid).max(BigDecimal.ZERO);
+        BigDecimal share = remaining.divide(
+                BigDecimal.valueOf(unpaid.size()), scale, RoundingMode.DOWN);
+
+        BigDecimal assigned = BigDecimal.ZERO;
+        for (int i = 0; i < unpaid.size(); i++) {
+            BigDecimal amount = (i == unpaid.size() - 1)
+                    ? remaining.subtract(assigned)
+                    : share;
+
+            installmentDao.updateUnpaidAmount(unpaid.get(i).getInstallmentId(), amount);
+            assigned = assigned.add(amount);
+        }
     }
 
     private static BigDecimal sumAmount(List<TuitionInstallment> installments, Currency currency) {
@@ -281,7 +319,7 @@ public class TuitionService {
      * started before {@code targetSemester}.
      *
      * <p>Walks every semester the student has actually studied in and asks {@link #billFor} for
-     * each one, the same call the Payments page itself makes — that both prices the semester from
+     * each one, the same call the Payments page itself makes â€” that both prices the semester from
      * its real enrollments and rates, and lazily generates its installment schedule the first time
      * anyone (this check included) asks, so a previous balance is caught even if the student never
      * opened the Payments page for that semester.</p>
@@ -529,7 +567,7 @@ String title = "Payment Overdue";
      *
      * <p>The last installment of each currency absorbs whatever the equal
      * split does not divide evenly, so the installments always add up to
-     * exactly the total — never more, never less.</p>
+     * exactly the total â€” never more, never less.</p>
      */
     private List<TuitionInstallment> generateInstallments(int studentId, Semester semester, TuitionRate rate,
                                                            BigDecimal totalUsd, BigDecimal totalLbp) {
@@ -604,8 +642,8 @@ String title = "Payment Overdue";
     /**
      * A deterministic, globally-unique reference: a pure function of currency,
      * semester, student and installment number, so it needs no shared counter
-     * and can never collide between two students — or two semesters of the
-     * same student — generating a bill at once.
+     * and can never collide between two students â€” or two semesters of the
+     * same student â€” generating a bill at once.
      *
      * <p>Keyed on {@code semester.getSemesterId()} rather than the calendar
      * year the bill happens to be generated in: with the semester selector,
@@ -630,6 +668,7 @@ String title = "Payment Overdue";
         return rate;
     }
 }
+
 
 
 
