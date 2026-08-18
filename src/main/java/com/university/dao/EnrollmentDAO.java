@@ -116,7 +116,7 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
     }
 
     /**
-     * Section 5, repeat policy — true when the student has any earlier COMPLETED attempt at this
+     * Section 5, repeat policy â€” true when the student has any earlier COMPLETED attempt at this
      * course, pass or fail. Used to flag a new registration's {@code is_repeat}.
      */
     public boolean hasCompletedCourse(int studentId, int courseId) {
@@ -127,7 +127,7 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
     }
 
     /**
-     * RULE R8 — another live section of the same course.
+     * RULE R8 â€” another live section of the same course.
      *
      * @return the {@code section_number} of the other section, if the student holds one
      */
@@ -162,6 +162,14 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
                 status, enrollmentId) > 0;
     }
 
+    /** True only while this enrollment is still actively ENROLLED. */
+    public boolean isEnrolled(Connection connection, int enrollmentId) {
+        return queryOne(connection,
+                "SELECT COUNT(*) FROM dbo.enrollments WHERE enrollment_id = ? AND status = 'ENROLLED'",
+                rs -> rs.getInt(1),
+                enrollmentId).orElse(0) > 0;
+    }
+
     /** Takes a repeated attempt out of the grade point average. */
     public boolean setCountsInGpa(Connection connection, int enrollmentId, boolean countsInGpa) {
         return executeUpdate(connection,
@@ -170,7 +178,7 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
     }
 
     /**
-     * Section 5.5 repeat policy, step 2 — every OLDER COMPLETED attempt at the same course loses
+     * Section 5.5 repeat policy, step 2 â€” every OLDER COMPLETED attempt at the same course loses
      * {@code counts_in_gpa}, so only the newest attempt affects the average. Both attempts stay
      * on the transcript; nothing is deleted. Keyed on {@code course_id}, not {@code section_id}:
      * a repeat is a second attempt at the same course, in any section, in any semester.

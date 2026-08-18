@@ -276,8 +276,12 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      *
      * <p>The mark columns are read through {@code CASE WHEN g.is_submitted = 1} rather than being
      * filtered out afterwards, so an unpublished draft never leaves the database — Section 6.6:
-     * "a student must never see a draft". Dropped rows are left out; withdrawn ones are kept,
-     * because a W belongs on the record.</p>
+     * "a student must never see a draft". Only an active enrollment (ENROLLED or COMPLETED, the
+     * same test as {@link com.university.enums.EnrollmentStatus#occupiesSeat()}) appears here —
+     * dropped and withdrawn rows are left out, matching the instructor's own section roster
+     * ({@link #findSectionRoster}) so the two sides of one grade never disagree on who is still
+     * on the list. The W itself is not lost: it stays on the transcript
+     * ({@link com.university.dao.TranscriptDAO}).</p>
      *
      * <p>Midterm is revealed the moment it is published, independent of everything else. Every
      * other component — Coursework/Lab, Final — belongs to the final result, so each of those
@@ -333,7 +337,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 + "CROSS APPLY (SELECT CASE WHEN EXISTS ("
                 + "     SELECT 1 FROM dbo.instructor_evaluations ie "
                 + "     WHERE ie.enrollment_id = e.enrollment_id) THEN 1 ELSE 0 END AS evaluation_done) ev "
-                + "WHERE e.student_id = ? AND e.status <> 'DROPPED'"
+                + "WHERE e.student_id = ? AND e.status IN ('ENROLLED', 'COMPLETED')"
                 + (semesterId == null ? "" : " AND sem.semester_id = ?")
                 + " ORDER BY sem.start_date DESC, c.course_code";
 

@@ -304,7 +304,7 @@ public class StudentDashboardController {
                         .collect(Collectors.toMap(StudentGradeRow::getEnrollmentId, r -> r, (a, b) -> a));
 
         List<Enrollment> enrollments =
-                registrationService.myClassesForSemester(studentId, currentSemester.getSemesterId());
+                registrationService.currentRegistrations(studentId, currentSemester.getSemesterId());
 
         Map<Integer, Section> sectionsById = sectionService.listForStudent(studentId, currentSemester.getSemesterId())
                 .stream().collect(Collectors.toMap(Section::getSectionId, s -> s, (a, b) -> a));

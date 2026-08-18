@@ -238,6 +238,8 @@ public class StudentRegistrationController {
         reloadAvailable();
         reloadMine();
         updateCreditsBadge();
+        availableTable.refresh();
+        myTable.refresh();
     }
 
     private void reloadAvailable() {
@@ -300,11 +302,7 @@ public class StudentRegistrationController {
             return;
         }
         try {
-            List<Enrollment> mine = registrationService.currentRegistrations(studentId, currentSemester.getSemesterId());
-            List<Section> sections = mine.stream()
-                    .map(e -> sectionService.findById(e.getSectionId()))
-                    .filter(java.util.Objects::nonNull)
-                    .toList();
+            List<Section> sections = sectionService.listForStudent(studentId, currentSemester.getSemesterId());
             myRows.setAll(sections);
         } catch (Exception e) {
             AlertUtil.error("Could not load your registrations", "Your registrations could not be loaded.", e);
@@ -405,3 +403,4 @@ public class StudentRegistrationController {
         }
     }
 }
+

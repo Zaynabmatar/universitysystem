@@ -407,17 +407,30 @@ public class RegistrationService {
         return enrollmentDao.sumCreditsInSemester(studentId, semesterId);
     }
 
-    /** The sections a student currently holds an ENROLLED seat in, for one semester. */
+    /**
+     * The sections a student is currently, actively enrolled in for one semester — ENROLLED or
+     * COMPLETED ({@link EnrollmentStatus#occupiesSeat()}), never DROPPED or WITHDRAWN. This is
+     * the single reference for "is this student still on this course" — My Grades
+     * ({@link com.university.dao.GradeDAO#findStudentGradeRows}), the instructor's section roster
+     * ({@link com.university.dao.GradeDAO#findSectionRoster}) and the attendance roster
+     * ({@link com.university.dao.AttendanceDAO#findRosterForDate}) all key off the same
+     * {@code occupiesSeat()} test so none of them can drift out of sync with this list.
+     * COMPLETED stays in (not just ENROLLED) because Submit-and-Lock flips a whole section's
+     * enrollments to COMPLETED the moment grades are finalized, in the same semester — dropping
+     * those from "current" here would hide a just-submitted grade from both sides on the spot.
+     */
     public List<Enrollment> currentRegistrations(int studentId, int semesterId) {
         return enrollmentDao.findByStudentAndSemester(studentId, semesterId).stream()
-                .filter(e -> e.getStatus() == EnrollmentStatus.ENROLLED)
+                .filter(e -> e.getStatus().occupiesSeat())
                 .toList();
     }
 
     /**
-     * Every enrollment a student holds in one semester that still belongs on their class list —
-     * ENROLLED, COMPLETED or WITHDRAWN, but not DROPPED. Used by the Classes page, which (unlike
-     * {@link #currentRegistrations}) also needs to show a withdrawn or already-completed course.
+     * Every enrollment a student holds in one semester that still counts as "already touched this
+     * course" — ENROLLED, COMPLETED or WITHDRAWN, but not DROPPED. Used only to keep the
+     * registration screen's "Available Sections" table from ever re-offering a course the student
+     * withdrew from or is already sitting (Section 6.1 R8 is the real guard; this is belt-and-braces
+     * on top of it). Not a display list — see {@link #currentRegistrations} for that.
      */
     public List<Enrollment> myClassesForSemester(int studentId, int semesterId) {
         return enrollmentDao.findByStudentAndSemester(studentId, semesterId).stream()

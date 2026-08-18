@@ -68,7 +68,9 @@ public class CoursePrerequisiteDAO extends AbstractDAO implements GenericDAO<Cou
      */
     public List<Course> findPrerequisiteCourses(int courseId) {
         return queryList("SELECT c.course_id, c.course_code, c.course_title, c.description, "
-                        + "c.credits, c.dept_id, c.level_year, c.is_active "
+                        + "c.credits, c.dept_id, c.level_year, c.is_active, c.has_lab, "
+                        + "c.coursework_weight, c.midterm_weight, c.final_weight, "
+                        + "c.coursework_max_mark, c.midterm_max_mark, c.final_max_mark "
                         + "FROM dbo.courses c "
                         + "INNER JOIN dbo.course_prerequisites p "
                         + "ON p.prerequisite_course_id = c.course_id "
@@ -89,7 +91,9 @@ public class CoursePrerequisiteDAO extends AbstractDAO implements GenericDAO<Cou
      */
     public List<Course> findUnmetPrerequisiteCourses(int studentId, int courseId) {
         return queryList("SELECT c.course_id, c.course_code, c.course_title, c.description, "
-                        + "c.credits, c.dept_id, c.level_year, c.is_active "
+                        + "c.credits, c.dept_id, c.level_year, c.is_active, c.has_lab, "
+                        + "c.coursework_weight, c.midterm_weight, c.final_weight, "
+                        + "c.coursework_max_mark, c.midterm_max_mark, c.final_max_mark "
                         + "FROM dbo.course_prerequisites p "
                         + "INNER JOIN dbo.courses c ON c.course_id = p.prerequisite_course_id "
                         + "WHERE p.course_id = ? AND NOT EXISTS ("
