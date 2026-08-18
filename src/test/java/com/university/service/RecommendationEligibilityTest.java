@@ -141,6 +141,27 @@ class RecommendationEligibilityTest {
     }
 
     @Test
+    @DisplayName("An overdue ELECTIVE never reaches the top priority tier, however overdue it is")
+    void overdueElectiveNeverOutranksAMandatoryCourse() {
+        StudentProfile me = student(4, 12, 18);
+
+        PlanEntry overdueElective = new PlanEntry();
+        overdueElective.courseId = 700;
+        overdueElective.isMandatory = false;
+        overdueElective.recommendedSemester = 1;                // 3 semesters overdue
+
+        PlanEntry currentMandatory = new PlanEntry();
+        currentMandatory.courseId = 701;
+        currentMandatory.isMandatory = true;
+        currentMandatory.recommendedSemester = 4;                // due exactly this semester
+
+        assertEquals(0, service.planPriorityTier(overdueElective, me),
+                "an elective must never claim the overdue/repeat tier, no matter how far behind its plan semester is");
+        assertTrue(service.planPriorityTier(currentMandatory, me) > service.planPriorityTier(overdueElective, me),
+                "a mandatory course due THIS semester must still outrank an overdue elective");
+    }
+
+    @Test
     @DisplayName("A course whose only open section is full (closed) is never recommended")
     void closedSectionNeverRecommended() {
         StudentProfile me = student(4, 12, 18);

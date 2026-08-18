@@ -136,18 +136,7 @@ final class ChartUtil {
                 }
             };
 
-            Node parent = chart.getParent();
-
-            while (parent != null) {
-
-                if (parent instanceof ScrollPane scrollPane) {
-                    scrollPane.vvalueProperty().addListener(
-                            (obs, oldValue, newValue) -> play.run()
-                    );
-                }
-
-                parent = parent.getParent();
-            }
+            attachScrollTrigger(chart, play);
 
             play.run();
         });
@@ -349,22 +338,48 @@ final class ChartUtil {
                 }
             };
 
-            Node parent = chart.getParent();
-
-            while (parent != null) {
-
-                if (parent instanceof ScrollPane scrollPane) {
-                    scrollPane.vvalueProperty().addListener(
-                            (obs, oldValue, newValue) -> play.run()
-                    );
-                }
-
-                parent = parent.getParent();
-            }
+            attachScrollTrigger(chart, play);
 
             play.run();
         });
     }
+
+    /**
+     * Fires {@code play} whenever the nearest ancestor ScrollPane scrolls, replacing whatever
+     * listener a previous fill call left behind on that same chart.
+     *
+     * <p>fillBar/fillLine re-run every time a page's Refresh button (or any in-place reload) is
+     * clicked, on the same chart node sitting in the same, never-recreated ScrollPane. Without
+     * this, each click added one more live listener that never got removed, so every scroll tick
+     * on the page kept re-running one growing pile of these -- each one forcing a
+     * localToScene/bounds check -- turning smooth scrolling progressively laggier the longer a
+     * session with repeated refreshes went on.</p>
+     */
+    private static void attachScrollTrigger(Node chart, Runnable play) {
+        Object previous = chart.getProperties().get(SCROLL_TRIGGER_KEY);
+        if (previous instanceof ScrollTrigger old) {
+            old.scrollPane.vvalueProperty().removeListener(old.listener);
+        }
+
+        Node parent = chart.getParent();
+        while (parent != null) {
+            if (parent instanceof ScrollPane scrollPane) {
+                javafx.beans.value.ChangeListener<Number> listener = (obs, oldValue, newValue) -> play.run();
+                scrollPane.vvalueProperty().addListener(listener);
+                chart.getProperties().put(SCROLL_TRIGGER_KEY, new ScrollTrigger(scrollPane, listener));
+                return;
+            }
+            parent = parent.getParent();
+        }
+
+        chart.getProperties().remove(SCROLL_TRIGGER_KEY);
+    }
+
+    private static final String SCROLL_TRIGGER_KEY = "chartUtil.scrollTrigger";
+
+    private record ScrollTrigger(ScrollPane scrollPane, javafx.beans.value.ChangeListener<Number> listener) {
+    }
+
     static void showOrExplain(Node chart,
                               Label emptyLabel,
                               boolean hasData) {

@@ -249,9 +249,22 @@ public class StudentRegistrationController {
         try {
             Set<Integer> studyPlanCourseIds = eligibleCourseIds();
 
+            // Belt-and-braces on top of the study-plan filter above: a course the student already
+            // holds a non-dropped enrollment in this semester (ENROLLED, COMPLETED or WITHDRAWN)
+            // must never appear as available to register for again, whatever section it is under —
+            // this is what keeps the table (and a stale copy of it still open in the UI) from ever
+            // offering a course the student is already registered in.
+            Set<Integer> alreadyEnrolledCourseIds = registrationService
+                    .myClassesForSemester(studentId, currentSemester.getSemesterId()).stream()
+                    .map(e -> sectionService.findById(e.getSectionId()))
+                    .filter(java.util.Objects::nonNull)
+                    .map(Section::getCourseId)
+                    .collect(Collectors.toSet());
+
             allAvailableSections = sectionService
                     .searchSections(currentSemester.getSemesterId(), null, null, SectionStatus.OPEN).stream()
                     .filter(s -> studyPlanCourseIds.contains(s.getCourseId()))
+                    .filter(s -> !alreadyEnrolledCourseIds.contains(s.getCourseId()))
                     .toList();
 
             applyAvailableFilters();

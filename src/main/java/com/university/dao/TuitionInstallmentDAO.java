@@ -30,6 +30,14 @@ public class TuitionInstallmentDAO extends AbstractDAO {
 
     private static final RowMapper<TuitionInstallment> MAPPER = TuitionInstallmentDAO::mapRow;
 
+    /**
+     * The current semester whose installment #1 and #2 due dates (2026-08-08 / 2026-08-15) are a
+     * fixed, one-off exception: they must never move even when this semester's own start/end dates
+     * are edited afterward. Scoped to this one semester id, not a general rule -- see
+     * {@link #rescheduleUnpaidForSemester} and {@code TuitionService#buildAndInsert}.
+     */
+    private static final int FIXED_DUE_DATE_SEMESTER_ID = 19;
+
     static TuitionInstallment mapRow(ResultSet rs) throws SQLException {
         TuitionInstallment installment = new TuitionInstallment();
         installment.setInstallmentId(rs.getInt("installment_id"));
@@ -81,13 +89,41 @@ public class TuitionInstallmentDAO extends AbstractDAO {
                 + "JOIN schedule s ON s.installment_id = sti.installment_id "
                 + "WHERE sti.semester_id = ? "
                 + " AND sti.status IN ('UNPAID', 'PARTIALLY_PAID', 'OVERDUE') "
-                + " AND sti.payment_date IS NULL",
+                + " AND sti.payment_date IS NULL "
+                + " AND NOT (sti.semester_id = " + FIXED_DUE_DATE_SEMESTER_ID + " AND sti.installment_no IN (1, 2))",
                 semesterId,
                 firstDue,
                 firstDue,
                 lastDue,
                 firstDue,
                 semesterId);
+    }
+
+    /**
+     * The installments {@link #refreshDelinquency(int)} is about to flip to OVERDUE and charge a
+     * penalty on -- read BEFORE that update runs, so the caller can notify the student that a
+     * penalty is about to be added while it is still true. Scoped to {@code ISNULL(penalty, 0) = 0}
+     * so an installment already carrying a penalty from an earlier sweep is never re-reported as
+     * "about to" get one.
+     */
+    public List<TuitionInstallment> findPendingPenalty(int semesterId) {
+        return queryList(SELECT
+                + " WHERE semester_id = ? "
+                + "  AND status IN ('UNPAID', 'PARTIALLY_PAID', 'OVERDUE') "
+                + "  AND payment_date IS NULL "
+                + "  AND ISNULL(penalty, 0) = 0 "
+                + "  AND due_date < CAST(GETDATE() AS DATE) "
+                + "ORDER BY currency, installment_no", MAPPER, semesterId);
+    }
+
+    /** Same as {@link #findPendingPenalty(int)}, across every semester -- pairs with {@link #refreshDelinquency()}. */
+    public List<TuitionInstallment> findPendingPenalty() {
+        return queryList(SELECT
+                + " WHERE status IN ('UNPAID', 'PARTIALLY_PAID', 'OVERDUE') "
+                + "  AND payment_date IS NULL "
+                + "  AND ISNULL(penalty, 0) = 0 "
+                + "  AND due_date < CAST(GETDATE() AS DATE) "
+                + "ORDER BY student_id, semester_id, currency, installment_no", MAPPER);
     }
 
     public int refreshDelinquency(int semesterId) {
@@ -104,6 +140,31 @@ public class TuitionInstallmentDAO extends AbstractDAO {
                 + "  AND payment_date IS NULL "
                 + "  AND due_date < CAST(GETDATE() AS DATE)",
                 semesterId);
+    }
+
+    /**
+     * Same rule as {@link #refreshDelinquency(int)}, applied across every semester at once.
+     *
+     * <p>{@link com.university.service.TuitionService#billFor} only ever calls the
+     * per-semester overload, as a side effect of one particular student's bill being
+     * computed -- so a semester's installments only became OVERDUE once somebody happened to
+     * view a bill in that semester. The system-wide notification sweep
+     * ({@link com.university.service.TuitionService#refreshPaymentNotificationsForAllStudents})
+     * cannot depend on that accident: it needs every semester's delinquency current for
+     * every student, regardless of who has or hasn't logged in.</p>
+     */
+    public int refreshDelinquency() {
+        return executeUpdate(
+                "UPDATE dbo.student_tuition_installments "
+                + "SET status = 'OVERDUE', "
+                + "    penalty = CASE "
+                + "        WHEN currency = 'USD' AND ISNULL(penalty, 0) = 0 THEN 10 "
+                + "        WHEN currency = 'LBP' AND ISNULL(penalty, 0) = 0 THEN 900000 "
+                + "        ELSE penalty "
+                + "    END "
+                + "WHERE status IN ('UNPAID', 'PARTIALLY_PAID', 'OVERDUE') "
+                + "  AND payment_date IS NULL "
+                + "  AND due_date < CAST(GETDATE() AS DATE)");
     }
     /**
      * Wipes one student's installment schedule for one semester, so {@link

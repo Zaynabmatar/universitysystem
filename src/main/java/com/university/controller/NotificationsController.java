@@ -77,7 +77,14 @@ public class NotificationsController {
             if (selected != null && !selected.isRead()) {
                 try {
                     notificationService.markRead(selected.getNotificationId());
-                    reload();
+                    // Flip the flag on the item already in the list and repaint in place --
+                    // NOT reload(): with many notifications, re-fetching the whole inbox and
+                    // replacing ListView's items on every single read-click was the actual cause
+                    // of "scrolling gets stuck" (each click threw away the ListView's scroll
+                    // position along with the list it just rebuilt from a fresh DB round trip).
+                    selected.setRead(true);
+                    notificationList.refresh();
+                    updateUnreadSummary();
                 } catch (RuntimeException ex) {
                     AlertUtil.error("Notifications", "This notification could not be marked as read.");
                 }
@@ -92,21 +99,27 @@ public class NotificationsController {
             int userId = Session.current().getUser().getUserId();
             List<Notification> all = notificationService.inbox(userId);
             notificationList.setItems(FXCollections.observableArrayList(all));
-
-            int unread = notificationService.unreadCount(userId);
-            unreadLabel.setText(unread + " unread");
-            markAllButton.setDisable(unread == 0);
+            updateUnreadSummary();
             emptyLabel.setText("");
         } catch (RuntimeException e) {
             AlertUtil.error("Notifications", "Your notifications could not be loaded.");
         }
     }
 
+    /** Unread count/badge, derived from the list already in memory -- no DB round trip. */
+    private void updateUnreadSummary() {
+        long unread = notificationList.getItems().stream().filter(n -> !n.isRead()).count();
+        unreadLabel.setText(unread + " unread");
+        markAllButton.setDisable(unread == 0);
+    }
+
     @FXML
     private void handleMarkAllRead() {
         try {
             notificationService.markAllRead(Session.current().getUser().getUserId());
-            reload();
+            notificationList.getItems().forEach(n -> n.setRead(true));
+            notificationList.refresh();
+            updateUnreadSummary();
         } catch (RuntimeException e) {
             AlertUtil.error("Notifications", "Your notifications could not be marked as read.");
         }

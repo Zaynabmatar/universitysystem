@@ -13,6 +13,7 @@ import javafx.animation.Animation;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
+import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -172,19 +173,27 @@ public class MainShellController {
         MenuEntry home = menu.get(0);
         SceneManager.getInstance().navigateToInstant(home.fxml(), home.label());
 
-        // Payment-due notifications and the unread-count bell are background upkeep, not
-        // something the user is waiting on. Run the DB work off the FX thread so it can't
-        // stall the dashboard that was just shown (refreshPaymentNotificationsForAllStudents
-        // sweeps every unpaid installment in the system on every login).
-        Integer studentId = session.getStudent() == null ? null : session.getStudent().getStudentId();
-        UserRole role = session.getRole();
-        Async.<Void>run(() -> {
-            if (role == UserRole.STUDENT && studentId != null) {
+        // Payment-due notifications are background upkeep, not something the user is waiting
+        // on -- and only a STUDENT login has any use for them at all (Instructors and Admins
+        // hold no tuition installments). refreshPaymentNotificationsForAllStudents() sweeps
+        // every unpaid installment for every student in the system (measured ~700-950ms of DB
+        // round trips), so running it unconditionally on every login -- including Instructor
+        // and Admin logins that get nothing out of it -- was making every login pay for it and
+        // race the dashboard that was just shown for the database's attention. Scoping it to
+        // STUDENT logins only, and giving the dashboard's own (much lighter) data fetch a head
+        // start before this heavier sweep begins, keeps the exact same notifications landing
+        // for the exact same students, just no longer contending with the page the user is
+        // actually looking at.
+        if (session.getRole() == UserRole.STUDENT && session.getStudent() != null) {
+            int studentId = session.getStudent().getStudentId();
+            PauseTransition paymentNotificationDelay = new PauseTransition(Duration.seconds(1));
+            paymentNotificationDelay.setOnFinished(e -> Async.<Void>run(() -> {
                 tuitionService.refreshPaymentNotificationsForStudent(studentId);
-            }
-            tuitionService.refreshPaymentNotificationsForAllStudents();
-            return null;
-        }, ignored -> { }, error -> { });
+                tuitionService.refreshPaymentNotificationsForAllStudents();
+                return null;
+            }, ignored -> { }, error -> { }));
+            paymentNotificationDelay.play();
+        }
 
         initNotificationBell();
     }
