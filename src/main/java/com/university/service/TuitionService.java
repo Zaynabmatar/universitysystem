@@ -52,6 +52,17 @@ public class TuitionService {
     private static final BigDecimal FALLBACK_LBP_RATE = new BigDecimal("300000");
     private static final int FALLBACK_INSTALLMENTS = 3;
 
+    /**
+     * Installment #1 and #2 of this one semester are pinned to these exact dates -- a fixed,
+     * one-off exception that must hold even if this semester's own start/end dates are edited
+     * afterward, so any newly-billed student is generated with the same dates the rest of the
+     * semester already has. Not a general rule for every semester; see
+     * {@link TuitionInstallmentDAO#rescheduleUnpaidForSemester}.
+     */
+    private static final int FIXED_DUE_DATE_SEMESTER_ID = 19;
+    private static final LocalDate FIXED_INSTALLMENT_1_DUE = LocalDate.of(2026, 8, 8);
+    private static final LocalDate FIXED_INSTALLMENT_2_DUE = LocalDate.of(2026, 8, 15);
+
     private final TuitionRateDAO rateDao = new TuitionRateDAO();
     private final TuitionInstallmentDAO installmentDao = new TuitionInstallmentDAO();
     private final EnrollmentDAO enrollmentDao = new EnrollmentDAO();
@@ -129,6 +140,11 @@ public class TuitionService {
 
         TuitionRate rate = rateDao.findBySemester(semester.getSemesterId()).orElseGet(() -> fallbackRate(semester));
 
+        // Notify while the penalty is still about to happen, then apply it -- reversing the order
+        // matters: read the affected rows before refreshDelinquency touches them, or the penalty
+        // is already on the row by the time anyone looks and the notice can only ever say
+        // "has been added" after the fact.
+        notifyPendingPenalty(installmentDao.findPendingPenalty(semester.getSemesterId()));
         installmentDao.refreshDelinquency(semester.getSemesterId());
 
         record RawCharge(String courseCode, String courseTitle, int credits, BigDecimal usd, BigDecimal lbp) {
@@ -271,6 +287,45 @@ public class TuitionService {
      * opened the Payments page for that semester.</p>
      */
 
+    /**
+     * Warns each installment's student that a late penalty is about to be added, before {@link
+     * TuitionInstallmentDAO#refreshDelinquency} actually adds it. Callers must read {@code
+     * pending} via {@link TuitionInstallmentDAO#findPendingPenalty} <em>before</em> calling
+     * {@code refreshDelinquency} in the same pass, or there is nothing left to warn about.
+     */
+    private void notifyPendingPenalty(List<TuitionInstallment> pending) {
+        String title = "Payment Overdue";
+
+        for (TuitionInstallment installment : pending) {
+            var student = studentDao.findById(installment.getStudentId()).orElse(null);
+            if (student == null) {
+                continue;
+            }
+            int userId = student.getUserId();
+            int installmentId = installment.getInstallmentId();
+
+            if (notificationService.alreadyNotified(userId, "TUITION_INSTALLMENT", installmentId, title)) {
+                continue;
+            }
+
+            String penaltyText = installment.getCurrency() == Currency.USD
+                    ? "$10"
+                    : "900,000 LBP";
+
+            notificationService.notify(
+                    userId,
+                    NotificationType.WARNING,
+                    title,
+                    "Your payment deadline has passed. A late penalty of "
+                            + penaltyText
+                            + " is about to be added to your installment. "
+                            + "Please settle the outstanding balance as soon as possible.",
+                    "TUITION_INSTALLMENT",
+                    installmentId
+            );
+        }
+    }
+
     private void sendPaymentNotifications(int studentId, List<TuitionInstallment> installments) {
         var student = studentDao.findById(studentId).orElse(null);
         if (student == null) {
@@ -318,8 +373,8 @@ String title = "Payment Overdue";
                 continue;
             }
 
-            // Reminder during the final 3 days before the deadline.
-            LocalDate reminderStart = dueDate.minusDays(3);
+            // Reminder starting 4 days before the deadline.
+            LocalDate reminderStart = dueDate.minusDays(4);
 
             if (!today.isBefore(reminderStart) && !today.isAfter(dueDate)) {
                 String title = "Payment Reminder";
@@ -352,6 +407,15 @@ String title = "Payment Overdue";
     public void refreshPaymentNotificationsForAllStudents() {
         LocalDate today = LocalDate.now();
 
+        // Same ordering as billFor(): read who is about to be charged a penalty and notify them
+        // first, before refreshDelinquency() actually adds it. Bringing every semester's status up
+        // to date is still done here regardless -- billFor() only flips a semester's installments
+        // to OVERDUE as a side effect of one student's own bill being computed, so without this a
+        // semester nobody happened to log into yet would still read UNPAID here even past its due
+        // date, and every student in it would silently get skipped below.
+        notifyPendingPenalty(installmentDao.findPendingPenalty());
+        installmentDao.refreshDelinquency();
+
         for (TuitionInstallment installment : installmentDao.findAll()) {
 
             if (installment.getDueDate() == null) {
@@ -373,8 +437,8 @@ String title = "Payment Overdue";
             int installmentId = installment.getInstallmentId();
             LocalDate dueDate = installment.getDueDate();
 
-            // Reminder: only during the final 3 days before the due date.
-            LocalDate reminderStart = dueDate.minusDays(3);
+            // Reminder: starting 4 days before the due date.
+            LocalDate reminderStart = dueDate.minusDays(4);
 
             if (!today.isBefore(reminderStart)
                     && !today.isAfter(dueDate)
@@ -512,7 +576,7 @@ String title = "Payment Overdue";
             installment.setInstallmentNo(no);
             installment.setBankReference(bankReference(currency, semester, studentId, no));
             installment.setAmount(amount);
-            installment.setDueDate(firstDue.plusMonths(no - 1));
+            installment.setDueDate(dueDateFor(semester, no, firstDue));
             installment.setPaymentDate(null);
             installment.setPenalty(BigDecimal.ZERO);
             installment.setStatus(InvoiceStatus.UNPAID);
@@ -522,6 +586,19 @@ String title = "Payment Overdue";
             rows.add(installment);
         }
         return rows;
+    }
+
+    /** {@link #FIXED_INSTALLMENT_1_DUE} / {@link #FIXED_INSTALLMENT_2_DUE} override the normal formula, only for {@link #FIXED_DUE_DATE_SEMESTER_ID}. */
+    private static LocalDate dueDateFor(Semester semester, int installmentNo, LocalDate firstDue) {
+        if (semester.getSemesterId() == FIXED_DUE_DATE_SEMESTER_ID) {
+            if (installmentNo == 1) {
+                return FIXED_INSTALLMENT_1_DUE;
+            }
+            if (installmentNo == 2) {
+                return FIXED_INSTALLMENT_2_DUE;
+            }
+        }
+        return firstDue.plusMonths(installmentNo - 1);
     }
 
     /**

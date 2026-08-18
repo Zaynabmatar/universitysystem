@@ -3,6 +3,8 @@ package com.university.service;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -37,7 +39,18 @@ import java.util.regex.Pattern;
  */
 public class GeneralAIService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(GeneralAIService.class);
+
     static final String UNAVAILABLE_MESSAGE = "AI service is currently unavailable.";
+
+    /**
+     * Gemini occasionally answers a request with a transient {@code 429} (rate limit) or
+     * {@code 503} (model overloaded) that a bare retry typically clears — this is the one
+     * automatic retry {@link #respond} performs for exactly those two statuses. Any other
+     * failure (a bad key's {@code 401}/{@code 403}, a malformed request's {@code 400}, a network
+     * error, an empty completion) is not retried, since retrying would not help.
+     */
+    private static final long RETRY_DELAY_MILLIS = 750;
 
     /** Rolling alias for the current stable Gemini Flash model; avoids breaking on model retirement. */
     private static final String MODEL = "gemini-flash-latest";
@@ -69,14 +82,16 @@ public class GeneralAIService {
             return UNAVAILABLE_MESSAGE;
         }
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "?key=" + apiKey))
-                    .timeout(REQUEST_TIMEOUT)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(buildRequestBody(message)))
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = send(message, apiKey);
+            if (isRetryableStatus(response.statusCode())) {
+                LOG.warn("Gemini request returned HTTP {} - retrying once after {}ms. Body: {}",
+                        response.statusCode(), RETRY_DELAY_MILLIS, truncate(response.body()));
+                Thread.sleep(RETRY_DELAY_MILLIS);
+                response = send(message, apiKey);
+            }
             if (response.statusCode() != 200) {
+                LOG.warn("Gemini request failed with HTTP {}. Body: {}",
+                        response.statusCode(), truncate(response.body()));
                 return UNAVAILABLE_MESSAGE;
             }
             String text = extractText(response.body());
@@ -85,8 +100,33 @@ public class GeneralAIService {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
+            LOG.warn("Gemini request failed: {}: {}", e.getClass().getName(), e.getMessage());
             return UNAVAILABLE_MESSAGE;
         }
+    }
+
+    /** One HTTP attempt against the Gemini endpoint. Never logs the API key (it is in the URI). */
+    private HttpResponse<String> send(String message, String apiKey) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(ENDPOINT + "?key=" + apiKey))
+                .timeout(REQUEST_TIMEOUT)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(buildRequestBody(message)))
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    /** {@code 429} (rate limit) and {@code 503} (model overloaded) are the only statuses a bare retry can fix. */
+    private static boolean isRetryableStatus(int statusCode) {
+        return statusCode == 429 || statusCode == 503;
+    }
+
+    /** Keeps a large error body out of the log without losing the useful part of it. */
+    private static String truncate(String body) {
+        if (body == null) {
+            return "";
+        }
+        return body.length() > 500 ? body.substring(0, 500) + "..." : body;
     }
 
     /**

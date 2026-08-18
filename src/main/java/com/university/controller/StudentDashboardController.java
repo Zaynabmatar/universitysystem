@@ -350,10 +350,15 @@ public class StudentDashboardController {
         // The main dashboard table is "what's coming up" -- an exam whose date/time has already
         // passed belongs only in "View All Exams" (handleViewAllExams, built unfiltered), never
         // here, and never deleted from dbo.exams either.
+        //
+        // Queried by student+semester directly (examsForStudentInSemester -> ExamDAO#findByStudentAndSemester)
+        // rather than filtered against sectionIds: sectionIds comes from listForStudent, which only
+        // returns sections where the enrollment status is ENROLLED, so a section the student finished
+        // (status COMPLETED) has an exam that "View All Exams" (status <> DROPPED) shows but this table
+        // silently dropped.
         LocalDateTime now = LocalDateTime.now();
-        List<Exam> mine = examService.examsForStudent(studentId);
+        List<Exam> mine = examService.examsForStudentInSemester(studentId, currentSemester.getSemesterId());
         List<ExamRow> examRowsBuilt = mine.stream()
-                .filter(exam -> sectionIds.contains(exam.getSectionId()))
                 .filter(exam -> !LocalDateTime.of(exam.getExamDate(), exam.getStartTime()).isBefore(now))
                 .map(exam -> toExamRow(exam, sectionsById))
                 .toList();

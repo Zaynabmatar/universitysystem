@@ -249,39 +249,26 @@ public class GradeService {
     // =====================================================================
 
     /**
-     * Releases whatever components are currently marked -- Coursework, Midterm, Lab, Final,
-     * independently of one another -- to the students on this sheet, without requiring every
-     * component to be present the way {@link #submitSection} does. A component with no mark yet
-     * is simply left unpublished; the instructor can press this again once it is filled in (Final
-     * added later, for instance). Already-submitted rows are skipped: submission already means
-     * every component is visible (see the student query in {@link GradeDAO#findStudentGradeRows}).
+     * Releases the Midterm mark -- and ONLY the Midterm mark -- to the students on this sheet.
+     * Coursework/Lab and Final are never released by this action, no matter how long ago they
+     * were entered: they, along with the overall Total/Letter/Points, stay hidden until the whole
+     * section is submitted via {@link #submitSection} ("Submit and Lock"), and even then remain
+     * gated behind the student's instructor evaluation (see the student query in
+     * {@link GradeDAO#findStudentGradeRows}). Already-submitted rows are skipped: submission
+     * already means every component is visible.
      *
-     * <p>The Total/Letter/Points the student sees still only appear once the row is fully
-     * submitted (rule G6) -- publishing components here never finalizes them, since they are not
-     * meaningful until every required component exists.</p>
-     *
-     * <p><b>Lab/Coursework and Final are only ever released as a pair.</b> Midterm may always
-     * publish by itself, but the course's other component -- Lab for a course with a lab,
-     * Coursework otherwise -- and Final only publish together: each needs the other either ready
-     * to publish in this same call, or already published from an earlier call. A row where only
-     * one of the two is ready simply keeps both unpublished; the instructor can press this again
-     * once the second mark is entered.</p>
-     *
-     * <p>Sends the student a notification the moment anything of theirs becomes visible for the
-     * first time (a plain {@link NotificationType#GRADE} message), and a separate
-     * {@link NotificationType#WARNING} message instead whenever a mark that was <em>already</em>
-     * published is edited and released again — the red "a published grade changed" case.</p>
-     *
-     * @return how many rows had one of the paired marks (Lab/Coursework or Final) ready but could
-     *         not be released yet because its companion has not been published
+     * <p>Sends the student a notification the moment their Midterm becomes visible for the first
+     * time (a plain {@link NotificationType#GRADE} message), and a separate
+     * {@link NotificationType#WARNING} message instead whenever a Midterm mark that was
+     * <em>already</em> published is edited and released again — the red "a published grade
+     * changed" case.</p>
      */
-    public int publishComponents(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
+    public void publishComponents(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
         Section section = requireSection(sectionId);
         assertOwnsSection(section, actingUserId);
         assertGradeWindowOpen(section);
         assertMarksValid(rows);
 
-        int pairsWithheld = 0;
         Connection connection = transactions.beginTransaction();
         try {
             for (GradeSheetRow row : rows) {
@@ -290,83 +277,27 @@ public class GradeService {
                 }
 
                 Grade existing = row.getGradeId() == null ? null : gradeDao.findById(row.getGradeId()).orElse(null);
-                boolean courseworkAlreadyPublished = row.isCourseworkPublished();
                 boolean midtermAlreadyPublished = row.isMidtermPublished();
-                boolean labAlreadyPublished = row.isLabPublished();
-                boolean finalAlreadyPublished = row.isFinalPublished();
 
                 row.recompute();
                 int gradeId = upsertGrade(connection, row, actingUserId, false);
 
                 boolean midtermMarkReady = row.getMidtermMark() != null;
-                boolean publishMidterm = midtermMarkReady;
+                boolean publishMidterm = midtermMarkReady && !midtermAlreadyPublished;
 
-                boolean componentMarkReady = row.isHasLab()
-                        ? row.getLabMark() != null
-                        : row.getCourseworkMark() != null;
-                boolean componentAlreadyPublished = row.isHasLab() ? labAlreadyPublished : courseworkAlreadyPublished;
-                boolean finalMarkReady = row.getFinalMark() != null;
-
-                // Midterm may publish alone.
-                // Lab/Coursework + Final require Midterm to exist too.
-                boolean publishComponentNow = midtermMarkReady
-                        && componentMarkReady
-                        && !componentAlreadyPublished
-                        && (finalMarkReady || finalAlreadyPublished);
-
-                boolean publishFinal = midtermMarkReady
-                        && finalMarkReady
-                        && !finalAlreadyPublished
-                        && (componentMarkReady || componentAlreadyPublished);
-                boolean publishLab = row.isHasLab() && publishComponentNow;
-                boolean publishCoursework = !row.isHasLab() && publishComponentNow;
-
-                if ((componentMarkReady && !componentAlreadyPublished && !publishComponentNow)
-                        || (finalMarkReady && !finalAlreadyPublished && !publishFinal)) {
-                    pairsWithheld++;
-                }
-
-                boolean courseworkEdited = courseworkAlreadyPublished && existing != null
-                        && !marksEqual(existing.getCourseworkPublishedMark(), row.getCourseworkMark());
                 boolean midtermEdited = midtermAlreadyPublished && existing != null
                         && !marksEqual(existing.getMidtermPublishedMark(), row.getMidtermMark());
-                boolean labEdited = labAlreadyPublished && existing != null
-                        && !marksEqual(existing.getLabPublishedMark(), row.getLabMark());
-                boolean finalEdited = finalAlreadyPublished && existing != null
-                        && !marksEqual(existing.getFinalPublishedMark(), row.getFinalMark());
-                boolean anyEdited = courseworkEdited || midtermEdited || labEdited || finalEdited;
 
-                boolean anyNewlyPublished = (publishMidterm && !midtermAlreadyPublished)
-                        || publishLab || publishCoursework || publishFinal;
-
-                if (!publishCoursework && !publishMidterm && !publishLab && !publishFinal && !anyEdited) {
+                if (!publishMidterm && !midtermEdited) {
                     continue;
                 }
 
-                // A component already published, whose value changed, is released again here too
-                // (not only a freshly-qualifying one) -- otherwise the red WARNING below would be
-                // announcing a change the student's snapshot was never actually updated to show.
-                boolean releaseCoursework = publishCoursework || courseworkEdited;
-                boolean releaseMidterm = publishMidterm || midtermEdited;
-                boolean releaseLab = publishLab || labEdited;
-                boolean releaseFinal = publishFinal || finalEdited;
-                if (releaseCoursework || releaseMidterm || releaseLab || releaseFinal) {
-                    gradeDao.publishComponents(connection, gradeId, releaseCoursework, releaseMidterm,
-                            releaseLab, releaseFinal);
-                }
-                row.setCourseworkPublished(row.isCourseworkPublished() || publishCoursework);
-                row.setMidtermPublished(row.isMidtermPublished() || publishMidterm);
-                row.setLabPublished(row.isLabPublished() || publishLab);
-                row.setFinalPublished(row.isFinalPublished() || publishFinal);
+                gradeDao.publishComponents(connection, gradeId, false, true, false, false);
+                row.setMidtermPublished(true);
 
-                if (anyEdited) {
-                    notifyPublished(connection, section, row, gradeId, true);
-                } else if (anyNewlyPublished) {
-                    notifyPublished(connection, section, row, gradeId, false);
-                }
+                notifyPublished(connection, section, row, gradeId, midtermEdited);
             }
             connection.commit();
-            return pairsWithheld;
         } catch (SQLException e) {
             transactions.rollbackQuietly(connection);
             throw new ServiceException("The marks could not be published.", e);

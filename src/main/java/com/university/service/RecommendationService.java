@@ -164,14 +164,17 @@ public class RecommendationService {
         public int finalScore;
 
         /**
-         * The PRIMARY sort key — the student's own Plan of Study, not the score.
-         * 3 = required repeat/overdue (an earlier-semester requirement, e.g. a previously failed
-         * course, not yet satisfied) — highest priority, exactly as project_details.md's
-         * recommendation ordering demands. 2 = required by the student's CURRENT study-plan
-         * semester. 1 = required by a FUTURE semester, not yet due. 0 = elective / not part of
-         * the plan. A required, overdue course always outranks a current-semester one, and a
-         * current-semester one always outranks an elective, however the 0..115 score compares;
-         * the score only breaks ties inside one tier.
+         * The PRIMARY sort key — the student's own Plan of Study, not the score. Tiers 1-3 are
+         * for MANDATORY requirements only:
+         * 3 = required repeat/overdue (an earlier-semester MANDATORY requirement, e.g. a
+         * previously failed course, not yet satisfied) — highest priority, exactly as
+         * project_details.md's recommendation ordering demands. 2 = required by the student's
+         * CURRENT study-plan semester. 1 = required by a FUTURE semester, not yet due. 0 =
+         * elective (including an overdue one) or not part of the plan at all — an elective never
+         * competes for tiers 1-3, no matter how overdue its recommended semester is, so it can
+         * never outrank a mandatory course that is actually due. A required, overdue course
+         * always outranks a current-semester one, and a current-semester one always outranks an
+         * elective, however the 0..115 score compares; the score only breaks ties inside one tier.
          */
         public int planPriorityTier;
 
@@ -432,14 +435,34 @@ public class RecommendationService {
                     score(candidate, me, plan, stats, unlockedCodes, maxUnlocks, peerStats));
         }
 
-        /* ---------- sort, cut, rank. Plan of Study first, score second, course code last. ---------- */
+        /* ---------- sort. Plan of Study first, score second, course code last. ---------- */
         out.recommendations.sort(
                 Comparator.comparingInt((Recommendation r) -> r.planPriorityTier).reversed()
                           .thenComparing(Comparator.comparingInt((Recommendation r) -> r.finalScore).reversed())
                           .thenComparing(r -> r.courseCode));
-        while (out.recommendations.size() > TOP_N) {
-            out.recommendations.remove(out.recommendations.size() - 1);
+
+        /* ---------- cut, cumulatively, to what the semester credit limit can actually hold.
+           The PRIMARY list must fit the student's REMAINING capacity as a whole — not just each
+           course checked one at a time against the full limit (R7 in isEligible() already did
+           that, per-candidate, as a safety net; this is the second, list-level check). Walking
+           the already-sorted list means a course is only skipped for credits, never for rank: a
+           lower-priority course later in the list that happens to be smaller is still allowed to
+           fill in behind it. ---------- */
+        List<Recommendation> primary = new ArrayList<>();
+        int runningCredits = me.currentCredits;
+        for (Recommendation candidate : out.recommendations) {
+            if (primary.size() >= TOP_N) {
+                break;
+            }
+            if (runningCredits + candidate.credits > me.creditLimit) {
+                continue;
+            }
+            runningCredits += candidate.credits;
+            primary.add(candidate);
         }
+        out.recommendations.clear();
+        out.recommendations.addAll(primary);
+
         for (int i = 0; i < out.recommendations.size(); i++) {
             out.recommendations.get(i).rank = i + 1;
         }
@@ -778,24 +801,27 @@ public class RecommendationService {
     /**
      * The Plan of Study tier (the primary sort key), driven entirely by where a course sits in
      * the student's Study Plan relative to {@code me.currentSemester} — the actual stage
-     * {@link TranscriptService#getDegreeProgress} computed, not a score:
+     * {@link TranscriptService#getDegreeProgress} computed, not a score. Tiers 1-3 are reserved
+     * for MANDATORY requirements; an elective never enters them, however overdue it is:
      *
      * <pre>
-     *   3 = assigned to an EARLIER planned semester, still unfinished/failed/missed  (highest —
-     *       "required repeat / old course": a previously failed or skipped requirement)
-     *   2 = assigned to the student's CURRENT planned semester
-     *   1 = assigned to a FUTURE planned semester (only reachable once tiers 2-3 are exhausted)
-     *   0 = not part of the plan (a free/general elective)
+     *   3 = MANDATORY, assigned to an EARLIER planned semester, still unfinished/failed/missed
+     *       (highest — "required repeat / old course": a previously failed or skipped requirement)
+     *   2 = MANDATORY, assigned to the student's CURRENT planned semester
+     *   1 = MANDATORY, assigned to a FUTURE planned semester (only reachable once tiers 2-3 are
+     *       exhausted)
+     *   0 = an ELECTIVE (whatever its recommended semester) or not part of the plan at all
      * </pre>
      *
      * <p>A course failed and not yet retaken has no passed attempt, so it is still
      * {@code plan.get(courseId)}'s entry and, once due, lands in tier 2 or 3 exactly like any
-     * other unfinished requirement — no separate "failed" case needed. The 0..115 score only
-     * breaks ties inside one tier; it never lets a future elective outrank a due requirement, and
-     * it never lets a current-semester requirement outrank an overdue repeat.</p>
+     * other unfinished MANDATORY requirement — no separate "failed" case needed. The 0..115 score
+     * only breaks ties inside one tier; it never lets a future mandatory course outrank a due one,
+     * and — because an overdue elective is tier 0, not tier 3 — it never lets a stale elective
+     * outrank a mandatory course that is actually due right now.</p>
      */
     int planPriorityTier(PlanEntry entry, StudentProfile me) {
-        if (entry == null || entry.recommendedSemester == null) {
+        if (entry == null || entry.recommendedSemester == null || !entry.isMandatory) {
             return 0;
         }
         int recommended = entry.recommendedSemester;
@@ -813,11 +839,21 @@ public class RecommendationService {
      *
      * <p>A lookup table, not a formula, on purpose: the professor can read it, the student can
      * defend it, and it can never produce 25.4 points.</p>
+     *
+     * <p>MANDATORY courses only — kept consistent with {@link #planPriorityTier}. An elective
+     * never earns "behind schedule" points, however overdue its recommended semester is; the same
+     * rule that keeps a stale elective out of tiers 1-3 keeps it out of this bonus too, so the two
+     * signals can never disagree about whether a course is "overdue".</p>
      */
     private int scoreBehindSchedule(PlanEntry entry, StudentProfile me, Recommendation r) {
         if (entry == null || entry.recommendedSemester == null) {
             r.degreeFitReasons.add(Reason.scored(Block.DEGREE_FIT,
                     "Not part of your published degree plan", 0));
+            return 0;
+        }
+        if (!entry.isMandatory) {
+            r.degreeFitReasons.add(Reason.scored(Block.DEGREE_FIT,
+                    "Elective — not scored against the mandatory schedule", 0));
             return 0;
         }
         int recommended = entry.recommendedSemester;

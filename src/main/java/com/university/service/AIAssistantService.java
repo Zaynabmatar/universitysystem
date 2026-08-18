@@ -15,6 +15,7 @@ import com.university.enums.DayOfWeekCode;
 import com.university.enums.InvoiceStatus;
 import com.university.enums.LetterGrade;
 import com.university.enums.StudentStatus;
+import com.university.enums.UserRole;
 import com.university.model.AttendanceRow;
 import com.university.model.Course;
 import com.university.model.Department;
@@ -112,6 +113,14 @@ public class AIAssistantService {
     private static final Pattern SECTION_NUMBER_PATTERN =
             Pattern.compile("section\\s*#?\\s*([A-Za-z0-9]{1,10})\\b", Pattern.CASE_INSENSITIVE);
 
+    /** "what is the id of Noor Younis", "instructor id of Noor Younis" — role hint optional, name after "of"/"for". */
+    private static final Pattern ID_OF_NAME_PATTERN = Pattern.compile(
+            "(?:(student|instructor)\\s+)?id\\s+(?:of|for)\\s+([a-z][a-z .'-]{1,60})", Pattern.CASE_INSENSITIVE);
+
+    /** "Noor Younis's instructor id", "Noor Younis's id" — the name comes before the possessive "'s ... id". */
+    private static final Pattern NAME_POSSESSIVE_ID_PATTERN = Pattern.compile(
+            "([a-z][a-z .'-]{1,60}?)(?:'s|s')\\s+(?:(student|instructor)\\s+)?id\\b", Pattern.CASE_INSENSITIVE);
+
     private final AcademicService academicService = new AcademicService();
     private final TranscriptService transcriptService = new TranscriptService();
     private final RegistrationService registrationService = new RegistrationService();
@@ -165,6 +174,10 @@ public class AIAssistantService {
             }
             if (matches(normalized, "notification", "notifications", "my inbox", "unread message")) {
                 return notificationsAnswer(session.getUser().getUserId());
+            }
+            String idLookupAnswer = personIdLookupAnswer(normalized, session);
+            if (!NOT_SUPPORTED.equals(idLookupAnswer)) {
+                return idLookupAnswer;
             }
             String universityAnswer = switch (session.getRole()) {
                 case STUDENT -> respondToStudent(normalized, message, session.requireStudentId());
@@ -473,6 +486,13 @@ public class AIAssistantService {
         if (matches(normalized, "another student", "other student", "someone else", "classmate")) {
             return true;
         }
+        if (!STUDENT_REF_PATTERN.matcher(normalized).find() && !BARE_ID_REFERENCE_PATTERN.matcher(normalized).find()) {
+            // Neither ID pattern appears in the message at all, so there is nothing to compare
+            // against another student's ID for — skip the database round trip entirely. This
+            // matters for general, non-university questions (e.g. "What is Java?"), which must
+            // never touch the database on their way to the Gemini fallback.
+            return false;
+        }
         Student self = studentDao.findById(studentId).orElse(null);
         return referencesForeignId(STUDENT_REF_PATTERN, normalized, self)
                 || referencesForeignId(BARE_ID_REFERENCE_PATTERN, normalized, self);
@@ -510,10 +530,6 @@ public class AIAssistantService {
     // ======================================================================
 
     private String respondToInstructor(String normalized, String original, int instructorId) {
-        Instructor instructor = instructorDao.findById(instructorId).orElse(null);
-        if (instructor == null) {
-            return NOT_SUPPORTED;
-        }
         if (matches(normalized, "another section", "other section", "unrelated section",
                 "another instructor", "other instructor's")
                 || referencesUnauthorizedStudent(normalized, instructorId)) {
@@ -547,7 +563,8 @@ public class AIAssistantService {
         if (matches(normalized, "next class", "next lecture", "upcoming class")) {
             return nextClassAnswer(instructorSchedule(instructorId));
         }
-        if (matches(normalized, "today")) {
+        if (matches(normalized, "today")
+                && matches(normalized, "schedule", "class", "classes", "lecture", "timetable")) {
             return todayScheduleAnswer(instructorSchedule(instructorId));
         }
         if (matches(normalized, "timetable", "my schedule", "weekly schedule")) {
@@ -570,6 +587,10 @@ public class AIAssistantService {
         }
         if (matches(normalized, "my department", "my profile", "my info", "my rank", "employee number",
                 "about me")) {
+            Instructor instructor = instructorDao.findById(instructorId).orElse(null);
+            if (instructor == null) {
+                return NOT_SUPPORTED;
+            }
             return instructorProfileAnswer(instructor);
         }
         return NOT_SUPPORTED;
@@ -1675,6 +1696,144 @@ public class AIAssistantService {
         BigDecimal average = sum.divide(BigDecimal.valueOf(totals.size()), 2, RoundingMode.HALF_UP);
         return "The average grade in " + courseLabel + " is " + average.stripTrailingZeros().toPlainString()
                 + " across " + totals.size() + " submitted grade(s).";
+    }
+
+    // ======================================================================
+    // Shared: person ID lookup by name ("What is the ID of Noor Younis?")
+    // ======================================================================
+
+    /**
+     * "What is the ID of Noor Younis?" / "What is Noor Younis's instructor ID?" — resolves a
+     * Student or Instructor ID by name from the current database. Never guesses: a name that
+     * matches more than one person (or matches both a student and an instructor with no role
+     * stated) is turned back to the asker to clarify, and a name matching nobody on file is
+     * reported as not found. Returns {@link #NOT_SUPPORTED} when the message isn't an ID-lookup
+     * question at all, so callers fall through to the rest of the normal intent handling.
+     *
+     * <p>Permission is scoped the same way as every other lookup in this class: a student may
+     * only confirm their own Student ID, an instructor may only look up Student IDs for students
+     * actually in their own current-semester sections, and instructor-to-instructor ID lookups
+     * are refused for non-admins (mirroring the existing "another instructor" refusal). Admins are
+     * unrestricted, as everywhere else in this class.</p>
+     */
+    private String personIdLookupAnswer(String normalized, Session session) {
+        String name = extractIdLookupName(normalized);
+        if (name == null) {
+            return NOT_SUPPORTED;
+        }
+        String roleHint = extractIdLookupRoleHint(normalized);
+        List<Student> studentMatches = "instructor".equals(roleHint) ? List.of() : findStudentsByName(name);
+        List<Instructor> instructorMatches = "student".equals(roleHint) ? List.of() : findInstructorsByName(name);
+        int total = studentMatches.size() + instructorMatches.size();
+        if (total == 0) {
+            return "I couldn't find a student or instructor record matching that name.";
+        }
+        if (total > 1) {
+            return "More than one record matches that name. Could you clarify whether you mean the "
+                    + "Student or the Instructor, and which one specifically?";
+        }
+        UserRole role = session.getRole();
+        if (!studentMatches.isEmpty()) {
+            Student student = studentMatches.get(0);
+            if (!canRevealStudentId(role, session, student)) {
+                return UNAUTHORIZED;
+            }
+            return student.getFullName() + " — Student ID: " + student.getUserId();
+        }
+        Instructor instructor = instructorMatches.get(0);
+        if (!canRevealInstructorId(role, session, instructor)) {
+            return UNAUTHORIZED;
+        }
+        return instructor.getFullName() + " — Instructor ID: " + instructor.getUserId();
+    }
+
+    /**
+     * The name text from an "id of NAME" or "NAME's ... id" question, or null when the message
+     * isn't asking for anyone's ID. The captured text may include a few leading filler words
+     * (e.g. "what is noor younis" instead of "noor younis") in the possessive form — harmless,
+     * since {@link #fullNameMatches} only ever checks whether a real name is contained within it,
+     * never exact equality, and the raw text is never echoed back to the user.
+     */
+    private static String extractIdLookupName(String normalized) {
+        Matcher m = ID_OF_NAME_PATTERN.matcher(normalized);
+        if (m.find()) {
+            String name = m.group(2).trim();
+            return name.length() >= 3 ? name : null;
+        }
+        m = NAME_POSSESSIVE_ID_PATTERN.matcher(normalized);
+        if (m.find()) {
+            String name = m.group(1).trim();
+            return name.length() >= 3 ? name : null;
+        }
+        return null;
+    }
+
+    /** "student" or "instructor" when the question names a role explicitly, otherwise null. */
+    private static String extractIdLookupRoleHint(String normalized) {
+        Matcher m = ID_OF_NAME_PATTERN.matcher(normalized);
+        if (m.find() && m.group(1) != null) {
+            return m.group(1);
+        }
+        m = NAME_POSSESSIVE_ID_PATTERN.matcher(normalized);
+        if (m.find() && m.group(2) != null) {
+            return m.group(2);
+        }
+        return null;
+    }
+
+    private boolean canRevealStudentId(UserRole role, Session session, Student student) {
+        return switch (role) {
+            case ADMIN -> true;
+            case STUDENT -> session.getStudent() != null
+                    && session.getStudent().getStudentId() == student.getStudentId();
+            case INSTRUCTOR -> session.getInstructor() != null
+                    && isStudentTaughtByInstructor(session.getInstructor().getInstructorId(), student.getStudentId());
+        };
+    }
+
+    /** Instructor contact/profile info is already visible to any signed-in student — see {@link #instructorContactAnswer}. */
+    private boolean canRevealInstructorId(UserRole role, Session session, Instructor instructor) {
+        return switch (role) {
+            case ADMIN -> true;
+            case STUDENT -> true;
+            case INSTRUCTOR -> session.getInstructor() != null
+                    && session.getInstructor().getInstructorId() == instructor.getInstructorId();
+        };
+    }
+
+    private boolean isStudentTaughtByInstructor(int instructorId, int studentId) {
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            return false;
+        }
+        return sectionDao.findByInstructorAndSemester(instructorId, semester.getSemesterId()).stream()
+                .flatMap(s -> enrollmentDao.findActiveBySection(s.getSectionId()).stream())
+                .anyMatch(e -> e.getStudentId() == studentId);
+    }
+
+    private List<Student> findStudentsByName(String capturedName) {
+        List<Student> matches = new ArrayList<>();
+        for (Student s : studentDao.findAll()) {
+            if (fullNameMatches(capturedName, s.getFirstName(), s.getLastName())) {
+                matches.add(s);
+            }
+        }
+        return matches;
+    }
+
+    private List<Instructor> findInstructorsByName(String capturedName) {
+        List<Instructor> matches = new ArrayList<>();
+        for (Instructor i : instructorDao.findAll()) {
+            if (fullNameMatches(capturedName, i.getFirstName(), i.getLastName())) {
+                matches.add(i);
+            }
+        }
+        return matches;
+    }
+
+    private static boolean fullNameMatches(String capturedName, String firstName, String lastName) {
+        String full = (lower(firstName) + " " + lower(lastName)).trim();
+        return full.length() >= 3 && capturedName.contains(full);
     }
 
     // ======================================================================

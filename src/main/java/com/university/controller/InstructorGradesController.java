@@ -434,33 +434,19 @@ public class InstructorGradesController {
         }
     }
 
-    /** Releases whatever marks are currently entered to the students, component by component --
-     *  Midterm can go out well before Final exists; Lab/Coursework and Final only ever release
-     *  together; the overall Total/Letter/Points still wait for "Submit and Lock". */
+    /** Releases only the Midterm mark to the students on this sheet -- Lab/Coursework, Final and
+     *  the overall Total/Letter/Points stay hidden until "Submit and Lock". */
     @FXML
     private void handlePublish() {
         if (!requireSection()) {
             return;
         }
         try {
-            boolean hasLab = !rows.isEmpty() && rows.get(0).isHasLab();
-            int pairsWithheld = gradeService.publishComponents(sectionId, rows, actingUserId());
-            if (pairsWithheld > 0) {
-                String guidance = hasLab
-                        ? "Please add the Final mark before publishing Lab + Final."
-                        : "Please enter both Coursework and Final marks before publishing.";
-                AlertUtil.warn("Some marks were withheld",
-                        "Every other mark that was ready has been released. " + pairsWithheld
-                        + " student(s) still need both halves of their " + (hasLab ? "Lab + Final" : "Coursework + Final")
-                        + " pair -- that pair is never released alone.\n\n" + guidance);
-            } else {
-                AlertUtil.success("Marks published",
-                        "Every mark currently entered has been released to its student — even a "
-                        + "single component such as Midterm, if that is all you have so far. "
-                        + (hasLab ? "Lab and Final" : "Coursework and Final") + " always release together. "
-                        + "The overall Total/Letter/Points only appear once every required component "
-                        + "exists and you press \"Submit and Lock\".");
-            }
+            gradeService.publishComponents(sectionId, rows, actingUserId());
+            AlertUtil.success("Midterm published",
+                    "The Midterm mark currently entered has been released to each student. Lab, "
+                    + "Final, and the overall Total/Letter/Points stay hidden until you press "
+                    + "\"Submit and Lock\".");
             refresh();
         } catch (ValidationException e) {
             AlertUtil.error("Cannot publish", e.getMessage());

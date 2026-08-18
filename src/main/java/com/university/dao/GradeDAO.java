@@ -280,10 +280,13 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
      * because a W belongs on the record.</p>
      *
      * <p>Midterm is revealed the moment it is published, independent of everything else. Every
-     * other component — Coursework/Lab, Final, and the Total/Letter/Points that only exist once
-     * every required component is present — belongs to the final result, so each of those also
-     * requires the student to have already completed this enrollment's instructor evaluation
-     * ({@code dbo.instructor_evaluations}); an already-published mark stays hidden until then.</p>
+     * other component — Coursework/Lab, Final — belongs to the final result, so each of those
+     * also requires the student to have already completed this enrollment's instructor evaluation
+     * ({@code dbo.instructor_evaluations}); an already-published mark stays hidden until then.
+     * The overall Total/Letter/Points is the course grade itself: it requires BOTH the instructor
+     * evaluation AND the section actually being submitted and locked ({@code is_submitted = 1}) —
+     * publishing every individual component ahead of "Submit and Lock" is never enough on its own,
+     * or a grade would leak before the instructor ever locks the section.</p>
      *
      * @param semesterId one semester, or null for every semester
      */
@@ -312,22 +315,15 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 + "CASE WHEN (g.is_submitted = 1 OR g.final_published = 1) AND ev.evaluation_done = 1 "
                 + "     THEN CASE WHEN g.is_submitted = 1 THEN g.final_mark ELSE g.final_published_mark END "
                 + "     END AS final_mark, "
-                // Total/Letter/Points finalize once every required final-stage component is
-                // published (Midterm + Lab/Coursework + Final) -- independent of is_submitted, so
-                // they are available before "Submit and Lock" is ever pressed -- plus the same
-                // evaluation gate as the rest of the final-stage columns above. A submitted row is
-                // always fully visible too, same as every other column here.
-                + "CASE WHEN ev.evaluation_done = 1 AND (g.is_submitted = 1 OR (g.midterm_published = 1 "
-                + "     AND g.final_published = 1 AND ((c.has_lab = 1 AND g.lab_published = 1) "
-                + "     OR (c.has_lab = 0 AND g.coursework_published = 1)))) "
+                // The course grade itself -- strictly BOTH conditions, no shortcut: the section
+                // must actually be submitted and locked (is_submitted = 1), never merely "every
+                // component happens to be published", and the student must have completed the
+                // instructor evaluation. Either one missing keeps it hidden.
+                + "CASE WHEN g.is_submitted = 1 AND ev.evaluation_done = 1 "
                 + "     THEN g.total_mark   END AS total_mark, "
-                + "CASE WHEN ev.evaluation_done = 1 AND (g.is_submitted = 1 OR (g.midterm_published = 1 "
-                + "     AND g.final_published = 1 AND ((c.has_lab = 1 AND g.lab_published = 1) "
-                + "     OR (c.has_lab = 0 AND g.coursework_published = 1)))) "
+                + "CASE WHEN g.is_submitted = 1 AND ev.evaluation_done = 1 "
                 + "     THEN g.letter_grade END AS letter_grade, "
-                + "CASE WHEN ev.evaluation_done = 1 AND (g.is_submitted = 1 OR (g.midterm_published = 1 "
-                + "     AND g.final_published = 1 AND ((c.has_lab = 1 AND g.lab_published = 1) "
-                + "     OR (c.has_lab = 0 AND g.coursework_published = 1)))) "
+                + "CASE WHEN g.is_submitted = 1 AND ev.evaluation_done = 1 "
                 + "     THEN g.grade_points END AS grade_points "
                 + "FROM dbo.enrollments e "
                 + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
