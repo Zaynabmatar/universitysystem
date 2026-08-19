@@ -31,6 +31,7 @@ public class StudentGradeRow {
     private BigDecimal labMark;
     private BigDecimal finalMark;
     private boolean hasLab;
+    private boolean labCleared;
     private BigDecimal totalMark;
     private LetterGrade letterGrade;
     private BigDecimal gradePoints;
@@ -148,6 +149,18 @@ public class StudentGradeRow {
     public void setHasLab(boolean hasLab) {
         this.hasLab = hasLab;
     }
+
+    /** True when the Lab was released to the student at some point but has since been cleared back
+     *  to blank (typically an instructor edit after an Admin Unlock) — distinguishes that state
+     *  from a Lab that was simply never graded, even though {@link #getLabMark()} is null either way. */
+    public boolean isLabCleared() {
+        return labCleared;
+    }
+
+    public void setLabCleared(boolean labCleared) {
+        this.labCleared = labCleared;
+    }
+
     public BigDecimal getFinalMark() {
         return finalMark;
     }

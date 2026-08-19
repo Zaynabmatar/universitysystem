@@ -32,17 +32,17 @@ import java.util.List;
  * costs in USD and in LBP, and the stable installment schedule for each.
  *
  * <p>USD and LBP are two independent obligations, never a currency
- * conversion of one another â€” every total is a straight sum of that
+ * conversion of one another — every total is a straight sum of that
  * currency's own course charges (credits &times; {@link TuitionRate}), and the
  * two installment schedules are generated, stored and read back
  * separately.</p>
  *
  * <p>Installments are generated once per student per semester, the first
  * time this class is asked for them, and normally never rewritten after
- * that â€” see {@link #billFor}. That is what keeps a bank reference, a due
+ * that — see {@link #billFor}. That is what keeps a bank reference, a due
  * date and a status stable across page loads. The one exception is a
  * schedule nothing has been paid against yet whose total has gone stale
- * (typically a dropped course) â€” {@link #scheduleIsStale} â€” which is
+ * (typically a dropped course) — {@link #scheduleIsStale} — which is
  * regenerated from the student's current charges so a dropped course is
  * never still billed or payable.</p>
  */
@@ -224,7 +224,7 @@ public class TuitionService {
 
     /**
      * True when the stored schedule's own totals no longer match what the student's current
-     * (non-dropped) enrollments actually cost, AND nothing on it has been paid â€” the only case
+     * (non-dropped) enrollments actually cost, AND nothing on it has been paid — the only case
      * where it is safe to throw the schedule away and regenerate it. A stray rounding difference
      * never trips this: the same {@code divide(..., scale, HALF_UP)} split
      * {@link #buildAndInsert} used to generate the stored rows is exact to the currency's own
@@ -319,7 +319,7 @@ public class TuitionService {
      * started before {@code targetSemester}.
      *
      * <p>Walks every semester the student has actually studied in and asks {@link #billFor} for
-     * each one, the same call the Payments page itself makes â€” that both prices the semester from
+     * each one, the same call the Payments page itself makes — that both prices the semester from
      * its real enrollments and rates, and lazily generates its installment schedule the first time
      * anyone (this check included) asks, so a previous balance is caught even if the student never
      * opened the Payments page for that semester.</p>
@@ -567,7 +567,7 @@ String title = "Payment Overdue";
      *
      * <p>The last installment of each currency absorbs whatever the equal
      * split does not divide evenly, so the installments always add up to
-     * exactly the total â€” never more, never less.</p>
+     * exactly the total — never more, never less.</p>
      */
     private List<TuitionInstallment> generateInstallments(int studentId, Semester semester, TuitionRate rate,
                                                            BigDecimal totalUsd, BigDecimal totalLbp) {
@@ -642,8 +642,8 @@ String title = "Payment Overdue";
     /**
      * A deterministic, globally-unique reference: a pure function of currency,
      * semester, student and installment number, so it needs no shared counter
-     * and can never collide between two students â€” or two semesters of the
-     * same student â€” generating a bill at once.
+     * and can never collide between two students — or two semesters of the
+     * same student — generating a bill at once.
      *
      * <p>Keyed on {@code semester.getSemesterId()} rather than the calendar
      * year the bill happens to be generated in: with the semester selector,

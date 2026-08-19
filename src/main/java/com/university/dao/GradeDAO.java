@@ -45,6 +45,14 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
             "UPDATE dbo.grades SET coursework_mark = ?, midterm_mark = ?, lab_mark = ?, final_mark = ?, "
             + "total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ?, is_submitted = ?, "
             + "coursework_published = ?, midterm_published = ?, lab_published = ?, final_published = ?, "
+            // A mark the instructor just cleared (now NULL) can never leave a stale published
+            // snapshot behind for the student to keep seeing -- when the new raw mark is NULL the
+            // published snapshot is cleared with it; otherwise it is left exactly as it was (only
+            // publishComponents ever moves it forward to a non-null value).
+            + "coursework_published_mark = CASE WHEN ? IS NULL THEN NULL ELSE coursework_published_mark END, "
+            + "midterm_published_mark    = CASE WHEN ? IS NULL THEN NULL ELSE midterm_published_mark    END, "
+            + "lab_published_mark        = CASE WHEN ? IS NULL THEN NULL ELSE lab_published_mark        END, "
+            + "final_published_mark      = CASE WHEN ? IS NULL THEN NULL ELSE final_published_mark      END, "
             + "last_modified_by = ?, last_modified_at = ? WHERE grade_id = ? AND is_submitted = 0";
 
     private static final String DELETE = "DELETE FROM dbo.grades WHERE grade_id = ?";
@@ -316,6 +324,11 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 + "CASE WHEN (g.is_submitted = 1 OR g.lab_published = 1) AND ev.evaluation_done = 1 "
                 + "     THEN CASE WHEN g.is_submitted = 1 THEN g.lab_mark ELSE g.lab_published_mark END "
                 + "     END AS lab_mark, "
+                // Was the Lab ever actually released to this student? Kept separate from lab_mark
+                // above so a Lab cleared after an Admin Unlock (lab_published stays 1, but the mark
+                // just went back to NULL) can be told apart from a Lab that was never graded at all
+                // (lab_published = 0) -- both otherwise read as the same NULL lab_mark.
+                + "ISNULL(g.lab_published, 0) AS lab_published, "
                 + "CASE WHEN (g.is_submitted = 1 OR g.final_published = 1) AND ev.evaluation_done = 1 "
                 + "     THEN CASE WHEN g.is_submitted = 1 THEN g.final_mark ELSE g.final_published_mark END "
                 + "     END AS final_mark, "
@@ -357,6 +370,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
             row.setCourseworkMark(rs.getBigDecimal("coursework_mark"));
             row.setMidtermMark(rs.getBigDecimal("midterm_mark"));
             row.setLabMark(rs.getBigDecimal("lab_mark"));
+            row.setLabCleared(rs.getBoolean("lab_published") && rs.getBigDecimal("lab_mark") == null);
             row.setFinalMark(rs.getBigDecimal("final_mark"));
             row.setTotalMark(rs.getBigDecimal("total_mark"));
             row.setLetterGrade(LetterGrade.fromDb(rs.getString("letter_grade")));
@@ -557,6 +571,15 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         String sql = "UPDATE dbo.grades SET "
                 + "coursework_mark = ?, midterm_mark = ?, lab_mark = ?, final_mark = ?, "
                 + "total_mark = ?, letter_grade = ?, grade_points = ?, result_status = ?, "
+                // Same rule as the ordinary update(): a mark cleared back to NULL here (e.g. after
+                // an Admin Unlock) must take its published snapshot down with it, or a student
+                // whose section is no longer submitted keeps reading the *_published_mark left over
+                // from before the unlock forever, since Save Draft otherwise never touches these
+                // columns at all.
+                + "coursework_published_mark = CASE WHEN ? IS NULL THEN NULL ELSE coursework_published_mark END, "
+                + "midterm_published_mark    = CASE WHEN ? IS NULL THEN NULL ELSE midterm_published_mark    END, "
+                + "lab_published_mark        = CASE WHEN ? IS NULL THEN NULL ELSE lab_published_mark        END, "
+                + "final_published_mark      = CASE WHEN ? IS NULL THEN NULL ELSE final_published_mark      END, "
                 + "last_modified_by = ?, last_modified_at = ? "
                 + "WHERE grade_id = ? AND is_submitted = 0";
 
@@ -569,6 +592,10 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 letterOrNull(entity),
                 entity.getGradePoints(),
                 resultOrNull(entity),
+                entity.getCourseworkMark(),
+                entity.getMidtermMark(),
+                entity.getLabMark(),
+                entity.getFinalMark(),
                 entity.getLastModifiedBy(),
                 entity.getLastModifiedAt(),
                 entity.getGradeId()) > 0;
@@ -620,6 +647,10 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 entity.isMidtermPublished(),
                 entity.isLabPublished(),
                 entity.isFinalPublished(),
+                entity.getCourseworkMark(),
+                entity.getMidtermMark(),
+                entity.getLabMark(),
+                entity.getFinalMark(),
                 entity.getLastModifiedBy(),
                 entity.getLastModifiedAt(),
                 entity.getGradeId()

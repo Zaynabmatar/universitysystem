@@ -267,6 +267,7 @@ public class StudentRegistrationController {
                     .searchSections(currentSemester.getSemesterId(), null, null, SectionStatus.OPEN).stream()
                     .filter(s -> studyPlanCourseIds.contains(s.getCourseId()))
                     .filter(s -> !alreadyEnrolledCourseIds.contains(s.getCourseId()))
+                    .filter(s -> !registrationService.hasUnmetPrerequisites(studentId, s.getCourseId()))
                     .toList();
 
             applyAvailableFilters();

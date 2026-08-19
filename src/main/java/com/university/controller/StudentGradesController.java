@@ -198,6 +198,11 @@ public class StudentGradesController {
 
                 if (!row.isHasLab()) {
                     setText("—");
+                } else if (mark == null && row.isLabCleared()) {
+                    // Was released to the student before, then the instructor cleared it back to
+                    // blank (typically after an Admin Unlock) -- that reads as "—", not as a Lab
+                    // that was simply never graded.
+                    setText("—");
                 } else {
                     setText(mark == null ? "Not graded yet" : mark.toPlainString());
                 }
