@@ -116,7 +116,7 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
     }
 
     /**
-     * Section 5, repeat policy â€” true when the student has any earlier COMPLETED attempt at this
+     * Section 5, repeat policy — true when the student has any earlier COMPLETED attempt at this
      * course, pass or fail. Used to flag a new registration's {@code is_repeat}.
      */
     public boolean hasCompletedCourse(int studentId, int courseId) {
@@ -127,7 +127,7 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
     }
 
     /**
-     * RULE R8 â€” another live section of the same course.
+     * RULE R8 — another live section of the same course.
      *
      * @return the {@code section_number} of the other section, if the student holds one
      */
@@ -162,6 +162,20 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
                 status, enrollmentId) > 0;
     }
 
+    /**
+     * Admin Unlock's other half: {@code submitSection} moves each enrollment it locks from
+     * ENROLLED to COMPLETED (rule G6); reopening the section for editing must undo that too, or
+     * the instructor's next Submit and Lock finds nobody ENROLLED to submit. Only touches rows
+     * whose grade is actually being unlocked ({@code is_submitted = 1}), so a student who was
+     * separately dropped/withdrawn after submission is left alone.
+     */
+    public int revertCompletedToEnrolled(Connection connection, int sectionId) {
+        String sql = "UPDATE e SET e.status = 'ENROLLED' FROM dbo.enrollments e "
+                + "INNER JOIN dbo.grades g ON g.enrollment_id = e.enrollment_id "
+                + "WHERE e.section_id = ? AND e.status = 'COMPLETED' AND g.is_submitted = 1";
+        return executeUpdate(connection, sql, sectionId);
+    }
+
     /** True only while this enrollment is still actively ENROLLED. */
     public boolean isEnrolled(Connection connection, int enrollmentId) {
         return queryOne(connection,
@@ -178,7 +192,7 @@ public class EnrollmentDAO extends AbstractDAO implements GenericDAO<Enrollment>
     }
 
     /**
-     * Section 5.5 repeat policy, step 2 â€” every OLDER COMPLETED attempt at the same course loses
+     * Section 5.5 repeat policy, step 2 — every OLDER COMPLETED attempt at the same course loses
      * {@code counts_in_gpa}, so only the newest attempt affects the average. Both attempts stay
      * on the transcript; nothing is deleted. Keyed on {@code course_id}, not {@code section_id}:
      * a repeat is a second attempt at the same course, in any section, in any semester.

@@ -443,6 +443,16 @@ public class RegistrationService {
         return enrollmentDao.findByStudent(studentId);
     }
 
+    /**
+     * True when the student has not yet passed at least one of the course's prerequisites — the
+     * same check {@link #registerStudent} enforces as rule R3, exposed here so the registration
+     * screen can keep courses the student is not yet eligible for out of "Available Sections"
+     * entirely instead of only rejecting them after the fact at Register time.
+     */
+    public boolean hasUnmetPrerequisites(int studentId, int courseId) {
+        return !prerequisiteDao.findUnmetPrerequisiteCourses(studentId, courseId).isEmpty();
+    }
+
     // ================================================================= HELPERS
 
     private Student requireStudent(int studentId) {

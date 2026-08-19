@@ -88,7 +88,7 @@
         </dependency>
 
         <!-- Proves the Section 5 arithmetic, above all the worked example that must
-             produce exactly 3.24. GradeCalculator is pure â€” no database, no JavaFX â€”
+             produce exactly 3.24. GradeCalculator is pure — no database, no JavaFX —
              which is precisely what makes it testable. -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

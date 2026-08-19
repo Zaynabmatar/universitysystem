@@ -8,8 +8,12 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Reads {@code dbo.audit_log}. Nothing here writes to it.
@@ -155,7 +159,84 @@ public class AuditLogDAO extends AbstractDAO {
         }
         sql.append("ORDER BY a.log_id DESC");
 
-        return queryList(sql.toString(), AuditLogDAO::mapSearchRow, params.toArray());
+        return resolveDisplayIds(queryList(sql.toString(), AuditLogDAO::mapSearchRow, params.toArray()));
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    //  Display-only ID resolution.
+    //
+    //  trg_Enrollment_Audit and trg_Payment_Audit (0014_audit_log_triggers.sql) and
+    //  trg_Section_Audit (0021_section_audit_trigger.sql) write the internal
+    //  dbo.students.student_id / dbo.instructors.instructor_id values into
+    //  old_value/new_value/description - not users.user_id, the "Student ID" /
+    //  "Instructor ID" every other screen shows (see trg_Student_Audit's and
+    //  trg_Instructor_Audit's own comments in that same migration). Rewriting that in
+    //  the trigger would mean touching the audit triggers themselves, so instead this
+    //  swaps the id actually shown, after the row is read, leaving audit_log, record_id
+    //  and every trigger untouched.
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    private static final Pattern STUDENT_ID_FIELD = Pattern.compile("student_id[ =](\\d+)");
+    private static final Pattern STUDENT_WORD = Pattern.compile("(?i)\\bstudent (\\d+)\\b");
+    private static final Pattern INSTRUCTOR_ID_FIELD = Pattern.compile("instructor_id=(\\d+)");
+
+    private List<AuditLog> resolveDisplayIds(List<AuditLog> rows) {
+        boolean hasStudentRows = rows.stream()
+                .anyMatch(r -> "enrollments".equals(r.getTableName()) || "payments".equals(r.getTableName()));
+        boolean hasSectionRows = rows.stream().anyMatch(r -> "sections".equals(r.getTableName()));
+        if (!hasStudentRows && !hasSectionRows) {
+            return rows;
+        }
+
+        Map<Integer, Integer> studentUserIds =
+                hasStudentRows ? idMap("SELECT student_id, user_id FROM dbo.students") : Map.of();
+        Map<Integer, Integer> instructorUserIds =
+                hasSectionRows ? idMap("SELECT instructor_id, user_id FROM dbo.instructors") : Map.of();
+
+        for (AuditLog row : rows) {
+            if ("enrollments".equals(row.getTableName()) || "payments".equals(row.getTableName())) {
+                row.setDescription(rewriteStudentIds(row.getDescription(), studentUserIds));
+                row.setOldValue(rewriteStudentIds(row.getOldValue(), studentUserIds));
+                row.setNewValue(rewriteStudentIds(row.getNewValue(), studentUserIds));
+            } else if ("sections".equals(row.getTableName())) {
+                row.setDescription(replaceIds(row.getDescription(), INSTRUCTOR_ID_FIELD, instructorUserIds));
+                row.setOldValue(replaceIds(row.getOldValue(), INSTRUCTOR_ID_FIELD, instructorUserIds));
+                row.setNewValue(replaceIds(row.getNewValue(), INSTRUCTOR_ID_FIELD, instructorUserIds));
+            }
+        }
+        return rows;
+    }
+
+    private static String rewriteStudentIds(String text, Map<Integer, Integer> studentUserIds) {
+        text = replaceIds(text, STUDENT_ID_FIELD, studentUserIds);
+        text = replaceIds(text, STUDENT_WORD, studentUserIds);
+        return text;
+    }
+
+    /** Replaces every id captured by {@code pattern}'s group 1, unresolved ids left as-is. */
+    private static String replaceIds(String text, Pattern pattern, Map<Integer, Integer> idMap) {
+        if (text == null || text.isEmpty() || idMap.isEmpty()) {
+            return text;
+        }
+        Matcher matcher = pattern.matcher(text);
+        StringBuilder result = new StringBuilder();
+        while (matcher.find()) {
+            Integer userId = idMap.get(Integer.parseInt(matcher.group(1)));
+            String replacement = userId == null
+                    ? matcher.group(0)
+                    : matcher.group(0).replace(matcher.group(1), String.valueOf(userId));
+            matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(result);
+        return result.toString();
+    }
+
+    private Map<Integer, Integer> idMap(String sql) {
+        Map<Integer, Integer> map = new HashMap<>();
+        for (int[] pair : queryList(sql, rs -> new int[] { rs.getInt(1), rs.getInt(2) })) {
+            map.put(pair[0], pair[1]);
+        }
+        return map;
     }
 
     /** The distinct table names actually present in the log, for the filter drop-down. */

@@ -34,16 +34,16 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * project_details.md Section 6.6 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â grade entry rules G1..G6, plus Save Draft / Submit and Lock
+ * project_details.md Section 6.6 — grade entry rules G1..G6, plus Save Draft / Submit and Lock
  * and the registrar's correction of an already-submitted grade.
  *
  * <pre>
  *   G1  only the instructor assigned to a section may enter its grades
  *   G2  only between the semester's grade_entry_start and grade_entry_end
  *   G3  marks must be 0..the component's own max mark    (GradeCalculator.isValidMark)
- *   G4  once is_submitted = 1 the instructor can no longer edit that section at all ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â only an
+ *   G4  once is_submitted = 1 the instructor can no longer edit that section at all — only an
  *       ADMIN correction (adminOverride) or an ADMIN unlock (unlockSection) reopens it
- *   G5  only ADMIN may change a submitted grade, and the change is audited (by trg_Grade_Audit ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+ *   G5  only ADMIN may change a submitted grade, and the change is audited (by trg_Grade_Audit —
  *       this class never writes to audit_log itself)
  *   G6  on submission: enrollment -&gt; COMPLETED, then the academic record is recalculated
  * </pre>
@@ -52,7 +52,7 @@ import java.util.Optional;
  * have all their required marks or nothing is submitted for anyone (Section 6.6's "Submit and
  * Lock" is an all-or-nothing action, not a per-student one).</p>
  *
- * <p>Every rule is enforced here, not only in the UI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â a rule that only exists in the UI is a
+ * <p>Every rule is enforced here, not only in the UI — a rule that only exists in the UI is a
  * suggestion, not a rule.</p>
  */
 public class GradeService {
@@ -87,26 +87,26 @@ public class GradeService {
     }
 
     /**
-     * Which of one instructor's sections in one semester already have a submitted grade ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the
+     * Which of one instructor's sections in one semester already have a submitted grade — the
      * same fact as {@link #isSectionSubmitted}, for every section in one round trip.
      */
     public java.util.Set<Integer> submittedSectionIds(int instructorId, int semesterId) {
         return gradeDao.submittedSectionIds(instructorId, semesterId);
     }
 
-    /** "Not started" / "Draft saved" / "Submitted ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬â„¢" ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â shown on the My Sections list. */
+    /** "Not started" / "Draft saved" / "Submitted 🔒" — shown on the My Sections list. */
     public String gradeStatusLabel(int sectionId) {
         if (isSectionSubmitted(sectionId)) {
-            return "Submitted ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬â„¢";
+            return "Submitted 🔒";
         }
         return gradeDao.countUnsubmittedInSection(sectionId) > 0 ? "Draft saved" : "Not started";
     }
 
     // =====================================================================
-    // G1 / G2 / G3 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the guards
+    // G1 / G2 / G3 — the guards
     // =====================================================================
 
-    /** G1 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the acting user must be the instructor this section is assigned to. */
+    /** G1 — the acting user must be the instructor this section is assigned to. */
     private void assertOwnsSection(Section section, int actingUserId) {
         Instructor instructor = instructorDao.findByUserId(actingUserId).orElse(null);
         boolean owns = instructor != null && section.getInstructorId() != null
@@ -116,7 +116,7 @@ public class GradeService {
         }
     }
 
-    /** G2 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â today must fall inside the semester's grade-entry window. */
+    /** G2 — today must fall inside the semester's grade-entry window. */
     private void assertGradeWindowOpen(Section section) {
         Semester semester = semesterDao.findById(section.getSemesterId())
                 .orElseThrow(() -> new ServiceException("That semester no longer exists."));
@@ -135,7 +135,7 @@ public class GradeService {
     }
 
     /**
-     * G3 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â every mark actually being written must be 0..the component's own max mark.
+     * G3 — every mark actually being written must be 0..the component's own max mark.
      *
      * <p>Skips a submitted row that is not being corrected in this call: it is locked (G4) and
      * neither {@link #saveDraft} nor {@link #submitSection} will write it, so an old mark that a
@@ -170,14 +170,17 @@ public class GradeService {
     /**
      * Writes the marks WITHOUT submitting. For a never-submitted row {@code is_submitted} stays
      * 0, the enrollment stays ENROLLED, no GPA is recalculated. A row that is already submitted
-     * (its section is locked) is skipped entirely ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â G4 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â until an Admin Unlock
+     * (its section is locked) is skipped entirely — G4 — until an Admin Unlock
      * ({@link #unlockSection}) reopens it for editing.
      *
      * <p>Always writes the instructor's current values, including for a component that was
-     * already published ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the instructor's edit must never come back as the old value on the
-     * next reload. What a student actually sees does not move: that stays frozen at whatever was
-     * last released by {@link #publishComponents}/{@link #submitSection} until one of those runs
-     * again, so this never leaks an in-progress edit early, and never sends a notification.</p>
+     * already published — the instructor's edit must never come back as the old value on the
+     * next reload. What a student actually sees stays frozen at whatever was last released by
+     * {@link #publishComponents}/{@link #submitSection} until one of those runs again, so this
+     * never leaks an in-progress edit early and never sends a notification — with one exception:
+     * clearing a mark back to blank clears its published snapshot with it ({@link
+     * GradeDAO#updateDraft}), so a mark the instructor deletes (typically after an Admin Unlock)
+     * actually disappears from the student's view instead of leaving the old value behind.</p>
      */
     public void saveDraft(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
         Section section = requireSection(sectionId);
@@ -192,7 +195,7 @@ public class GradeService {
                     continue; // student dropped/withdrew after this screen was loaded
                 }
                 if (row.isSubmitted()) {
-                    continue; // G4 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â locked; only Admin Unlock reopens a submitted row
+                    continue; // G4 — locked; only Admin Unlock reopens a submitted row
                 }
                 row.recompute();
 
@@ -206,29 +209,21 @@ public class GradeService {
                     grade.setLabMark(row.isHasLab() ? row.getLabMark() : null);
                     grade.setFinalMark(row.getFinalMark());
 
-                    // Total/Letter/Points are only hidden from the student by the SQL gate while
-                    // one of the required final-stage components is not yet published; once every
-                    // one of them already is, that gate is already open, so writing the freshly
-                    // recomputed values here would leak the in-progress edit before Publish. Keep
-                    // the previously stored (published) result in that case; only Publish is
-                    // allowed to move it forward.
-                    Grade existing = gradeDao.findById(row.getGradeId()).orElse(null);
-                    boolean fullyPublished = existing != null && existing.isMidtermPublished()
-                            && existing.isFinalPublished()
-                            && (row.isHasLab() ? existing.isLabPublished() : existing.isCourseworkPublished());
-                    if (fullyPublished) {
-                        grade.setTotalMark(existing.getTotalMark());
-                        grade.setLetterGrade(existing.getLetterGrade());
-                        grade.setGradePoints(existing.getGradePoints());
-                        grade.setResultStatus(existing.getResultStatus());
-                    } else {
-                        grade.setTotalMark(row.getTotalMark());
-                        grade.setLetterGrade(row.getLetterGrade());
-                        grade.setGradePoints(row.getGradePoints());
-                        grade.setResultStatus(row.getLetterGrade() == null
-                                ? null
-                                : row.getLetterGrade().toResultStatus());
-                    }
+                    // Total/Letter/Points are only ever shown to the student once the section is
+                    // actually submitted and locked (see the strict is_submitted = 1 gate in
+                    // GradeDAO#findStudentGradeRows) -- never merely because every component
+                    // happens to already be published. A draft row is never submitted (G4 skips
+                    // submitted rows above), so nothing here is ever visible early; always write
+                    // the freshly recomputed values, the same "never come back as the old value"
+                    // policy already applied to the raw marks above. This is what makes a cleared
+                    // mark actually clear the stored Total/Letter/Points too, instead of leaving
+                    // them frozen at whatever they were before the clear.
+                    grade.setTotalMark(row.getTotalMark());
+                    grade.setLetterGrade(row.getLetterGrade());
+                    grade.setGradePoints(row.getGradePoints());
+                    grade.setResultStatus(row.getLetterGrade() == null
+                            ? null
+                            : row.getLetterGrade().toResultStatus());
                     grade.setLastModifiedBy(actingUserId);
                     grade.setLastModifiedAt(LocalDateTime.now());
 
@@ -248,7 +243,7 @@ public class GradeService {
     }
 
     // =====================================================================
-    // Partial publish ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â release individual components ahead of Submit and Lock
+    // Partial publish — release individual components ahead of Submit and Lock
     // =====================================================================
 
     /**
@@ -263,7 +258,7 @@ public class GradeService {
      * <p>Sends the student a notification the moment their Midterm becomes visible for the first
      * time (a plain {@link NotificationType#GRADE} message), and a separate
      * {@link NotificationType#WARNING} message instead whenever a Midterm mark that was
-     * <em>already</em> published is edited and released again ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the red "a published grade
+     * <em>already</em> published is edited and released again — the red "a published grade
      * changed" case.</p>
      */
     public void publishComponents(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
@@ -334,27 +329,27 @@ public class GradeService {
         if (warning) {
             notifications.notify(connection, student.getUserId(), NotificationType.WARNING,
                     "A published grade was changed",
-                    "One of your already-published marks for " + course.getCourseCode() + " ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â "
+                    "One of your already-published marks for " + course.getCourseCode() + " — "
                             + course.getCourseTitle() + " was edited by the instructor. Check My Grades "
                             + "for the new value.",
                     "grades", gradeId);
         } else {
             notifications.notify(connection, student.getUserId(), NotificationType.GRADE,
                     "A new grade was published",
-                    "A new mark for " + course.getCourseCode() + " ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â " + course.getCourseTitle()
+                    "A new mark for " + course.getCourseCode() + " — " + course.getCourseTitle()
                             + " is now available. Check My Grades for details.",
                     "grades", gradeId);
         }
     }
 
     // =====================================================================
-    // Submit and Lock ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â G4 and G6
+    // Submit and Lock — G4 and G6
     // =====================================================================
 
     /**
      * WHOLE-SECTION Submit and Lock: every actively enrolled student must have all their required
      * marks (Midterm + Final + Lab for a lab course, Midterm + Final + Coursework otherwise) or
-     * the entire section is refused ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â nothing is submitted for anyone, and the exception message
+     * the entire section is refused — nothing is submitted for anyone, and the exception message
      * names who is still missing marks. Only once every row qualifies does this run: for each row,
      * {@code grades.is_submitted = 1} (G4), {@code enrollments.status = COMPLETED} and the
      * student's academic record is recalculated (G6), and the student is notified (N9). All of it
@@ -362,7 +357,7 @@ public class GradeService {
      *
      * <p>Once locked this way, only {@link #adminOverride} (a single student, with a reason) or
      * {@link #unlockSection} (the whole section, reopened for normal editing) can touch these
-     * rows again ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â G4.</p>
+     * rows again — G4.</p>
      *
      * <p>Same red-vs-blue notification rule as {@link #publishComponents}: for a component that
      * was already published before this call, the value the student was actually last shown
@@ -371,7 +366,7 @@ public class GradeService {
      * genuine change to a mark the student had already seen sends {@link NotificationType#WARNING}
      * instead of the normal {@link NotificationType#GRADE}. Comparing against that freshly-read
      * snapshot (not some earlier baseline) is also what keeps this from firing twice for the same
-     * edit ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â if that value was already re-published (and so the snapshot already matches what is
+     * edit — if that value was already re-published (and so the snapshot already matches what is
      * about to be submitted), submitting it again is not a further change.</p>
      */
     public void submitSection(int sectionId, List<GradeSheetRow> rows, int actingUserId) {
@@ -458,13 +453,13 @@ public class GradeService {
     }
 
     // =====================================================================
-    // Admin Unlock ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â reopens a Submit-&-Locked section for normal instructor editing
+    // Admin Unlock — reopens a Submit-&-Locked section for normal instructor editing
     // =====================================================================
 
     /**
      * The registrar's way to undo a whole-section Submit and Lock: every submitted grade in the
      * section goes back to {@code is_submitted = 0}, exactly the pre-submit state (marks and
-     * publish flags are untouched ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â nothing is cleared). The instructor can then edit normally
+     * publish flags are untouched — nothing is cleared). The instructor can then edit normally
      * again and must press "Submit and Lock" once more when finished.
      */
     public void unlockSection(int sectionId, int adminUserId) {
@@ -473,6 +468,9 @@ public class GradeService {
 
         Connection connection = transactions.beginTransaction();
         try {
+            // Must run before gradeDao.unlockSection flips is_submitted to 0 -- it joins on
+            // is_submitted = 1 to find exactly the enrollments that submission had completed.
+            enrollmentDao.revertCompletedToEnrolled(connection, sectionId);
             int unlocked = gradeDao.unlockSection(connection, sectionId);
             if (unlocked == 0) {
                 throw new ValidationException("This section has not been submitted, so there is nothing to unlock.");
@@ -490,13 +488,13 @@ public class GradeService {
     }
 
     // =====================================================================
-    // G5 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â admin override of a SUBMITTED grade
+    // G5 — admin override of a SUBMITTED grade
     // =====================================================================
 
     /**
-     * Only an active ADMIN reaches this method ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the role is re-checked in SQL, never trusted
+     * Only an active ADMIN reaches this method — the role is re-checked in SQL, never trusted
      * from the UI alone. The change is written to {@code audit_log} by the DATABASE trigger
-     * {@code trg_Grade_Audit} (project_details.md Section 4.16) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â this method never inserts into
+     * {@code trg_Grade_Audit} (project_details.md Section 4.16) — this method never inserts into
      * {@code audit_log} itself.
      *
      * @param reason free text typed by the admin; must be at least 5 characters
@@ -571,7 +569,7 @@ public class GradeService {
         }
     }
 
-    /** Re-checks the role in SQL ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Section 6.6: "only ADMIN may change a submitted grade." */
+    /** Re-checks the role in SQL — Section 6.6: "only ADMIN may change a submitted grade." */
     private void assertIsAdmin(int userId) {
         User user = userDao.findById(userId).orElse(null);
         if (user == null || user.getRole() != UserRole.ADMIN || !user.isActive()) {
@@ -584,7 +582,7 @@ public class GradeService {
     // =====================================================================
 
     /**
-     * Writes the mark columns (insert or update, gated by {@code is_submitted = 0} in SQL ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â G4
+     * Writes the mark columns (insert or update, gated by {@code is_submitted = 0} in SQL — G4
      * enforced twice), then, when {@code submit} is true, flips the submission flag in a second
      * statement so {@code submitted_by}/{@code submitted_at} are only ever stamped by
      * {@link GradeDAO#submit}.
@@ -626,7 +624,7 @@ public class GradeService {
         return gradeId;
     }
 
-    /** Notification N9 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â phase-10 context/NOTIFICATION_MESSAGES.md. {@code warning} is the same
+    /** Notification N9 — phase-10 context/NOTIFICATION_MESSAGES.md. {@code warning} is the same
      *  red "a published mark changed" case {@link #notifyPublished} sends, for a component that
      *  was already visible to the student and is only now being submitted with a different value. */
     private void notifySubmitted(Connection connection, Section section, GradeSheetRow row, int gradeId,
@@ -639,14 +637,14 @@ public class GradeService {
         if (warning) {
             notifications.notify(connection, student.getUserId(), NotificationType.WARNING,
                     "A published grade was changed",
-                    "Your final grade for " + course.getCourseCode() + " ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â " + course.getCourseTitle()
+                    "Your final grade for " + course.getCourseCode() + " — " + course.getCourseTitle()
                             + " has changed to " + row.getLetterGrade().getLabel() + " following a "
                             + "correction by the instructor. Your GPA has been updated.",
                     "grades", gradeId);
         } else {
             notifications.notify(connection, student.getUserId(), NotificationType.GRADE,
                     "Your grade for " + course.getCourseCode() + " is available",
-                    "Your final grade for " + course.getCourseCode() + " ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â " + course.getCourseTitle()
+                    "Your final grade for " + course.getCourseCode() + " — " + course.getCourseTitle()
                             + " is " + row.getLetterGrade().getLabel() + ". Your GPA has been updated.",
                     "grades", gradeId);
         }
@@ -665,9 +663,9 @@ public class GradeService {
             return;
         }
         notifications.notify(connection, student.getUserId(), NotificationType.GRADE, "A grade was corrected",
-                "Your grade for " + course.getCourseCode() + " ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â " + course.getCourseTitle()
-                        + " was changed from " + (oldLetter == null ? "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â" : oldLetter.getLabel())
-                        + " to " + (newLetter == null ? "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â" : newLetter.getLabel())
+                "Your grade for " + course.getCourseCode() + " — " + course.getCourseTitle()
+                        + " was changed from " + (oldLetter == null ? "—" : oldLetter.getLabel())
+                        + " to " + (newLetter == null ? "—" : newLetter.getLabel())
                         + " by the registrar.", "grades", enrollment.getEnrollmentId());
     }
 
@@ -683,7 +681,7 @@ public class GradeService {
     /**
      * Called by {@link CourseService#updateCourse} in the same transaction as the course update.
      * When a component's max mark changes, every mark already stored for that course (submitted
-     * or not) is rescaled proportionally to the new max ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â 95/100 becomes 19/20 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â so its
+     * or not) is rescaled proportionally to the new max — 95/100 becomes 19/20 — so its
      * percentage/grade meaning is preserved instead of the mark silently becoming invalid (rule
      * G3). This is not a correction (no reason, no audit entry, {@code is_submitted}/{@code
      * submitted_by}/{@code last_modified_by} untouched): the grade itself has not changed, only
@@ -733,14 +731,14 @@ public class GradeService {
             gradeDao.rescaleStoredGrade(connection, grade);
         }
 
-        // Submitted grades feed students.cumulative_gpa/completed_credits (cached columns) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+        // Submitted grades feed students.cumulative_gpa/completed_credits (cached columns) —
         // the rescale just changed grade_points for some of them, so the cache must follow.
         for (int studentId : gradeDao.findSubmittedStudentIdsByCourse(connection, newCourse.getCourseId())) {
             academicService.refreshAcademicRecord(connection, studentId);
         }
     }
 
-    /** {@code mark * newMax / oldMax}, rounded HALF_UP to 2 decimals ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â null and a 0 old max pass through unchanged. */
+    /** {@code mark * newMax / oldMax}, rounded HALF_UP to 2 decimals — null and a 0 old max pass through unchanged. */
     private BigDecimal rescaleMark(BigDecimal mark, BigDecimal oldMax, BigDecimal newMax) {
         if (mark == null || oldMax == null || newMax == null
                 || oldMax.compareTo(BigDecimal.ZERO) == 0 || oldMax.compareTo(newMax) == 0) {

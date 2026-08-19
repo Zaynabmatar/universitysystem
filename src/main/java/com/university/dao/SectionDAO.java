@@ -86,7 +86,7 @@ public class SectionDAO extends AbstractDAO implements GenericDAO<Section> {
                 + "s.campus_id, s.section_number, s.capacity, s.enrolled_count, s.room, s.status "
                 + "FROM dbo.sections s "
                 + "INNER JOIN dbo.enrollments e ON e.section_id = s.section_id "
-                + "WHERE e.student_id = ? AND s.semester_id = ? AND e.status = 'ENROLLED' "
+                + "WHERE e.student_id = ? AND s.semester_id = ? AND e.status IN ('ENROLLED', 'COMPLETED') "
                 + "ORDER BY s.course_id, s.section_number", MAPPER, studentId, semesterId);
     }
 

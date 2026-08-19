@@ -80,7 +80,7 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
     }
 
     /**
-     * Every semester the student actually has enrollments in, newest first â€” the choices for the
+     * Every semester the student actually has enrollments in, newest first — the choices for the
      * My Grades semester selector. A semester they never studied in is not offered.
      */
     public List<Semester> findWithEnrollments(int studentId) {
@@ -118,7 +118,7 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
      * <p>A single UPDATE, not two: {@code trg_semesters_enforce_single_open} rejects the whole
      * statement when the semester losing the flag is a DIFFERENT one from the one gaining it,
      * and a trigger can only see that both rows changed at once when they change in the same
-     * statement â€” two separate UPDATEs would each show the trigger only one side of the change.
+     * statement — two separate UPDATEs would each show the trigger only one side of the change.
      * In practice {@link com.university.service.SemesterService#setCurrent} only ever calls this
      * when nothing else is current (or re-selects the semester already current), so the trigger
      * should never actually fire here; it exists to refuse the swap even if that Java-level check
@@ -150,7 +150,7 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
     }
 
     /**
-     * Clears the current flag with nobody taking it â€” the explicit "close" step a semester now
+     * Clears the current flag with nobody taking it — the explicit "close" step a semester now
      * needs before a different one may become current (Section 8: no direct swap any more).
      *
      * @return true when a semester actually was current and got closed
