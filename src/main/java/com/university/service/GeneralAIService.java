@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
@@ -45,18 +46,32 @@ public class GeneralAIService {
 
     /**
      * Gemini occasionally answers a request with a transient {@code 429} (rate limit) or
-     * {@code 503} (model overloaded) that a bare retry typically clears — this is the one
-     * automatic retry {@link #respond} performs for exactly those two statuses. Any other
-     * failure (a bad key's {@code 401}/{@code 403}, a malformed request's {@code 400}, a network
-     * error, an empty completion) is not retried, since retrying would not help.
+     * {@code 503} (model overloaded), or the request simply times out under load. There is no
+     * time to keep retrying the same overloaded model during a live presentation, so
+     * {@link #respond} instead fails over once: {@link #PRIMARY_MODEL} is tried first, and only
+     * on one of those three transient failures is {@link #FALLBACK_MODEL} tried with the same
+     * question, for at most {@link #MODELS}{@code .length} (two) total attempts. Any other
+     * failure (a bad key's {@code 401}/{@code 403}, a malformed request's {@code 400}, a
+     * non-timeout network error, an empty completion) is not retried on the fallback model
+     * either, since retrying would not help.
+     *
+     * <p>{@code gemini-2.5-flash-lite} and {@code gemini-2.5-flash} were retired for this API
+     * key (HTTP 404, "no longer available to new users") even though Google's own ListModels
+     * endpoint still lists them as supporting {@code generateContent} — that endpoint does not
+     * reflect real per-key availability, so the models below were chosen by actually calling
+     * {@code generateContent} on every candidate, not by reading the model list. Both are
+     * Google's auto-updating {@code -latest}/version aliases rather than a single pinned
+     * version, which is what let the previous pinned name silently go stale.
      */
-    private static final long RETRY_DELAY_MILLIS = 750;
+    private static final String PRIMARY_MODEL = "gemini-flash-lite-latest";
 
-    /** Rolling alias for the current stable Gemini Flash model; avoids breaking on model retirement. */
-    private static final String MODEL = "gemini-flash-latest";
+    private static final String FALLBACK_MODEL = "gemini-3.5-flash";
 
-    private static final String ENDPOINT =
-            "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent";
+    private static final String[] MODELS = {PRIMARY_MODEL, FALLBACK_MODEL};
+
+    private static String endpointFor(String model) {
+        return "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
+    }
 
     private static final String SYSTEM_INSTRUCTION =
             "You are the general-knowledge half of a university system's AI assistant. Answer "
@@ -66,7 +81,7 @@ public class GeneralAIService {
                     + "schedule, or any other private university data — if asked, say you can't "
                     + "see that and suggest they ask the assistant directly.";
 
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(8);
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(REQUEST_TIMEOUT)
@@ -82,20 +97,39 @@ public class GeneralAIService {
             return UNAVAILABLE_MESSAGE;
         }
         try {
-            HttpResponse<String> response = send(message, apiKey);
-            if (isRetryableStatus(response.statusCode())) {
-                LOG.warn("Gemini request returned HTTP {} - retrying once after {}ms. Body: {}",
-                        response.statusCode(), RETRY_DELAY_MILLIS, truncate(response.body()));
-                Thread.sleep(RETRY_DELAY_MILLIS);
-                response = send(message, apiKey);
+            for (int i = 0; i < MODELS.length; i++) {
+                String model = MODELS[i];
+                boolean isLastModel = i == MODELS.length - 1;
+                HttpResponse<String> response;
+                try {
+                    response = send(message, apiKey, model);
+                } catch (HttpTimeoutException e) {
+                    if (isLastModel) {
+                        LOG.warn("Gemini model {} timed out; no more models to try.", model);
+                        return UNAVAILABLE_MESSAGE;
+                    }
+                    LOG.warn("Gemini model {} timed out - failing over to {}.", model, MODELS[i + 1]);
+                    continue;
+                }
+                if (isRetryableStatus(response.statusCode())) {
+                    if (isLastModel) {
+                        LOG.warn("Gemini model {} returned HTTP {}; no more models to try. Body: {}",
+                                model, response.statusCode(), truncate(response.body()));
+                        return UNAVAILABLE_MESSAGE;
+                    }
+                    LOG.warn("Gemini model {} returned HTTP {} - failing over to {}. Body: {}",
+                            model, response.statusCode(), MODELS[i + 1], truncate(response.body()));
+                    continue;
+                }
+                if (response.statusCode() != 200) {
+                    LOG.warn("Gemini model {} failed with HTTP {}. Body: {}",
+                            model, response.statusCode(), truncate(response.body()));
+                    return UNAVAILABLE_MESSAGE;
+                }
+                String text = extractText(response.body());
+                return (text == null || text.isBlank()) ? UNAVAILABLE_MESSAGE : text.trim();
             }
-            if (response.statusCode() != 200) {
-                LOG.warn("Gemini request failed with HTTP {}. Body: {}",
-                        response.statusCode(), truncate(response.body()));
-                return UNAVAILABLE_MESSAGE;
-            }
-            String text = extractText(response.body());
-            return (text == null || text.isBlank()) ? UNAVAILABLE_MESSAGE : text.trim();
+            return UNAVAILABLE_MESSAGE;
         } catch (IOException | InterruptedException | RuntimeException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
@@ -105,10 +139,11 @@ public class GeneralAIService {
         }
     }
 
-    /** One HTTP attempt against the Gemini endpoint. Never logs the API key (it is in the URI). */
-    private HttpResponse<String> send(String message, String apiKey) throws IOException, InterruptedException {
+    /** One HTTP attempt against the given Gemini model. Never logs the API key (it is in the URI). */
+    private HttpResponse<String> send(String message, String apiKey, String model)
+            throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "?key=" + apiKey))
+                .uri(URI.create(endpointFor(model) + "?key=" + apiKey))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(buildRequestBody(message)))
