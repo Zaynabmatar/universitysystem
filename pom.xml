@@ -106,6 +106,18 @@
             <version>20240303</version>
         </dependency>
 
+        <!-- Voice-to-text for the mic button (VoiceInputService). Vosk is an offline speech
+             recognizer (Kaldi-based) with Java/JNA bindings that bundle the native library for
+             Windows/Linux/macOS inside the jar, so this needs no separate native install and no
+             API key. It replaces the old Windows System.Speech dictation grammar, whose accuracy
+             was poor for general speech. Requires a language model directory downloaded
+             separately at run time (see VoiceInputService); the jar itself has no model. -->
+        <dependency>
+            <groupId>com.alphacephei</groupId>
+            <artifactId>vosk</artifactId>
+            <version>0.3.45</version>
+        </dependency>
+
     </dependencies>
 
     <build>

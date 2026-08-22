@@ -22,8 +22,10 @@
 }
 
 /* ---------- shared text ---------- */
-.page-title      { -fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
-.section-title   { -fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
+.page-title      { -fx-font-size: 22px; -fx-font-weight: bold;
+     -fx-text-fill: -navy-900; }
+.section-title   { -fx-font-size: 15px; -fx-font-weight: bold;
+     -fx-text-fill: -navy-900; }
 .muted-text      { -fx-text-fill: #6b7280; }
 .error-text      { -fx-text-fill: #d32f2f; -fx-font-size: 11.5px; }
 .success-text    { -fx-text-fill: #2e7d32; -fx-font-size: 11.5px; }
@@ -161,6 +163,7 @@
 .login-content .error-text {
     -fx-text-fill: white;
     -fx-font-weight: bold;
+    
     -fx-font-size: 11.5px;
     -fx-background-color: rgba(255, 255, 255, 0.14);
     -fx-background-radius: 6;
@@ -206,6 +209,7 @@
     -fx-background-radius: 6;
     -fx-text-fill: white;
     -fx-font-weight: bold;
+    
     -fx-font-size: 15px;
     -fx-padding: 14 0 14 0;
     -fx-pref-width: 367;
@@ -225,6 +229,7 @@
     -fx-text-fill: rgba(255, 255, 255, 0.85);
     -fx-font-size: 11.5px;
     -fx-font-weight: bold;
+    
     -fx-padding: 0 0 0 4;
 }
 
@@ -294,7 +299,8 @@
 .logout-icon { -fx-fill: #991b1b; }
 
 .avatar-menu-header { -fx-padding: 6 14 8 14; }
-.avatar-menu-name   { -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
+.avatar-menu-name   { -fx-font-size: 13px; -fx-font-weight: bold;
+     -fx-text-fill: -navy-900; }
 .avatar-menu-id     { -fx-font-size: 11.5px; -fx-text-fill: #6b7280; }
 
 /* ---------- sidebar ---------- */
@@ -325,6 +331,7 @@
     -fx-text-fill: rgba(255, 255, 255, 0.55);
     -fx-font-size: 11px;
     -fx-font-weight: bold;
+    
     -fx-padding: 6 18 10 18;
 }
 /* Selectors are scoped under .sidebar (not just .nav-button) so their specificity reliably
@@ -352,6 +359,7 @@
     -fx-background-radius: 8;
     -fx-text-fill: white;
     -fx-font-weight: bold;
+    
     -fx-border-color: transparent;
     -fx-border-width: 0;
 }
@@ -375,7 +383,8 @@
     -fx-border-radius: 10;
     -fx-padding: 24;
 }
-.settings-card .field-name { -fx-font-size: 12.5px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
+.settings-card .field-name { -fx-font-size: 12.5px; -fx-font-weight: bold;
+     -fx-text-fill: -navy-900; }
 
 /* ---------- buttons (shared base for every plain <Button> in the app) ---------- */
 .button {
@@ -395,6 +404,7 @@
     -fx-background-color: -navy-700;
     -fx-text-fill: white;
     -fx-font-weight: bold;
+    
 }
 .button:default:hover   { -fx-background-color: -navy-600; }
 .button:default:pressed { -fx-background-color: -navy-800; }
@@ -405,7 +415,8 @@
 /* ---------- tables & forms ---------- */
 .table-view { -fx-border-color: #dfe5ec; }
 .table-view .column-header-background { -fx-background-color: #eef1f8; }
-.table-view .column-header .label { -fx-font-weight: bold; -fx-text-fill: -navy-900; }
+.table-view .column-header .label { -fx-font-weight: bold;
+     -fx-text-fill: -navy-900; }
 
 .field-error { -fx-border-color: #d32f2f; -fx-border-width: 1.4; -fx-border-radius: 4; }
 
@@ -414,6 +425,7 @@
     -fx-background-radius: 10;
     -fx-font-size: 11px;
     -fx-font-weight: bold;
+    
 }
 .badge-ok      { -fx-background-color: #dcfce7; -fx-text-fill: #166534; }
 .badge-warn    { -fx-background-color: #fef3c7; -fx-text-fill: #92400e; }
@@ -422,16 +434,21 @@
 
 /* ---------- Phase 08: semesters & sections ---------- */
 .current-semester-banner { -fx-background-color: #e8f0fe; -fx-text-fill: #1a3a6b; -fx-font-weight: bold;
+    
                            -fx-padding: 6 12 6 12; -fx-background-radius: 4; }
-.reg-open       { -fx-text-fill: #1b7f3b; -fx-font-weight: bold; }
-.reg-closed     { -fx-text-fill: #c62828; -fx-font-weight: bold; }
-.section-full   { -fx-text-fill: #c62828; -fx-font-weight: bold; }
+.reg-open       { -fx-text-fill: #1b7f3b; -fx-font-weight: bold;
+     }
+.reg-closed     { -fx-text-fill: #c62828; -fx-font-weight: bold;
+     }
+.section-full   { -fx-text-fill: #c62828; -fx-font-weight: bold;
+     }
 
 /* ---------- Phase 09: registration & timetable ---------- */
 .timetable-scroll { -fx-background-color: transparent; }
 .timetable-grid    { -fx-padding: 4; }
 .timetable-day-header {
     -fx-font-weight: bold;
+    
     -fx-text-fill: #374151;
     -fx-background-color: #f3f4f6;
     -fx-padding: 4;
@@ -442,7 +459,8 @@
     -fx-padding: 4 6 4 6;
     -fx-border-radius: 4;
 }
-.timetable-block-title { -fx-font-weight: bold; -fx-font-size: 11.5px; -fx-text-fill: #111827; }
+.timetable-block-title { -fx-font-weight: bold;
+     -fx-font-size: 11.5px; -fx-text-fill: #111827; }
 .timetable-block-sub   { -fx-font-size: 10.5px; -fx-text-fill: #374151; }
 .tt-color-1  { -fx-background-color: #dbeafe; -fx-border-color: #2563eb; }
 .tt-color-2  { -fx-background-color: #dcfce7; -fx-border-color: #16a34a; }
@@ -461,14 +479,17 @@
 /* ---------- Phase 10: notifications ---------- */
 .bell-stack  { -fx-padding: 0 2 0 2; }
 .bell-badge  { -fx-background-color: #d32f2f; -fx-text-fill: white; -fx-font-size: 10px;
-               -fx-font-weight: bold; -fx-background-radius: 9; -fx-padding: 1 5 1 5;
+               -fx-font-weight: bold;
+     -fx-background-radius: 9; -fx-padding: 1 5 1 5;
                -fx-translate-x: 4; -fx-translate-y: -6; }
 
 .notifications-popup { -fx-background-color: white; }
 .popup-header       { -fx-background-color: #f5f6f8; }
-.popup-title        { -fx-font-size: 15px; -fx-font-weight: bold; }
+.popup-title        { -fx-font-size: 15px; -fx-font-weight: bold;
+     }
 .notification-list  { -fx-background-color: white; }
-.notif-title-unread { -fx-font-weight: bold;   -fx-font-size: 13px; }
+.notif-title-unread { -fx-font-weight: bold;
+       -fx-font-size: 13px; }
 .notif-title-read   { -fx-font-weight: normal; -fx-font-size: 13px; -fx-text-fill: #666666; }
 .notif-body         { -fx-font-size: 12px; -fx-text-fill: #333333; }
 .notif-meta         { -fx-font-size: 10px; -fx-text-fill: #999999; }
@@ -476,22 +497,28 @@
                       -fx-border-width: 0 0 0 3; }
 .notif-cell-read    { -fx-padding: 6 4 6 8; }
 .muted-label        { -fx-text-fill: #888888; -fx-font-size: 12px; }
-.badge-label         { -fx-text-fill: #1976d2; -fx-font-size: 12px; -fx-font-weight: bold; }
+.badge-label         { -fx-text-fill: #1976d2; -fx-font-size: 12px; -fx-font-weight: bold;
+     }
 
 /* ---------- Phase 11: grades, GPA and academic standing ---------- */
 .lock-banner     { -fx-background-color: #fff3cd; -fx-text-fill: #856404;
                    -fx-padding: 6 12 6 12; -fx-background-radius: 4; -fx-font-size: 12px; }
-.grade-pass      { -fx-text-fill: #1b7f3b; -fx-font-weight: bold; }
-.grade-fail      { -fx-text-fill: #c62828; -fx-font-weight: bold; }
+.grade-pass      { -fx-text-fill: #1b7f3b; -fx-font-weight: bold;
+     }
+.grade-fail      { -fx-text-fill: #c62828; -fx-font-weight: bold;
+     }
 .mark-invalid    { -fx-background-color: #fdecea; -fx-border-color: #d32f2f; -fx-border-width: 1.4; }
 .kpi-card        { -fx-background-color: white; -fx-background-radius: 8; -fx-padding: 14;
                    -fx-border-color: #e4e9f4; -fx-border-radius: 8;
                    -fx-effect: dropshadow(gaussian, rgba(8,39,102,0.10), 8, 0, 0, 2);
                    -fx-min-width: 170; }
-.kpi-value       { -fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
+.kpi-value       { -fx-font-size: 26px; -fx-font-weight: bold;
+     -fx-text-fill: -navy-900; }
 .kpi-label       { -fx-font-size: 12px; -fx-text-fill: #666666; }
-.standing-good   { -fx-text-fill: #1b7f3b; -fx-font-weight: bold; }
-.standing-bad    { -fx-text-fill: #c62828; -fx-font-weight: bold; }
+.standing-good   { -fx-text-fill: #1b7f3b; -fx-font-weight: bold;
+     }
+.standing-bad    { -fx-text-fill: #c62828; -fx-font-weight: bold;
+     }
 .legend-chip     { -fx-padding: 3 10 3 10; -fx-font-size: 11.5px; }
 .table-view .table-row-cell:selected { -fx-background-color: #dbe4f7; }
 
@@ -516,9 +543,11 @@
     -fx-border-radius: 8;
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 6, 0, 0, 2);
 }
-.term-heading          { -fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #1f395c; }
+.term-heading          { -fx-font-size: 15px; -fx-font-weight: bold;
+     -fx-text-fill: #1f395c; }
 .term-total            { -fx-font-size: 12px; -fx-text-fill: #44506a; }
-.term-total-cumulative { -fx-font-weight: bold; -fx-text-fill: #1f395c; }
+.term-total-cumulative { -fx-font-weight: bold;
+     -fx-text-fill: #1f395c; }
 
 /* Section 5.5 — the superseded attempt is greyed so the eye skips it. */
 .table-row-cell.row-repeated .text   { -fx-fill: #8a8a8a; }
@@ -533,22 +562,27 @@
 .degree-progress          { -fx-accent: #2f7d4f; }
 .degree-progress > .bar   { -fx-background-insets: 0; -fx-background-radius: 6; }
 .degree-progress > .track { -fx-background-color: #e6ebf1; -fx-background-radius: 6; }
-.progress-percent         { -fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: #1f395c; }
+.progress-percent         { -fx-font-size: 26px; -fx-font-weight: bold;
+     -fx-text-fill: #1f395c; }
 
 .condition-line { -fx-font-size: 13px; }
 .condition-ok   { -fx-text-fill: #2f7d4f; }
 .condition-fail { -fx-text-fill: #b3402f; }
-.verdict        { -fx-font-size: 15px; -fx-font-weight: bold; }
+.verdict        { -fx-font-size: 15px; -fx-font-weight: bold;
+     }
 .verdict-ok     { -fx-text-fill: #2f7d4f; }
 .verdict-warn   { -fx-text-fill: #a86a12; }
 
-.status-passed     { -fx-text-fill: #2f7d4f; -fx-font-weight: bold; }
+.status-passed     { -fx-text-fill: #2f7d4f; -fx-font-weight: bold;
+     }
 .status-inprogress { -fx-text-fill: #a86a12; }
 .status-nottaken   { -fx-text-fill: #7a8391; }
 
 /* Study Plan (Degree Progress) — same palette as the statuses above */
-.status-failed          { -fx-text-fill: #b3402f; -fx-font-weight: bold; }
-.status-eligible        { -fx-text-fill: #1b6e8c; -fx-font-weight: bold; }
+.status-failed          { -fx-text-fill: #b3402f; -fx-font-weight: bold;
+     }
+.status-eligible        { -fx-text-fill: #1b6e8c; -fx-font-weight: bold;
+     }
 .status-locked          { -fx-text-fill: #9a9a9a; }
 .status-notyetavailable { -fx-text-fill: #b0b6bf; }
 
@@ -565,24 +599,31 @@
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.07), 8, 0, 0, 2);
 }
 .reco-rank {
-    -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: white;
+    -fx-font-size: 13px; -fx-font-weight: bold;
+     -fx-text-fill: white;
     -fx-background-color: -navy-700; -fx-background-radius: 12;
     -fx-padding: 2 9 2 9;
 }
-.reco-title { -fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #17202e; }
+.reco-title { -fx-font-size: 16px; -fx-font-weight: bold;
+     -fx-text-fill: #17202e; }
 .reco-sub   { -fx-font-size: 12px; -fx-text-fill: #6d7684; }
-.reco-score { -fx-font-size: 17px; -fx-font-weight: bold; -fx-text-fill: #2f7d4f; }
+.reco-score { -fx-font-size: 17px; -fx-font-weight: bold;
+     -fx-text-fill: #2f7d4f; }
 
 .reco-block       { -fx-padding: 4 0 4 0; }
-.reco-block-title { -fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #44506a;
+.reco-block-title { -fx-font-size: 12px; -fx-font-weight: bold;
+     -fx-text-fill: #44506a;
                     -fx-padding: 6 0 2 0; }
 
 .reason-text   { -fx-font-size: 13px; -fx-text-fill: #2b3444; }
-.reason-yes    { -fx-text-fill: #2f7d4f; -fx-font-weight: bold; }
-.reason-zero   { -fx-text-fill: #9aa3b0; -fx-font-weight: bold; }
+.reason-yes    { -fx-text-fill: #2f7d4f; -fx-font-weight: bold;
+     }
+.reason-zero   { -fx-text-fill: #9aa3b0; -fx-font-weight: bold;
+     }
 /* Monospace and right-aligned so the four degree-fit numbers line up and the addition is obvious. */
 .reason-points { -fx-font-family: "Consolas", "Courier New", monospace;
-                 -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #1f395c;
+                 -fx-font-size: 13px; -fx-font-weight: bold;
+     -fx-text-fill: #1f395c;
                  -fx-min-width: 44; -fx-alignment: CENTER_RIGHT; }
 .reason-note   { -fx-font-size: 12px; -fx-text-fill: #6d7684; -fx-min-width: 78; }
 
@@ -622,7 +663,8 @@
     -fx-background-radius: 12;
     -fx-effect: dropshadow(gaussian, rgba(8,39,102,0.20), 12, 0, 0, 3);
 }
-.ai-assistant-title { -fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white; }
+.ai-assistant-title { -fx-font-size: 15px; -fx-font-weight: bold;
+     -fx-text-fill: white; }
 
 .ai-new-chat-btn {
     -fx-background-color: transparent;
@@ -673,6 +715,25 @@
     -fx-text-fill: white;
 }
 
+/* Sent Photo/PDF/Document attachment, shown in the chat history as a compact file card (icon +
+   file name) instead of a plain text bubble — same rounded/indigo language as .chat-bubble-student
+   so it still reads as "sent by me", just shaped like a real attached file. */
+.chat-attachment-card {
+    -fx-background-color: -indigo-600;
+    -fx-background-radius: 14;
+    -fx-padding: 8 12 8 10;
+    -fx-max-width: 240;
+}
+.chat-attachment-icon {
+    -fx-fill: white;
+}
+.chat-attachment-name {
+    -fx-text-fill: white;
+    -fx-font-size: 12.5px;
+    -fx-font-weight: bold;
+    
+}
+
 .ai-typing-indicator { -fx-text-fill: rgba(255, 255, 255, 0.7); -fx-font-size: 11px; -fx-font-style: italic; }
 
 /* ---------- University AI Assistant — collapsed toggle (Student/Instructor dashboards only) ----------
@@ -684,6 +745,7 @@
     -fx-text-fill: white;
     -fx-font-size: 13px;
     -fx-font-weight: bold;
+    
     -fx-padding: 10 16 10 16;
     -fx-cursor: hand;
     -fx-effect: dropshadow(gaussian, rgba(8,39,102,0.20), 8, 0, 0, 2);
@@ -697,6 +759,7 @@
     -fx-text-fill: white;
     -fx-font-size: 11px;
     -fx-font-weight: bold;
+    
     -fx-padding: 4 10 4 10;
     -fx-cursor: hand;
 }
@@ -719,9 +782,77 @@
     -fx-border-color: transparent;
     -fx-text-fill: white;
     -fx-font-weight: bold;
+    -fx-min-width: 70px;
+    
 }
 .ai-send-btn:hover   { -fx-background-color: -indigo-700; }
 .ai-send-btn:pressed { -fx-background-color: -navy-900; }
+
+.ai-mic-btn {
+    -fx-background-color: rgba(255, 255, 255, 0.12);
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 6 12 6 12;
+    -fx-cursor: hand;
+}
+.ai-mic-btn:hover     { -fx-background-color: rgba(255, 255, 255, 0.22); }
+.ai-mic-btn:pressed   { -fx-background-color: -navy-900; }
+.ai-mic-btn:disabled  { -fx-opacity: 0.6; }
+
+/* Plain, recognizable microphone glyph (solid capsule + cradle), the standard shape used by
+   messaging apps' voice-input buttons. */
+.ai-mic-icon {
+    -fx-fill: white;
+}
+
+/* Active/listening state: red fill, same glyph, plus the pulse animation the controller runs on
+   the button itself so it reads clearly as "recording" at a glance. */
+.ai-mic-btn-listening {
+    -fx-background-color: #dc2626;
+    -fx-border-color: transparent;
+}
+
+/* "+" attachment button — same size/shape/hover/pressed/disabled behavior as .ai-mic-btn, styled
+   identically on purpose so all three controls in the bottom row read as one control group. */
+.ai-attach-btn {
+    -fx-background-color: rgba(255, 255, 255, 0.12);
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 6 12 6 12;
+    -fx-cursor: hand;
+}
+.ai-attach-btn:hover     { -fx-background-color: rgba(255, 255, 255, 0.22); }
+.ai-attach-btn:pressed   { -fx-background-color: -navy-900; }
+.ai-attach-btn:disabled  { -fx-opacity: 0.6; }
+
+.ai-attach-icon {
+    -fx-fill: white;
+}
+
+/* Selected-attachment chip shown above the input row, in the same rounded/translucent language
+   as .quick-question-btn, until it is sent or removed via #handleRemoveAttachment. */
+.ai-attachment-chip {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+    -fx-border-color: rgba(255, 255, 255, 0.28);
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 5 8 5 8;
+}
+.ai-attachment-chip-label {
+    -fx-text-fill: white;
+    -fx-font-size: 11px;
+}
+.ai-attachment-remove-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: rgba(255, 255, 255, 0.75);
+    -fx-font-size: 11px;
+    -fx-padding: 0 4 0 4;
+    -fx-cursor: hand;
+}
+.ai-attachment-remove-btn:hover { -fx-text-fill: white; }
 
 /* ---------- Instructor Attendance ---------- */
 /* The full-semester calendar: one .calendar-month block per month the semester spans, each a
@@ -734,6 +865,7 @@
 .calendar-day-header {
     -fx-font-size: 11px;
     -fx-font-weight: bold;
+    
     -fx-text-fill: #6b7280;
 }
 .calendar-day-cell {
@@ -752,6 +884,7 @@
     -fx-background-color: -indigo-600;
     -fx-text-fill: white;
     -fx-font-weight: bold;
+    
     -fx-cursor: hand;
 }
 .scheduled-class-day:hover {
@@ -769,6 +902,7 @@
     -fx-background-radius: 10;
     -fx-font-size: 11.5px;
     -fx-font-weight: bold;
+    
     -fx-pref-width: 120;
 }
 .attendance-status-combo.badge-ok         { -fx-background-color: #dcfce7; }
@@ -786,7 +920,8 @@
     -fx-padding: 22 30 20 30;
     -fx-effect: dropshadow(gaussian, rgba(8,39,102,0.20), 12, 0, 0, 3);
 }
-.footer-heading   { -fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: white; }
+.footer-heading   { -fx-font-size: 14px; -fx-font-weight: bold;
+     -fx-text-fill: white; }
 .footer-line      { -fx-font-size: 12.5px; -fx-text-fill: rgba(255, 255, 255, 0.82); }
 .footer-copyright { -fx-font-size: 11.5px; -fx-text-fill: rgba(255, 255, 255, 0.6); -fx-padding: 8 0 0 0; }
 .footer-social-row  { -fx-padding: 6 0 0 0; }
@@ -808,7 +943,8 @@
 .badge-linkedin  { -fx-background-color: #0A66C2; }
 
 /* ---------- Student Academic Analytics ---------- */
-.analytics-stat-value { -fx-font-size: 19px; -fx-font-weight: bold; -fx-text-fill: -navy-900; }
+.analytics-stat-value { -fx-font-size: 19px; -fx-font-weight: bold;
+     -fx-text-fill: -navy-900; }
 .gauge-card            { -fx-padding: 16; -fx-min-height: 230; }
 
 /* ---------- Academic Calendar (Student "My Calendar" / Admin "Academic Calendar") ----------
@@ -854,6 +990,7 @@
     -fx-background-color: -navy-900;
     -fx-text-fill: white;
     -fx-font-weight: bold;
+    
     -fx-font-size: 12px;
     -fx-border-color: -navy-900;
 }
@@ -862,6 +999,7 @@
 
 .week-number-cell {
     -fx-font-weight: bold;
+    
     -fx-text-fill: -navy-900;
     -fx-background-color: #eef1f8;
     -fx-font-size: 12px;
@@ -887,6 +1025,7 @@
     -fx-padding: 2 8 2 8;
     -fx-text-fill: white;
     -fx-font-weight: bold;
+    
 }
 .week-day-number.week-day-inactive { -fx-opacity: 0.45; }
 /* Yellow holiday background needs dark text to stay readable, unlike every other type's white text. */
@@ -905,7 +1044,8 @@
     -fx-padding: 16;
     -fx-min-width: 190;
 }
-.legend-title  { -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: -navy-900; -fx-padding: 0 0 4 0; }
+.legend-title  { -fx-font-size: 13px; -fx-font-weight: bold;
+     -fx-text-fill: -navy-900; -fx-padding: 0 0 4 0; }
 .legend-row    { -fx-alignment: center-left; }
 .legend-swatch { -fx-min-width: 14; -fx-min-height: 14; -fx-max-width: 14; -fx-max-height: 14;
                  -fx-background-radius: 4; }
@@ -932,6 +1072,7 @@
 .notif-high-absence-title {
     -fx-text-fill: #991b1b;
     -fx-font-weight: bold;
+    
 }
 
 .tt-exam {
@@ -943,6 +1084,10 @@
 .tt-exam .timetable-block-title {
     -fx-text-fill: #9a3412;
     -fx-font-weight: bold;
+    
 }
 
 .notification-list .scroll-bar:horizontal { -fx-opacity: 0; -fx-pref-height: 0; -fx-max-height: 0; }
+
+
+

@@ -195,6 +195,38 @@ public class AIAssistantService {
         return generalAiService.respond(message);
     }
 
+    /**
+     * Answers a question about an attachment picked with the panel's "+" button. An attachment is
+     * never a university-data lookup, so — unlike {@link #respond} — this never touches the
+     * intent-matching above and goes straight to {@link GeneralAIService}; it still requires an
+     * active session, matching {@link #respond}'s own authorization guard.
+     *
+     * <p>May perform a blocking network call — callers must not invoke this on the JavaFX
+     * Application Thread.</p>
+     */
+    public String respondToImage(String message, byte[] imageBytes, String mimeType) {
+        if (!Session.isActive()) {
+            return UNAUTHORIZED;
+        }
+        try {
+            return generalAiService.respondAboutImage(message, imageBytes, mimeType);
+        } catch (RuntimeException e) {
+            return "I couldn't analyze that image right now. Please try again.";
+        }
+    }
+
+    /** Document counterpart of {@link #respondToImage}; see that method's Javadoc. */
+    public String respondToDocument(String message, String documentText, String fileName) {
+        if (!Session.isActive()) {
+            return UNAUTHORIZED;
+        }
+        try {
+            return generalAiService.respondAboutDocument(message, documentText, fileName);
+        } catch (RuntimeException e) {
+            return "I couldn't read that document right now. Please try again.";
+        }
+    }
+
     // ======================================================================
     // STUDENT
     // ======================================================================
