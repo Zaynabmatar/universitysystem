@@ -16,6 +16,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -81,7 +82,38 @@ public class GeneralAIService {
                     + "schedule, or any other private university data — if asked, say you can't "
                     + "see that and suggest they ask the assistant directly.";
 
+    /** Used by {@link #respondAboutImage}: same ground rules as {@link #SYSTEM_INSTRUCTION}, plus
+     *  the instruction to actually look at the attached image. */
+    private static final String IMAGE_SYSTEM_INSTRUCTION =
+            "You are the general-knowledge half of a university system's AI assistant. The user "
+                    + "has attached an image. Look at it carefully and answer their question about "
+                    + "it, or describe/analyze it if they did not ask a specific question. You have "
+                    + "no access to this university's database, so never claim to know the asker's "
+                    + "personal records, grades, schedule, or any other private university data.";
+
+    /** Used by {@link #respondAboutDocument}: same ground rules as {@link #SYSTEM_INSTRUCTION},
+     *  plus the instruction to ground the answer in the attached document's own text. */
+    private static final String DOCUMENT_SYSTEM_INSTRUCTION =
+            "You are the general-knowledge half of a university system's AI assistant. The user "
+                    + "has attached a document; its extracted text follows the question, delimited "
+                    + "by triple quotes. Answer their question using that text, or summarize it if "
+                    + "they did not ask a specific question. If the answer isn't in the document, "
+                    + "say so rather than guessing. You have no access to this university's "
+                    + "database, so never claim to know the asker's personal records, grades, "
+                    + "schedule, or any other private university data.";
+
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(8);
+
+    /** Image/document requests carry a much larger payload (base64 image data, or a whole
+     *  document's text) and can take Gemini noticeably longer to read and answer than a short
+     *  chat message, so they get a longer per-request timeout than {@link #REQUEST_TIMEOUT}. */
+    private static final Duration ATTACHMENT_REQUEST_TIMEOUT = Duration.ofSeconds(30);
+
+    /** Roughly 15k tokens' worth of document text — comfortably inside every {@link #MODELS}
+     *  entry's context window while keeping the request small. Longer documents are truncated
+     *  with a trailing note rather than rejected outright, so a question about the first part of
+     *  a long PDF still works. */
+    private static final int MAX_DOCUMENT_CHARS = 60_000;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(REQUEST_TIMEOUT)
@@ -92,6 +124,41 @@ public class GeneralAIService {
      * cannot be reached or the key is not configured.
      */
     public String respond(String message) {
+        return callGemini(buildRequestBody(message), REQUEST_TIMEOUT);
+    }
+
+    /**
+     * Answers a question about an attached image with Gemini's vision understanding — the image
+     * bytes are sent inline (base64) alongside the question, exactly like {@link #respond} except
+     * for the extra {@code inlineData} part and a longer timeout (see {@link
+     * #ATTACHMENT_REQUEST_TIMEOUT}). {@code mimeType} must be one of the types Gemini accepts for
+     * inline images (e.g. {@code image/png}, {@code image/jpeg}, {@code image/webp}).
+     */
+    public String respondAboutImage(String message, byte[] imageBytes, String mimeType) {
+        String prompt = (message == null || message.isBlank())
+                ? "Describe this image in detail." : message;
+        return callGemini(buildImageRequestBody(prompt, imageBytes, mimeType), ATTACHMENT_REQUEST_TIMEOUT);
+    }
+
+    /**
+     * Answers a question about an attached document's already-extracted text (see {@link
+     * com.university.util.DocumentTextExtractor}) — the text is embedded directly in the prompt
+     * rather than uploaded as a file, so this works the same for a PDF or a Word document once
+     * the text has been pulled out of it.
+     */
+    public String respondAboutDocument(String message, String documentText, String fileName) {
+        String prompt = (message == null || message.isBlank())
+                ? "Summarize this document and highlight its key points." : message;
+        return callGemini(buildDocumentRequestBody(prompt, documentText, fileName), ATTACHMENT_REQUEST_TIMEOUT);
+    }
+
+    /**
+     * Shared request/retry/fail-over logic for {@link #respond}, {@link #respondAboutImage} and
+     * {@link #respondAboutDocument} — only the request body and per-request timeout differ between
+     * them; the model fail-over policy described on {@link #MODELS} applies identically to all
+     * three.
+     */
+    private String callGemini(String requestBody, Duration timeout) {
         String apiKey = resolveApiKey();
         if (apiKey == null || apiKey.isBlank()) {
             return UNAVAILABLE_MESSAGE;
@@ -102,7 +169,7 @@ public class GeneralAIService {
                 boolean isLastModel = i == MODELS.length - 1;
                 HttpResponse<String> response;
                 try {
-                    response = send(message, apiKey, model);
+                    response = send(requestBody, apiKey, model, timeout);
                 } catch (HttpTimeoutException e) {
                     if (isLastModel) {
                         LOG.warn("Gemini model {} timed out; no more models to try.", model);
@@ -140,13 +207,13 @@ public class GeneralAIService {
     }
 
     /** One HTTP attempt against the given Gemini model. Never logs the API key (it is in the URI). */
-    private HttpResponse<String> send(String message, String apiKey, String model)
+    private HttpResponse<String> send(String requestBody, String apiKey, String model, Duration timeout)
             throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(endpointFor(model) + "?key=" + apiKey))
-                .timeout(REQUEST_TIMEOUT)
+                .timeout(timeout)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(buildRequestBody(message)))
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
@@ -250,6 +317,52 @@ public class GeneralAIService {
                 .put("contents", new JSONArray().put(userContent))
                 .put("systemInstruction", systemContent);
         return body.toString();
+    }
+
+    /** Text part (the question) plus an {@code inlineData} part (the base64 image) — Gemini's
+     *  standard shape for "look at this image" requests. */
+    private static String buildImageRequestBody(String message, byte[] imageBytes, String mimeType) {
+        JSONObject textPart = new JSONObject().put("text", message);
+        JSONObject imagePart = new JSONObject().put("inlineData", new JSONObject()
+                .put("mimeType", mimeType)
+                .put("data", Base64.getEncoder().encodeToString(imageBytes)));
+        JSONObject userContent = new JSONObject()
+                .put("role", "user")
+                .put("parts", new JSONArray().put(textPart).put(imagePart));
+
+        JSONObject systemContent = new JSONObject()
+                .put("parts", new JSONArray().put(new JSONObject().put("text", IMAGE_SYSTEM_INSTRUCTION)));
+
+        return new JSONObject()
+                .put("contents", new JSONArray().put(userContent))
+                .put("systemInstruction", systemContent)
+                .toString();
+    }
+
+    /** The document's extracted text is embedded directly in the user turn, delimited so Gemini
+     *  can tell it apart from the actual question (see {@link #DOCUMENT_SYSTEM_INSTRUCTION}). */
+    private static String buildDocumentRequestBody(String message, String documentText, String fileName) {
+        String combined = "Document (" + fileName + "):\n\"\"\"\n"
+                + truncateForPrompt(documentText) + "\n\"\"\"\n\nQuestion: " + message;
+        JSONObject userPart = new JSONObject().put("text", combined);
+        JSONObject userContent = new JSONObject()
+                .put("role", "user")
+                .put("parts", new JSONArray().put(userPart));
+
+        JSONObject systemContent = new JSONObject()
+                .put("parts", new JSONArray().put(new JSONObject().put("text", DOCUMENT_SYSTEM_INSTRUCTION)));
+
+        return new JSONObject()
+                .put("contents", new JSONArray().put(userContent))
+                .put("systemInstruction", systemContent)
+                .toString();
+    }
+
+    private static String truncateForPrompt(String documentText) {
+        if (documentText.length() <= MAX_DOCUMENT_CHARS) {
+            return documentText;
+        }
+        return documentText.substring(0, MAX_DOCUMENT_CHARS) + "\n[... document truncated ...]";
     }
 
     /** The concatenated text of the first candidate's parts, or null when none can be found. */

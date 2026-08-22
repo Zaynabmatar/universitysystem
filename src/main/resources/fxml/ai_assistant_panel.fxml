@@ -9,6 +9,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.SVGPath?>
 
 <!-- ===== University AI Assistant — shared chat panel, included by student/instructor/admin
      screens via fx:include. See AIAssistantPanelController; each host calls configure() with a
@@ -39,9 +40,34 @@
     <Label fx:id="typingIndicatorLabel" text="AI is typing..." styleClass="ai-typing-indicator"
            visible="false" managed="false"/>
 
+    <!-- Selected attachment preview — shown only while a Photo/PDF/Document is attached and not
+         yet sent; #handleRemoveAttachment clears it without sending anything. -->
+    <HBox fx:id="attachmentPreviewBox" spacing="6" alignment="CENTER_LEFT"
+          styleClass="ai-attachment-chip" visible="false" managed="false">
+        <Label fx:id="attachmentNameLabel" styleClass="ai-attachment-chip-label"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="attachmentRemoveButton" text="✕" onAction="#handleRemoveAttachment"
+                styleClass="ai-attachment-remove-btn"/>
+    </HBox>
+
     <HBox spacing="8" alignment="CENTER">
+        <Button fx:id="attachButton" onAction="#handleAttachClick" styleClass="ai-attach-btn">
+            <graphic>
+                <!-- Standard "plus" glyph, matching the mic icon's stroke weight/scale. -->
+                <SVGPath styleClass="ai-attach-icon" scaleX="0.68" scaleY="0.68"
+                         content="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/>
+            </graphic>
+        </Button>
         <TextField fx:id="chatInputField" promptText="Ask the University AI Assistant..."
                    styleClass="ai-chat-input" HBox.hgrow="ALWAYS" onAction="#handleSendMessage"/>
+        <Button fx:id="micButton" onAction="#handleVoiceInput" styleClass="ai-mic-btn">
+            <graphic>
+                <!-- Standard solid microphone glyph (capsule head + cradle + stand), the same
+                     shape used by most messaging apps' voice-input buttons. -->
+                <SVGPath styleClass="ai-mic-icon" scaleX="0.68" scaleY="0.68"
+                         content="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </graphic>
+        </Button>
         <Button fx:id="sendButton" text="Send" onAction="#handleSendMessage" styleClass="ai-send-btn"/>
     </HBox>
 </VBox>
