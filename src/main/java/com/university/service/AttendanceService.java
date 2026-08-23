@@ -154,28 +154,17 @@ public class AttendanceService {
                 attendanceDao.upsert(connection, record);
 
                 if (newAbsence) {
-                    notificationService.notify(
-                            connection,
-                            row.getStudentUserId(),
-                            NotificationType.WARNING,
-                            "Attendance Notice",
-                            "You were marked absent in " + row.getSectionLabel()
-                                    + " on " + classDate + ".",
-                            "attendance_records",
-                            null
-                    );
-
                     int totalAbsences = attendanceDao
                             .countAbsencesForEnrollment(connection, row.getEnrollmentId());
 
-                    if (totalAbsences == 4) {
+                    if (totalAbsences <= 4) {
                         notificationService.notify(
                                 connection,
                                 row.getStudentUserId(),
-                                NotificationType.WARNING,
-                                "Attendance Warning",
-                                "You have reached 4 absences in " + row.getSectionLabel()
-                                        + ". Your absences are becoming high. Please attend your upcoming classes regularly.",
+                                NotificationType.INFO,
+                                "Attendance Notice",
+                                "You were marked absent in " + row.getSectionLabel()
+                                        + " on " + classDate + ".",
                                 "attendance_records",
                                 null
                         );
@@ -186,7 +175,7 @@ public class AttendanceService {
                                 NotificationType.WARNING,
                                 "High Absence Warning",
                                 "You have reached 5 absences in " + row.getSectionLabel()
-                                        + ". Frequent absences may affect your attendance grade. Please review your attendance.",
+                                        + ". Your absences are becoming high.",
                                 "attendance_records",
                                 null
                         );

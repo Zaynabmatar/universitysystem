@@ -98,6 +98,15 @@ public class NotificationDAO extends AbstractDAO implements GenericDAO<Notificat
                 userId, entityType, entityId, title) > 0;
     }
 
+    /** Removes one notification event for a related record. */
+    public int deleteForEntityAndTitle(String entityType, int entityId, String title) {
+        return executeUpdate(
+                "DELETE FROM dbo.notifications "
+                        + "WHERE related_entity_type = ? "
+                        + "AND related_entity_id = ? "
+                        + "AND title = ?",
+                entityType, entityId, title);
+    }
     /** Marks one item as seen. */
     public boolean markRead(int notificationId) {
         return executeUpdate("UPDATE dbo.notifications SET is_read = 1 WHERE notification_id = ?",
@@ -167,4 +176,5 @@ public class NotificationDAO extends AbstractDAO implements GenericDAO<Notificat
         };
     }
 }
+
 

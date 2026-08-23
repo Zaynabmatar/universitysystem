@@ -3,6 +3,7 @@ package com.university.controller;
 import com.university.controller.dialog.SemesterFormDialog;
 import com.university.enums.UserRole;
 import com.university.model.Semester;
+import com.university.service.EvaluationWindowOpenException;
 import com.university.service.SemesterService;
 import com.university.service.ServiceException;
 import com.university.service.Session;
@@ -216,6 +217,32 @@ public class AdminSemestersController {
             semesterService.setCurrent(selected.getSemesterId());
             reload();
             AlertUtil.success("Current semester changed", selected.getSemesterName() + " is now the current semester.");
+        } catch (EvaluationWindowOpenException ewe) {
+            handleEvaluationWindowStillOpen(selected, ewe);
+        } catch (ServiceException se) {
+            AlertUtil.warn("Cannot change the current semester", se.getMessage());
+        } catch (Exception e) {
+            AlertUtil.error("Could not change the current semester", "The current semester could not be changed.", e);
+        }
+    }
+
+    /**
+     * The "warn, then let the Admin confirm closing it" step: a different semester's evaluation
+     * period is still open, so {@link SemesterService#setCurrent(int)} refused to activate
+     * {@code selected} silently. Offers to close that window automatically and retry — there must
+     * never be an old semester's evaluation period still open once a new semester becomes current.
+     */
+    private void handleEvaluationWindowStillOpen(Semester selected, EvaluationWindowOpenException ewe) {
+        boolean closeAndProceed = AlertUtil.confirm("Evaluation period still open",
+                ewe.getMessage() + "\n\nClose it now and make " + selected.getSemesterName()
+                + " the current semester?");
+        if (!closeAndProceed) return;
+
+        try {
+            semesterService.setCurrent(selected.getSemesterId(), true);
+            reload();
+            AlertUtil.success("Current semester changed", selected.getSemesterName()
+                    + " is now the current semester. The previous evaluation period was closed.");
         } catch (ServiceException se) {
             AlertUtil.warn("Cannot change the current semester", se.getMessage());
         } catch (Exception e) {

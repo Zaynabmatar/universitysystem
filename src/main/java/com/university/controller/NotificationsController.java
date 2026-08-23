@@ -40,7 +40,6 @@ public class NotificationsController {
     @FXML
     private void initialize() {
         notificationList.setPlaceholder(new Label("You have no notifications yet."));
-        notificationList.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> e.consume());
         notificationList.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(Notification n, boolean empty) {
@@ -139,6 +138,7 @@ public class NotificationsController {
         ((Stage) closeButton.getScene().getWindow()).close();
     }
 }
+
 
 
 

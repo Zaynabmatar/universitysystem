@@ -5,6 +5,8 @@ import com.university.dao.SemesterDAO;
 import com.university.dao.TuitionInstallmentDAO;
 import com.university.model.Semester;
 
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -20,6 +22,9 @@ import java.util.List;
  * every later phase (registration, drops, grading) reads its dates.</p>
  */
 public class SemesterService {
+
+    /** How many days after a semester ends the instructor evaluation window may run at the latest. */
+    public static final int EVALUATION_WINDOW_DAYS = 21;
 
     private final SemesterDAO semesterDao = new SemesterDAO();
     private final SectionDAO sectionDao = new SectionDAO();
@@ -72,6 +77,8 @@ public class SemesterService {
                     + " is still open. Close it first.");
         }
         requireNoDateOverlap(semester, null);
+        applyEvaluationDefaults(semester);
+        requireValidEvaluationWindow(semester);
         semester.setCurrent(false);
         return semesterDao.insert(semester);
     }
@@ -79,6 +86,8 @@ public class SemesterService {
     public void update(Semester semester) {
         requireUniqueName(semester.getSemesterName(), semester.getSemesterId());
         requireNoDateOverlap(semester, semester.getSemesterId());
+        applyEvaluationDefaults(semester);
+        requireValidEvaluationWindow(semester);
         semesterDao.update(semester);
 
         java.time.LocalDate firstDue = semester.getStartDate().plusWeeks(1);
@@ -124,15 +133,62 @@ public class SemesterService {
      * refused again — this time unconditionally — by {@code trg_semesters_enforce_single_open} if
      * this check is ever bypassed. The database, not just this service, is the real guard.</p>
      *
+     * <p>Equivalent to {@code setCurrent(semesterId, false)} — refuses (rather than silently
+     * closing) any other semester whose instructor evaluation window is still open. See
+     * {@link #setCurrent(int, boolean)}.</p>
+     *
      * @throws ServiceException when a different semester is already current
+     * @throws EvaluationWindowOpenException when another semester's evaluation window is still open
      */
     public void setCurrent(int semesterId) {
+        setCurrent(semesterId, false);
+    }
+
+    /**
+     * Same as {@link #setCurrent(int)}, but also decides what happens when another semester's
+     * instructor evaluation window ({@code evaluation_start}/{@code evaluation_end}) is still open
+     * right now: there must never be an old semester's evaluation period still open once a new
+     * semester becomes current.
+     *
+     * @param closeOpenEvaluationWindows when false (the default via {@link #setCurrent(int)}), an
+     *                                   open window on another semester refuses the whole call with
+     *                                   {@link EvaluationWindowOpenException} instead of activating
+     *                                   {@code semesterId} silently; when true, every such window is
+     *                                   force-closed (its {@code evaluation_end} moved to now) first,
+     *                                   and {@code semesterId} then becomes current — the Admin's
+     *                                   explicit "close it for me" confirmation
+     * @throws ServiceException when a different semester is already current
+     * @throws EvaluationWindowOpenException when another semester's evaluation window is still open
+     *                                        and {@code closeOpenEvaluationWindows} is false
+     */
+    public void setCurrent(int semesterId, boolean closeOpenEvaluationWindows) {
         Semester target = requireSemester(semesterId);
         Semester current = getCurrentSemester();
         if (current != null && current.getSemesterId() != target.getSemesterId()) {
             throw new ServiceException(current.getSemesterName() + " is currently open. "
                     + "Close it before opening another semester.");
         }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<Semester> stillOpen = semesterDao.findAll().stream()
+                .filter(other -> other.getSemesterId() != target.getSemesterId())
+                .filter(other -> other.isEvaluationOpen(now))
+                .toList();
+
+        if (!stillOpen.isEmpty()) {
+            if (!closeOpenEvaluationWindows) {
+                String names = stillOpen.stream().map(Semester::getSemesterName)
+                        .collect(java.util.stream.Collectors.joining(", "));
+                throw new EvaluationWindowOpenException(stillOpen,
+                        "The instructor evaluation period for " + names + " is still open. "
+                        + "It must be closed before " + target.getSemesterName()
+                        + " can become the current semester.");
+            }
+            for (Semester s : stillOpen) {
+                semesterDao.closeEvaluationWindow(s.getSemesterId(), now);
+            }
+        }
+
         semesterDao.makeCurrent(semesterId);
     }
 
@@ -148,6 +204,64 @@ public class SemesterService {
             throw new ServiceException("There is no open semester to close.");
         }
         semesterDao.closeCurrent();
+    }
+
+    /**
+     * Fills in {@code evaluation_start}/{@code evaluation_end} when the caller left them blank,
+     * so every semester gets an instructor evaluation window without the Admin having to set one
+     * by hand: start defaults to the semester's own start date, end defaults to the latest this
+     * semester is ever allowed to run ({@link #maxEvaluationEnd}).
+     */
+    private void applyEvaluationDefaults(Semester semester) {
+        if (semester.getEvaluationStart() == null) {
+            semester.setEvaluationStart(semester.getStartDate().atStartOfDay());
+        }
+        if (semester.getEvaluationEnd() == null) {
+            semester.setEvaluationEnd(maxEvaluationEnd(semester));
+        }
+    }
+
+    /**
+     * The latest moment this semester's evaluation window may end: {@link #EVALUATION_WINDOW_DAYS}
+     * days after the semester itself ends, pulled in earlier when the next semester (by start date)
+     * already begins before that, so two semesters' evaluation windows can never overlap.
+     *
+     * <p>{@code semester.getSemesterId()} is 0 for a not-yet-inserted semester, which excludes
+     * nothing here since no stored row ever has that id — so this same lookup works unchanged for
+     * both {@link #create} and {@link #update}.</p>
+     */
+    private LocalDateTime maxEvaluationEnd(Semester semester) {
+        LocalDateTime hardCap = semester.getEndDate().plusDays(EVALUATION_WINDOW_DAYS).atTime(23, 59, 59);
+        return semesterDao.findAll().stream()
+                .filter(other -> other.getSemesterId() != semester.getSemesterId())
+                .filter(other -> other.getStartDate().isAfter(semester.getEndDate()))
+                .map(Semester::getStartDate)
+                .min(Comparator.naturalOrder())
+                .map(nextStart -> nextStart.atStartOfDay().minusSeconds(1))
+                .filter(latestBeforeNext -> latestBeforeNext.isBefore(hardCap))
+                .orElse(hardCap);
+    }
+
+    /**
+     * Section requirement: evaluation_end must be after evaluation_start, and never later than
+     * {@link #maxEvaluationEnd} — replaces the old "must fall within the semester dates" rule,
+     * which forbade the whole point of a window that runs past the semester's own end date.
+     */
+    private void requireValidEvaluationWindow(Semester semester) {
+        LocalDateTime start = semester.getEvaluationStart();
+        LocalDateTime end = semester.getEvaluationEnd();
+        if (start == null || end == null) {
+            throw new ValidationException("Instructor evaluation start and end are required.");
+        }
+        if (!end.isAfter(start)) {
+            throw new ValidationException("Evaluation end must be after evaluation start.");
+        }
+        LocalDateTime maxEnd = maxEvaluationEnd(semester);
+        if (end.isAfter(maxEnd)) {
+            throw new ServiceException("Evaluation end cannot be later than " + maxEnd + " for "
+                    + semester.getSemesterName() + " — at most " + EVALUATION_WINDOW_DAYS
+                    + " days after the semester ends, and always before the next semester begins.");
+        }
     }
 
     private void requireUniqueName(String semesterName, Integer excludeId) {

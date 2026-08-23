@@ -124,6 +124,13 @@ public final class SemesterFormDialog extends Dialog<Semester> {
         box.setMinHeight(Region.USE_PREF_SIZE);
         getDialogPane().setContent(box);
 
+        // In add mode, keep the evaluation window pre-filled with its default (start date /
+        // end date + 21 days) as the admin edits the term dates, right up until they type into
+        // the evaluation fields themselves — SemesterService applies the same default again on
+        // save regardless, this is purely so the dialog does not show blank fields meanwhile.
+        startDatePicker.valueProperty().addListener((obs, old, val) -> defaultEvaluationStartIfUntouched());
+        endDatePicker.valueProperty().addListener((obs, old, val) -> defaultEvaluationEndIfUntouched());
+
         if (editMode) {
             fillFromModel(existing);
         } else {
@@ -169,6 +176,30 @@ public final class SemesterFormDialog extends Dialog<Semester> {
         withdrawDeadlinePicker.setValue(today.plusDays(60));
         gradeEntryStartPicker.setValue(today.plusDays(90));
         gradeEntryEndPicker.setValue(today.plusDays(97));
+    }
+
+    /** Mirrors {@code SemesterService}'s default: evaluation start = semester start date. */
+    private void defaultEvaluationStartIfUntouched() {
+        if (editMode || evaluationStartDatePicker.getValue() != null
+                || !ValidationUtil.isBlank(evaluationStartTimeField.getText())) {
+            return;
+        }
+        LocalDate start = startDatePicker.getValue();
+        if (start == null) return;
+        evaluationStartDatePicker.setValue(start);
+        evaluationStartTimeField.setText("00:00");
+    }
+
+    /** Mirrors {@code SemesterService}'s default: evaluation end = semester end date + 21 days. */
+    private void defaultEvaluationEndIfUntouched() {
+        if (editMode || evaluationEndDatePicker.getValue() != null
+                || !ValidationUtil.isBlank(evaluationEndTimeField.getText())) {
+            return;
+        }
+        LocalDate end = endDatePicker.getValue();
+        if (end == null) return;
+        evaluationEndDatePicker.setValue(end.plusDays(21));
+        evaluationEndTimeField.setText("23:59");
     }
 
     private void fillFromModel(Semester s) {
@@ -298,9 +329,16 @@ public final class SemesterFormDialog extends Dialog<Semester> {
                 return mark(evaluationEndTimeField, "Evaluation must end after it starts.");
             }
 
-            if (evaluationStart.toLocalDate().isBefore(start)
-                    || evaluationEnd.toLocalDate().isAfter(end)) {
-                return "The instructor evaluation window must fall within the semester dates.";
+            // The window is free to run past the semester's own end date (that is the whole
+            // point — instructors are evaluated once the term is over), but never past 21 days
+            // after it. Whether it must be pulled in further still, so it ends before the next
+            // semester starts, needs the other semesters' dates and is enforced by
+            // SemesterService when the dialog's result is saved, the same way a term-date
+            // overlap with another semester is.
+            LocalDateTime latestEnd = end.plusDays(21).atTime(23, 59, 59);
+            if (evaluationEnd.isAfter(latestEnd)) {
+                return mark(evaluationEndDatePicker, "Evaluation end cannot be later than 21 days "
+                        + "after the semester ends (" + latestEnd.toLocalDate() + ").");
             }
         }
         return null;

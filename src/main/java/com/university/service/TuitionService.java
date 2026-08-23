@@ -50,20 +50,7 @@ public class TuitionService {
 
     private static final BigDecimal FALLBACK_USD_RATE = new BigDecimal("100.00");
     private static final BigDecimal FALLBACK_LBP_RATE = new BigDecimal("300000");
-    private static final int FALLBACK_INSTALLMENTS = 3;
-
-    /**
-     * Installment #1 and #2 of this one semester are pinned to these exact dates -- a fixed,
-     * one-off exception that must hold even if this semester's own start/end dates are edited
-     * afterward, so any newly-billed student is generated with the same dates the rest of the
-     * semester already has. Not a general rule for every semester; see
-     * {@link TuitionInstallmentDAO#rescheduleUnpaidForSemester}.
-     */
-    private static final int FIXED_DUE_DATE_SEMESTER_ID = 19;
-    private static final LocalDate FIXED_INSTALLMENT_1_DUE = LocalDate.of(2026, 8, 8);
-    private static final LocalDate FIXED_INSTALLMENT_2_DUE = LocalDate.of(2026, 8, 15);
-
-    private final TuitionRateDAO rateDao = new TuitionRateDAO();
+    private static final int FALLBACK_INSTALLMENTS = 3;private final TuitionRateDAO rateDao = new TuitionRateDAO();
     private final TuitionInstallmentDAO installmentDao = new TuitionInstallmentDAO();
     private final EnrollmentDAO enrollmentDao = new EnrollmentDAO();
     private final SectionDAO sectionDao = new SectionDAO();
@@ -144,7 +131,6 @@ public class TuitionService {
         // matters: read the affected rows before refreshDelinquency touches them, or the penalty
         // is already on the row by the time anyone looks and the notice can only ever say
         // "has been added" after the fact.
-        notifyPendingPenalty(installmentDao.findPendingPenalty(semester.getSemesterId()));
         installmentDao.refreshDelinquency(semester.getSemesterId());
 
         record RawCharge(String courseCode, String courseTitle, int credits, BigDecimal usd, BigDecimal lbp) {
@@ -451,7 +437,6 @@ String title = "Payment Overdue";
         // to OVERDUE as a side effect of one student's own bill being computed, so without this a
         // semester nobody happened to log into yet would still read UNPAID here even past its due
         // date, and every student in it would silently get skipped below.
-        notifyPendingPenalty(installmentDao.findPendingPenalty());
         installmentDao.refreshDelinquency();
 
         for (TuitionInstallment installment : installmentDao.findAll()) {
@@ -572,7 +557,7 @@ String title = "Payment Overdue";
     private List<TuitionInstallment> generateInstallments(int studentId, Semester semester, TuitionRate rate,
                                                            BigDecimal totalUsd, BigDecimal totalLbp) {
         int count = rate.getInstallmentCount() > 0 ? rate.getInstallmentCount() : FALLBACK_INSTALLMENTS;
-        LocalDate firstDue = LocalDate.now().plusMonths(1).withDayOfMonth(10);
+        LocalDate firstDue = semester.getStartDate().plusWeeks(1);
 
         Connection connection = transactions.beginTransaction();
         try {
@@ -626,16 +611,7 @@ String title = "Payment Overdue";
         return rows;
     }
 
-    /** {@link #FIXED_INSTALLMENT_1_DUE} / {@link #FIXED_INSTALLMENT_2_DUE} override the normal formula, only for {@link #FIXED_DUE_DATE_SEMESTER_ID}. */
     private static LocalDate dueDateFor(Semester semester, int installmentNo, LocalDate firstDue) {
-        if (semester.getSemesterId() == FIXED_DUE_DATE_SEMESTER_ID) {
-            if (installmentNo == 1) {
-                return FIXED_INSTALLMENT_1_DUE;
-            }
-            if (installmentNo == 2) {
-                return FIXED_INSTALLMENT_2_DUE;
-            }
-        }
         return firstDue.plusMonths(installmentNo - 1);
     }
 
@@ -668,6 +644,11 @@ String title = "Payment Overdue";
         return rate;
     }
 }
+
+
+
+
+
 
 
 

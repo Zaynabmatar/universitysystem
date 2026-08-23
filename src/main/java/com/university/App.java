@@ -71,6 +71,15 @@ public class App extends Application {
             MigrationException migrationFailure =
                     connectionFailure == null ? applyPendingMigrations() : null;
 
+            if (connectionFailure == null && migrationFailure == null) {
+                try {
+                    new com.university.service.TuitionService()
+                            .refreshPaymentNotificationsForAllStudents();
+                } catch (Throwable paymentRefreshFailure) {
+                    paymentRefreshFailure.printStackTrace();
+                }
+            }
+
             Platform.runLater(() -> {
                 Platform.setImplicitExit(true);
                 if (connectionFailure != null) {
@@ -207,3 +216,4 @@ public class App extends Application {
     }
 
 }
+

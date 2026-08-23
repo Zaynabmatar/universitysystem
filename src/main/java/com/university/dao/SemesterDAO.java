@@ -160,6 +160,19 @@ public class SemesterDAO extends AbstractDAO implements GenericDAO<Semester> {
     }
 
     /**
+     * Force-ends one semester's instructor evaluation window right now, so it no longer reads as
+     * open — the Admin's "close it for me" confirmation in
+     * {@link com.university.service.SemesterService#setCurrent(int, boolean)}.
+     *
+     * @return true when the semester still had an evaluation window to close
+     */
+    public boolean closeEvaluationWindow(int semesterId, java.time.LocalDateTime closedAt) {
+        return executeUpdate("UPDATE dbo.semesters SET evaluation_end = ? "
+                + "WHERE semester_id = ? AND evaluation_end IS NOT NULL AND evaluation_end > ?",
+                closedAt, semesterId, closedAt) > 0;
+    }
+
+    /**
      * SQL Server wraps a trigger's {@code THROW} message inside its own
      * "The transaction ended in the trigger..." wrapper; this pulls the
      * trigger's own sentence back out so the screen can show it instead of

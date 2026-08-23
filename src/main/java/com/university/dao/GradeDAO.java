@@ -309,19 +309,19 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 // Each component is revealed the moment its OWN publish flag is set, or once the
                 // whole row is submitted (submission always implied full visibility, unchanged) --
                 // this is what lets Coursework/Midterm show up before Final even exists. Midterm is
-                // never gated by the evaluation; every other final-stage column is.
+                // never gated by the evaluation; the other final-stage columns require evaluation while the window is open.
                 // Once submitted, the raw mark IS the final truth (no further draft edit is
                 // possible without an Admin Unlock, which itself does not touch these columns).
                 // Before that, only the snapshot frozen at the last Publish is shown -- the raw
                 // mark column keeps moving with every Save Draft, whether or not this component
                 // has ever been published, so it must never be read directly here.
-                + "CASE WHEN (g.is_submitted = 1 OR g.coursework_published = 1) AND ev.evaluation_done = 1 "
+                + "CASE WHEN (g.is_submitted = 1 OR g.coursework_published = 1) AND (ev.evaluation_done = 1 OR (sem.evaluation_end IS NOT NULL AND SYSDATETIME() > sem.evaluation_end)) "
                 + "     THEN CASE WHEN g.is_submitted = 1 THEN g.coursework_mark ELSE g.coursework_published_mark END "
                 + "     END AS coursework_mark, "
                 + "CASE WHEN g.is_submitted = 1 OR g.midterm_published    = 1 "
                 + "     THEN CASE WHEN g.is_submitted = 1 THEN g.midterm_mark ELSE g.midterm_published_mark END "
                 + "     END AS midterm_mark, "
-                + "CASE WHEN (g.is_submitted = 1 OR g.lab_published = 1) AND ev.evaluation_done = 1 "
+                + "CASE WHEN (g.is_submitted = 1 OR g.lab_published = 1) AND (ev.evaluation_done = 1 OR (sem.evaluation_end IS NOT NULL AND SYSDATETIME() > sem.evaluation_end)) "
                 + "     THEN CASE WHEN g.is_submitted = 1 THEN g.lab_mark ELSE g.lab_published_mark END "
                 + "     END AS lab_mark, "
                 // Was the Lab ever actually released to this student? Kept separate from lab_mark
@@ -329,18 +329,18 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
                 // just went back to NULL) can be told apart from a Lab that was never graded at all
                 // (lab_published = 0) -- both otherwise read as the same NULL lab_mark.
                 + "ISNULL(g.lab_published, 0) AS lab_published, "
-                + "CASE WHEN (g.is_submitted = 1 OR g.final_published = 1) AND ev.evaluation_done = 1 "
+                + "CASE WHEN (g.is_submitted = 1 OR g.final_published = 1) AND (ev.evaluation_done = 1 OR (sem.evaluation_end IS NOT NULL AND SYSDATETIME() > sem.evaluation_end)) "
                 + "     THEN CASE WHEN g.is_submitted = 1 THEN g.final_mark ELSE g.final_published_mark END "
                 + "     END AS final_mark, "
                 // The course grade itself -- strictly BOTH conditions, no shortcut: the section
                 // must actually be submitted and locked (is_submitted = 1), never merely "every
                 // component happens to be published", and the student must have completed the
-                // instructor evaluation. Either one missing keeps it hidden.
-                + "CASE WHEN g.is_submitted = 1 AND ev.evaluation_done = 1 "
+                // instructor evaluation while that window is still open. After the evaluation deadline, the grade is released automatically.
+                + "CASE WHEN g.is_submitted = 1 AND (ev.evaluation_done = 1 OR (sem.evaluation_end IS NOT NULL AND SYSDATETIME() > sem.evaluation_end)) "
                 + "     THEN g.total_mark   END AS total_mark, "
-                + "CASE WHEN g.is_submitted = 1 AND ev.evaluation_done = 1 "
+                + "CASE WHEN g.is_submitted = 1 AND (ev.evaluation_done = 1 OR (sem.evaluation_end IS NOT NULL AND SYSDATETIME() > sem.evaluation_end)) "
                 + "     THEN g.letter_grade END AS letter_grade, "
-                + "CASE WHEN g.is_submitted = 1 AND ev.evaluation_done = 1 "
+                + "CASE WHEN g.is_submitted = 1 AND (ev.evaluation_done = 1 OR (sem.evaluation_end IS NOT NULL AND SYSDATETIME() > sem.evaluation_end)) "
                 + "     THEN g.grade_points END AS grade_points "
                 + "FROM dbo.enrollments e "
                 + "INNER JOIN dbo.sections s ON s.section_id = e.section_id "
@@ -666,6 +666,7 @@ public class GradeDAO extends AbstractDAO implements GenericDAO<Grade> {
         return entity.getResultStatus() == null ? null : entity.getResultStatus().toDb();
     }
 }
+
 
 
 

@@ -111,6 +111,10 @@ public class NotificationService {
         return notificationDao.countUnread(userId);
     }
 
+    /** Removes one notification event for a related record. */
+    public int removeForEntityAndTitle(String entityType, int entityId, String title) {
+        return notificationDao.deleteForEntityAndTitle(entityType, entityId, title);
+    }
     /** Marks one item as seen. */
     public boolean markRead(int notificationId) {
         return notificationDao.markRead(notificationId);
@@ -139,4 +143,5 @@ public class NotificationService {
         return notification;
     }
 }
+
 
