@@ -24,6 +24,9 @@ import java.util.Optional;
  *   <li>a {@code DROPPED} enrolment never appears (Section 6.4);</li>
  *   <li>a mark with {@code is_submitted = 0} is invisible — a student never sees a draft
  *       (Phase 11, rule G4);</li>
+ *   <li>a submitted mark still stays hidden until the student completes this enrollment's
+ *       instructor evaluation (or the evaluation window has closed) — the same gate
+ *       {@link GradeDAO#findStudentGradeRows} applies to My Grades;</li>
  *   <li>a {@code WITHDRAWN} enrolment shows the letter {@code W} with no marks and no points
  *       (Section 6.4);</li>
  *   <li>rows come back ordered by {@code semesters.start_date}, never by {@code semester_name} —
@@ -73,6 +76,16 @@ public class TranscriptDAO extends AbstractDAO {
           + "INNER JOIN dbo.programs p ON p.program_id = s.program_id "
           + "WHERE s.student_id = ?";
 
+    /**
+     * Same evaluation gate {@code GradeDAO.findStudentGradeRows} applies to the course's final
+     * result: BOTH the section submitted/locked ({@code is_submitted = 1}) AND the student having
+     * completed this enrollment's instructor evaluation, unless the evaluation window has already
+     * closed (Section 6.6 / GradeDAO). A grade hidden in My Grades for this reason must stay
+     * hidden on the Transcript too — this is that same condition, kept in sync on purpose.
+     */
+    private static final String EVALUATION_GATE =
+            "(ev.evaluation_done = 1 OR (sem.evaluation_end IS NOT NULL AND SYSDATETIME() > sem.evaluation_end))";
+
     private static final String SQL_ROWS =
             "SELECT sem.semester_id, sem.semester_name, sem.academic_year, sem.term, sem.start_date, "
           + "       c.course_id, c.course_code, c.course_title, c.credits, "
@@ -80,13 +93,13 @@ public class TranscriptDAO extends AbstractDAO {
           + "       CASE WHEN i.instructor_id IS NULL THEN NULL "
           + "            ELSE i.first_name + N' ' + i.last_name END AS instructor_name, "
           + "       e.enrollment_id, e.status, e.is_repeat, e.counts_in_gpa, "
-          + "       CASE WHEN e.status <> 'WITHDRAWN' AND g.is_submitted = 1 "
+          + "       CASE WHEN e.status <> 'WITHDRAWN' AND g.is_submitted = 1 AND " + EVALUATION_GATE + " "
           + "            THEN g.total_mark END AS total_mark, "
           + "       CASE WHEN e.status = 'WITHDRAWN' THEN N'W' "
-          + "            WHEN g.is_submitted = 1 THEN g.letter_grade END AS letter_grade, "
-          + "       CASE WHEN e.status <> 'WITHDRAWN' AND g.is_submitted = 1 "
+          + "            WHEN g.is_submitted = 1 AND " + EVALUATION_GATE + " THEN g.letter_grade END AS letter_grade, "
+          + "       CASE WHEN e.status <> 'WITHDRAWN' AND g.is_submitted = 1 AND " + EVALUATION_GATE + " "
           + "            THEN g.grade_points END AS grade_points, "
-          + "       CASE WHEN e.status <> 'WITHDRAWN' AND g.is_submitted = 1 "
+          + "       CASE WHEN e.status <> 'WITHDRAWN' AND g.is_submitted = 1 AND " + EVALUATION_GATE + " "
           + "            THEN g.grade_points * c.credits END AS quality_points "
           + "FROM dbo.enrollments e "
           + "INNER JOIN dbo.sections sec   ON sec.section_id  = e.section_id "
@@ -94,6 +107,9 @@ public class TranscriptDAO extends AbstractDAO {
           + "INNER JOIN dbo.courses c      ON c.course_id     = sec.course_id "
           + "LEFT JOIN  dbo.instructors i  ON i.instructor_id = sec.instructor_id "
           + "LEFT JOIN  dbo.grades g       ON g.enrollment_id = e.enrollment_id "
+          + "CROSS APPLY (SELECT CASE WHEN EXISTS ("
+          + "     SELECT 1 FROM dbo.instructor_evaluations ie "
+          + "     WHERE ie.enrollment_id = e.enrollment_id) THEN 1 ELSE 0 END AS evaluation_done) ev "
           + "WHERE e.student_id = ? AND e.status <> 'DROPPED' "
           + "ORDER BY sem.start_date, sem.semester_id, c.course_code";
 

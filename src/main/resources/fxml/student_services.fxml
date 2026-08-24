@@ -96,9 +96,10 @@
                     <Insets top="20" right="20" bottom="20" left="20"/>
                 </padding>
 
-                <Label text="My Requests" styleClass="section-title"/>
+                <Label fx:id="myRequestsTitleLabel" text="My Requests" styleClass="section-title"/>
                 <Separator/>
-                <Label text="You do not have any service requests yet." styleClass="muted-text"/>
+                <Label fx:id="noRequestsLabel" text="You do not have any service requests yet." styleClass="muted-text"/>
+                <VBox fx:id="requestsListBox" spacing="8"/>
             </VBox>
 
         </VBox>
