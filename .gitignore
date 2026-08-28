@@ -19,3 +19,6 @@ db.properties
 !db.properties.example
 .universitysystem/
 *.bak
+
+# Local Vosk speech recognition model
+vosk-model/
