@@ -244,6 +244,15 @@ erDiagram
         datetime updated_at
     }
 
+    STUDENT_SERVICE_REQUESTS {
+        int request_id PK
+        int student_id FK
+        string service_name
+        string status
+        string details
+        datetime submitted_at
+    }
+
     FEE_TYPES {
         int fee_type_id PK
         string fee_name UK
@@ -367,8 +376,8 @@ erDiagram
     PROGRAMS      ||--o{ PROGRAM_REQUIREMENTS    : specifies
     COURSES       ||--o{ PROGRAM_REQUIREMENTS    : required_by
 
-    COURSES       ||--o{ COURSE_PREREQUISITES    : has_prerequisite_entry
-    COURSES       ||--o{ COURSE_PREREQUISITES    : is_prerequisite_for
+    COURSES ||--o{ COURSE_PREREQUISITES : has_prerequisites
+    COURSES ||--o{ COURSE_PREREQUISITES : is_prerequisite_for
 
     USERS         ||--o| STUDENTS                : has_profile
     USERS         ||--o| INSTRUCTORS             : has_profile
@@ -392,6 +401,8 @@ erDiagram
     EVALUATION_QUESTIONS   ||--o{ EVALUATION_ANSWERS : answered_by
 
     SEMESTERS     ||--o{ CALENDAR_EVENTS         : has_event
+    STUDENTS      ||--o{ STUDENT_SERVICE_REQUESTS : requests
+
     SEMESTERS     ||--o| TUITION_RATES           : priced_by
     SEMESTERS     ||--o{ STUDENT_TUITION_INSTALLMENTS : due_in
     SEMESTERS     ||--o{ STUDENT_INVOICES        : billed_for
